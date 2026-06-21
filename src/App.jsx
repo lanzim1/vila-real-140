@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   collection, doc, onSnapshot, setDoc, addDoc, deleteDoc,
   getDocs, query, where, writeBatch
@@ -387,6 +389,97 @@ export default function App() {
     return Array.from(set).sort().reverse();
   };
 
+  // ── Exportação de Relatório em PDF ──
+  const exportarPDF = () => {
+    const docPdf = new jsPDF();
+    const X = 14;
+    const AZUL = [30, 58, 95];
+    let y = 18;
+
+    docPdf.setFontSize(17);
+    docPdf.setTextColor(...AZUL);
+    docPdf.text("Vila Real 140 — Relatório do Condomínio", X, y);
+    y += 7;
+    docPdf.setFontSize(10);
+    docPdf.setTextColor(107, 122, 141);
+    docPdf.text(`Período de referência: ${mesLabel(mesSel)}  ·  Gerado em ${new Date().toLocaleDateString("pt-BR")}`, X, y);
+    y += 10;
+
+    // Resumo financeiro
+    docPdf.setFontSize(12.5);
+    docPdf.setTextColor(...AZUL);
+    docPdf.text("Resumo Financeiro", X, y);
+    y += 5;
+    autoTable(docPdf, {
+      startY: y, margin: { left: X }, theme: "grid", styles: { fontSize: 9 }, headStyles: { fillColor: AZUL },
+      head: [["Indicador", "Valor"]],
+      body: [
+        ["Total de unidades", String(moradores.length)],
+        ["Pagamentos realizados", String(pagos)],
+        ["Pendentes / Atrasados", String(pendentes)],
+        ["Arrecadado", `R$ ${totalArrecadado.toFixed(2).replace(".",",")}`],
+        ["A receber", `R$ ${totalPendente.toFixed(2).replace(".",",")}`],
+      ],
+    });
+    y = docPdf.lastAutoTable.finalY + 12;
+
+    // Cobranças do mês
+    docPdf.setFontSize(12.5);
+    docPdf.setTextColor(...AZUL);
+    docPdf.text(`Cobranças — ${mesLabel(mesSel)}`, X, y);
+    y += 5;
+    const linhasCob = cobMes.map(c => {
+      const m = moradores.find(x => x.id === c.moradorId);
+      return [m?.unidade || "—", m?.nome || "—", c.status === "pago" ? "Pago" : "Pendente", c.dataPagamento || "—"];
+    });
+    autoTable(docPdf, {
+      startY: y, margin: { left: X }, theme: "grid", styles: { fontSize: 9 }, headStyles: { fillColor: AZUL },
+      head: [["Unidade", "Morador", "Status", "Data Pgto"]],
+      body: linhasCob.length ? linhasCob : [["—", "Nenhuma cobrança neste mês", "—", "—"]],
+    });
+    y = docPdf.lastAutoTable.finalY + 12;
+
+    // Despesas (Água/Luz) do mês
+    if (y > 250) { docPdf.addPage(); y = 18; }
+    docPdf.setFontSize(12.5);
+    docPdf.setTextColor(...AZUL);
+    docPdf.text(`Despesas (Água/Luz) — ${mesLabel(mesSel)}`, X, y);
+    y += 5;
+    const despesasMes = despesas.filter(d => d.mes === mesSel);
+    autoTable(docPdf, {
+      startY: y, margin: { left: X }, theme: "grid", styles: { fontSize: 9 }, headStyles: { fillColor: AZUL },
+      head: [["Tipo", "Descrição", "Valor", "Status"]],
+      body: despesasMes.length ? despesasMes.map(d => [
+        d.tipo === "agua" ? "Água" : d.tipo === "luz" ? "Luz" : "Outro",
+        d.descricao || "—",
+        `R$ ${d.valor.toFixed(2).replace(".",",")}`,
+        d.status === "pago" ? "Pago" : "Pendente",
+      ]) : [["—", "Nenhuma despesa neste mês", "—", "—"]],
+    });
+    y = docPdf.lastAutoTable.finalY + 12;
+
+    // Serviços concluídos
+    if (y > 230) { docPdf.addPage(); y = 18; }
+    docPdf.setFontSize(12.5);
+    docPdf.setTextColor(...AZUL);
+    docPdf.text("Serviços Concluídos", X, y);
+    y += 5;
+    const concluidos = servicos.filter(s => s.status === "concluido");
+    autoTable(docPdf, {
+      startY: y, margin: { left: X }, theme: "grid", styles: { fontSize: 9 }, headStyles: { fillColor: AZUL },
+      head: [["Serviço", "Início", "Fim", "Material", "Mão de obra", "Total"]],
+      body: concluidos.length ? concluidos.map(s => [
+        s.titulo, s.dataInicio || "—", s.dataFim || "—",
+        `R$ ${(s.valorMaterial || 0).toFixed(2).replace(".",",")}`,
+        `R$ ${(s.valorMaoDeObra || 0).toFixed(2).replace(".",",")}`,
+        `R$ ${((s.valorMaterial || 0) + (s.valorMaoDeObra || 0)).toFixed(2).replace(".",",")}`,
+      ]) : [["—", "—", "—", "—", "—", "Nenhum serviço concluído"]],
+    });
+
+    docPdf.save(`relatorio-vila-real-140-${mesSel}.pdf`);
+    showToast("Relatório PDF gerado com sucesso!");
+  };
+
   // ── Sidebar ──
   const navItems = [
     { id:"dashboard", icon:"📊", label:"Dashboard" },
@@ -487,11 +580,16 @@ export default function App() {
               </div>
             </div>
 
-            {!readOnly && (
-              <button onClick={enviarLembretes} style={{ padding:"12px 24px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:9, fontSize:14, fontWeight:600, cursor:"pointer" }}>
-                📧 Enviar Lembretes por E-mail ({pendentes} pendente{pendentes!==1?"s":""})
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+              {!readOnly && (
+                <button onClick={enviarLembretes} style={{ padding:"12px 24px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:9, fontSize:14, fontWeight:600, cursor:"pointer" }}>
+                  📧 Enviar Lembretes por E-mail ({pendentes} pendente{pendentes!==1?"s":""})
+                </button>
+              )}
+              <button onClick={exportarPDF} style={{ padding:"12px 24px", background:"#fff", color:"#1E3A5F", border:"1.5px solid #1E3A5F", borderRadius:9, fontSize:14, fontWeight:600, cursor:"pointer" }}>
+                📄 Exportar Relatório PDF
               </button>
-            )}
+            </div>
           </div>
         )}
 

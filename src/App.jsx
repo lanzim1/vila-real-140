@@ -25,6 +25,17 @@ const MOCK_MORADORES = [
   { nome: "Patrícia Nunes", unidade: "Apto 302", email: "patricia@email.com", telefone: "(85) 99123-0006" },
 ];
 
+// Conta usada exclusivamente para o link de visualização (somente leitura).
+// Crie esse usuário no Firebase Console → Authentication → Users com este
+// e-mail e senha exatos. As regras do Firestore impedem essa conta de
+// escrever dados (veja instruções no README).
+const VISITANTE_EMAIL = "visitante@vilareal140-ddf4d.firebaseapp.com";
+const VISITANTE_SENHA = "VisualizarVR140";
+
+// true quando o link foi aberto com ?visualizar=1
+const modoVisitante = typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("visualizar") === "1";
+
 const mesAtual = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -145,9 +156,25 @@ export default function App() {
 
   // ── Autenticação ──
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); });
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (!u && modoVisitante) {
+        // Link de visualização: tenta logar automaticamente com a conta visitante
+        try {
+          await signInWithEmailAndPassword(auth, VISITANTE_EMAIL, VISITANTE_SENHA);
+        } catch (e) {
+          console.error("Conta visitante indisponível:", e);
+          setAuthChecked(true);
+        }
+        return; // onAuthStateChanged será chamado de novo com o novo usuário
+      }
+      setUser(u);
+      setAuthChecked(true);
+    });
     return unsub;
   }, []);
+
+  // true quando o usuário logado é a conta de visualização
+  const readOnly = user?.email === VISITANTE_EMAIL;
 
   // ── Listeners em tempo real do Firestore (só depois de logado) ──
   useEffect(() => {
@@ -367,13 +394,24 @@ export default function App() {
     { id:"moradores", icon:"👥", label:"Moradores" },
     { id:"despesas",  icon:"💧", label:"Água/Luz" },
     { id:"servicos",  icon:"🔧", label:"Serviços" },
-    { id:"config",    icon:"⚙️",  label:"Configurações" },
+    ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Configurações" }] : []),
   ];
 
   if (!authChecked) {
     return (
       <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#1E3A5F", color:"#fff", fontFamily:"'Inter',sans-serif" }}>
         Carregando...
+      </div>
+    );
+  }
+
+  if (modoVisitante && !user) {
+    return (
+      <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#1E3A5F", color:"#fff", fontFamily:"'Inter',sans-serif", textAlign:"center", padding:24 }}>
+        <div>
+          <div style={{ fontSize:36, marginBottom:10 }}>🔒</div>
+          Link de visualização indisponível no momento.<br/>Contate o síndico.
+        </div>
       </div>
     );
   }
@@ -396,9 +434,15 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <button onClick={() => signOut(auth)} style={{ margin:"0 16px", padding:"9px", background:"rgba(176,58,46,.25)", border:"1px solid rgba(176,58,46,.4)", borderRadius:8, color:"#ff9a8b", cursor:"pointer", fontSize:13, fontWeight:600 }}>
-          Sair
-        </button>
+        {readOnly ? (
+          <div style={{ margin:"0 16px", padding:"9px", background:"rgba(201,147,58,.2)", border:"1px solid rgba(201,147,58,.4)", borderRadius:8, color:"#F0D9A8", fontSize:12, fontWeight:600, textAlign:"center" }}>
+            👁️ Modo Visualização
+          </div>
+        ) : (
+          <button onClick={() => signOut(auth)} style={{ margin:"0 16px", padding:"9px", background:"rgba(176,58,46,.25)", border:"1px solid rgba(176,58,46,.4)", borderRadius:8, color:"#ff9a8b", cursor:"pointer", fontSize:13, fontWeight:600 }}>
+            Sair
+          </button>
+        )}
       </aside>
 
       {/* Conteúdo */}
@@ -443,9 +487,11 @@ export default function App() {
               </div>
             </div>
 
-            <button onClick={enviarLembretes} style={{ padding:"12px 24px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:9, fontSize:14, fontWeight:600, cursor:"pointer" }}>
-              📧 Enviar Lembretes por E-mail ({pendentes} pendente{pendentes!==1?"s":""})
-            </button>
+            {!readOnly && (
+              <button onClick={enviarLembretes} style={{ padding:"12px 24px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:9, fontSize:14, fontWeight:600, cursor:"pointer" }}>
+                📧 Enviar Lembretes por E-mail ({pendentes} pendente{pendentes!==1?"s":""})
+              </button>
+            )}
           </div>
         )}
 
@@ -461,9 +507,11 @@ export default function App() {
                 <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, color:"#1E3A5F", background:"#fff" }}>
                   {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
                 </select>
-                <button onClick={enviarLembretes} style={{ padding:"9px 18px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>
-                  📧 Enviar Lembretes
-                </button>
+                {!readOnly && (
+                  <button onClick={enviarLembretes} style={{ padding:"9px 18px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                    📧 Enviar Lembretes
+                  </button>
+                )}
               </div>
             </div>
 
@@ -490,9 +538,11 @@ export default function App() {
                         <td style={{ padding:"13px 16px" }}>
                           <div style={{ display:"flex", gap:8 }}>
                             {cob.status !== "pago" ? (
-                              <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ padding:"5px 12px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                                ✓ Registrar Pgto
-                              </button>
+                              !readOnly && (
+                                <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ padding:"5px 12px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                                  ✓ Registrar Pgto
+                                </button>
+                              )
                             ) : (
                               <>
                                 {cob.comprovante && (
@@ -500,9 +550,11 @@ export default function App() {
                                     📄 Ver Comprovante
                                   </button>
                                 )}
-                                <button onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} style={{ padding:"5px 12px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                                  ↩ Estornar
-                                </button>
+                                {!readOnly && (
+                                  <button onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} style={{ padding:"5px 12px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                                    ↩ Estornar
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>
@@ -524,9 +576,11 @@ export default function App() {
                 <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:26 }}>Moradores</h2>
                 <p style={{ color:"#6B7A8D", margin:"6px 0 0", fontSize:14 }}>{moradores.length} unidade{moradores.length!==1?"s":""} cadastrada{moradores.length!==1?"s":""}</p>
               </div>
-              <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer" }}>
-                + Novo Morador
-              </button>
+              {!readOnly && (
+                <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                  + Novo Morador
+                </button>
+              )}
             </div>
 
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:16 }}>
@@ -545,9 +599,11 @@ export default function App() {
                       <div>📧 {m.email}</div>
                       {m.telefone && <div>📱 {m.telefone}</div>}
                     </div>
-                    <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ marginTop:14, padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                      Remover
-                    </button>
+                    {!readOnly && (
+                      <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ marginTop:14, padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                        Remover
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -563,9 +619,11 @@ export default function App() {
                 <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:26 }}>Água &amp; Luz</h2>
                 <p style={{ color:"#6B7A8D", margin:"6px 0 0", fontSize:14 }}>Contas e despesas fixas do condomínio</p>
               </div>
-              <button onClick={() => setModal({ type:"novaDespesa" })} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer" }}>
-                + Nova Despesa
-              </button>
+              {!readOnly && (
+                <button onClick={() => setModal({ type:"novaDespesa" })} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                  + Nova Despesa
+                </button>
+              )}
             </div>
 
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:16, marginBottom:24 }}>
@@ -602,7 +660,7 @@ export default function App() {
                       <td style={{ padding:"13px 16px", fontSize:12, color:"#6B7A8D" }}>{d.dataPagamento || "—"}</td>
                       <td style={{ padding:"13px 16px" }}>
                         <div style={{ display:"flex", gap:8 }}>
-                          {d.status !== "pago" && (
+                          {d.status !== "pago" && !readOnly && (
                             <button onClick={() => marcarDespesaPaga(d.id)} style={{ padding:"5px 12px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
                               ✓ Marcar Paga
                             </button>
@@ -612,9 +670,11 @@ export default function App() {
                               📄 Ver
                             </button>
                           )}
-                          <button onClick={() => { if(window.confirm("Remover esta despesa?")) removerDespesa(d.id); }} style={{ padding:"5px 12px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                            Remover
-                          </button>
+                          {!readOnly && (
+                            <button onClick={() => { if(window.confirm("Remover esta despesa?")) removerDespesa(d.id); }} style={{ padding:"5px 12px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                              Remover
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -636,9 +696,11 @@ export default function App() {
                 <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:26 }}>Serviços &amp; Manutenção</h2>
                 <p style={{ color:"#6B7A8D", margin:"6px 0 0", fontSize:14 }}>Acompanhe consertos e melhorias do condomínio</p>
               </div>
-              <button onClick={() => setModal({ type:"novoServico" })} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer" }}>
-                + Novo Serviço
-              </button>
+              {!readOnly && (
+                <button onClick={() => setModal({ type:"novoServico" })} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                  + Novo Serviço
+                </button>
+              )}
             </div>
 
             <h3 style={{ fontSize:14, color:"#1E3A5F", fontWeight:700, margin:"24px 0 12px" }}>🟡 Pendentes ({servicos.filter(s=>s.status==="pendente").length})</h3>
@@ -648,14 +710,16 @@ export default function App() {
                   <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:15, marginBottom:4 }}>{s.titulo}</div>
                   {s.descricao && <div style={{ fontSize:13, color:"#6B7A8D", marginBottom:8 }}>{s.descricao}</div>}
                   <div style={{ fontSize:11, color:"#9aa6b5" }}>Aberto em {s.dataAbertura}</div>
-                  <div style={{ display:"flex", gap:8, marginTop:14 }}>
-                    <button onClick={() => { setConcluirForm({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" }); setModal({ type:"concluirServico", data:s }); }} style={{ padding:"6px 14px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                      ✓ Concluir
-                    </button>
-                    <button onClick={() => { if(window.confirm(`Remover serviço "${s.titulo}"?`)) removerServico(s.id); }} style={{ padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                      Remover
-                    </button>
-                  </div>
+                  {!readOnly && (
+                    <div style={{ display:"flex", gap:8, marginTop:14 }}>
+                      <button onClick={() => { setConcluirForm({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" }); setModal({ type:"concluirServico", data:s }); }} style={{ padding:"6px 14px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                        ✓ Concluir
+                      </button>
+                      <button onClick={() => { if(window.confirm(`Remover serviço "${s.titulo}"?`)) removerServico(s.id); }} style={{ padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                        Remover
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
               {servicos.filter(s=>s.status==="pendente").length === 0 && (
@@ -676,14 +740,16 @@ export default function App() {
                     <div>💰 Total: <b style={{color:"#C9933A"}}>R$ {((s.valorMaterial||0)+(s.valorMaoDeObra||0)).toFixed(2).replace(".",",")}</b></div>
                     {s.obsConclusao && <div style={{marginTop:4}}>📝 {s.obsConclusao}</div>}
                   </div>
-                  <div style={{ display:"flex", gap:8, marginTop:12 }}>
-                    <button onClick={() => reabrirServico(s.id)} style={{ padding:"6px 14px", background:"#FFF8E1", color:"#F57F17", border:"1px solid #FFE082", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                      ↩ Reabrir
-                    </button>
-                    <button onClick={() => { if(window.confirm(`Remover serviço "${s.titulo}"?`)) removerServico(s.id); }} style={{ padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                      Remover
-                    </button>
-                  </div>
+                  {!readOnly && (
+                    <div style={{ display:"flex", gap:8, marginTop:12 }}>
+                      <button onClick={() => reabrirServico(s.id)} style={{ padding:"6px 14px", background:"#FFF8E1", color:"#F57F17", border:"1px solid #FFE082", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                        ↩ Reabrir
+                      </button>
+                      <button onClick={() => { if(window.confirm(`Remover serviço "${s.titulo}"?`)) removerServico(s.id); }} style={{ padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                        Remover
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
               {servicos.filter(s=>s.status==="concluido").length === 0 && (

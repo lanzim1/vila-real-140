@@ -1,4 +1,10 @@
 import { useState, useEffect, useRef } from "react";
+import { auth, db } from "./firebase";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import {
+  collection, doc, onSnapshot, setDoc, addDoc, deleteDoc,
+  getDocs, query, where, writeBatch
+} from "firebase/firestore";
 
 // ─── Paleta ───────────────────────────────────────────────
 // Azul ardósia escuro  #1E3A5F  (autoridade, confiança)
@@ -9,16 +15,14 @@ import { useState, useEffect, useRef } from "react";
 // Branco               #FFFFFF
 // ──────────────────────────────────────────────────────────
 
-const ADMIN_USER = "sindico";
-const ADMIN_PASS = "vilareal140";
-
+// Dados usados apenas para popular o Firestore na primeira vez que o app roda
 const MOCK_MORADORES = [
-  { id: 1, nome: "Carlos Mendes", unidade: "Apto 101", email: "carlos@email.com", telefone: "(85) 99123-0001" },
-  { id: 2, nome: "Fernanda Lima", unidade: "Apto 102", email: "fernanda@email.com", telefone: "(85) 99123-0002" },
-  { id: 3, nome: "Roberto Alves", unidade: "Apto 201", email: "roberto@email.com", telefone: "(85) 99123-0003" },
-  { id: 4, nome: "Juliana Costa", unidade: "Apto 202", email: "juliana@email.com", telefone: "(85) 99123-0004" },
-  { id: 5, nome: "Marcos Souza", unidade: "Apto 301", email: "marcos@email.com", telefone: "(85) 99123-0005" },
-  { id: 6, nome: "Patrícia Nunes", unidade: "Apto 302", email: "patricia@email.com", telefone: "(85) 99123-0006" },
+  { nome: "Carlos Mendes", unidade: "Apto 101", email: "carlos@email.com", telefone: "(85) 99123-0001" },
+  { nome: "Fernanda Lima", unidade: "Apto 102", email: "fernanda@email.com", telefone: "(85) 99123-0002" },
+  { nome: "Roberto Alves", unidade: "Apto 201", email: "roberto@email.com", telefone: "(85) 99123-0003" },
+  { nome: "Juliana Costa", unidade: "Apto 202", email: "juliana@email.com", telefone: "(85) 99123-0004" },
+  { nome: "Marcos Souza", unidade: "Apto 301", email: "marcos@email.com", telefone: "(85) 99123-0005" },
+  { nome: "Patrícia Nunes", unidade: "Apto 302", email: "patricia@email.com", telefone: "(85) 99123-0006" },
 ];
 
 const mesAtual = () => {
@@ -31,9 +35,6 @@ const mesLabel = (m) => {
   const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
   return `${meses[parseInt(mo) - 1]}/${y}`;
 };
-
-const gerarCobrancas = (moradores, mes) =>
-  moradores.map((m) => ({ moradorId: m.id, mes, status: "pendente", comprovante: null, dataPagamento: null, obs: "" }));
 
 // ─── Componentes de UI ───────────────────────────────────
 
@@ -76,14 +77,23 @@ const Badge = ({ status }) => {
 
 // ─── Tela de Login ───────────────────────────────────────
 
-const Login = ({ onLogin }) => {
-  const [user, setUser] = useState("");
+const Login = () => {
+  const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handle = () => {
-    if (user === ADMIN_USER && pass === ADMIN_PASS) { onLogin(); }
-    else { setErr("Usuário ou senha incorretos."); }
+  const handle = async () => {
+    setErr("");
+    if (!email || !pass) { setErr("Preencha e-mail e senha."); return; }
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), pass);
+    } catch (e) {
+      setErr("E-mail ou senha incorretos.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -95,20 +105,17 @@ const Login = ({ onLogin }) => {
           <p style={{ color:"#6B7A8D", fontSize:13, margin:"6px 0 0" }}>Sistema de Cobrança de Condomínio</p>
         </div>
         <div style={{ marginBottom:16 }}>
-          <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#1E3A5F", marginBottom:6, textTransform:"uppercase", letterSpacing:.5 }}>Usuário</label>
-          <input value={user} onChange={e=>setUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="sindico" style={{ width:"100%", padding:"10px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, color:"#1E3A5F", outline:"none", boxSizing:"border-box" }} />
+          <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#1E3A5F", marginBottom:6, textTransform:"uppercase", letterSpacing:.5 }}>E-mail</label>
+          <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="sindico@vilareal140-ddf4d.firebaseapp.com" style={{ width:"100%", padding:"10px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, color:"#1E3A5F", outline:"none", boxSizing:"border-box" }} />
         </div>
         <div style={{ marginBottom:20 }}>
           <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#1E3A5F", marginBottom:6, textTransform:"uppercase", letterSpacing:.5 }}>Senha</label>
           <input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="••••••••" style={{ width:"100%", padding:"10px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, color:"#1E3A5F", outline:"none", boxSizing:"border-box" }} />
         </div>
         {err && <p style={{ color:"#B03A2E", fontSize:13, margin:"0 0 14px", textAlign:"center" }}>{err}</p>}
-        <button onClick={handle} style={{ width:"100%", padding:"12px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:15, fontWeight:600, cursor:"pointer", letterSpacing:.3 }}>
-          Entrar
+        <button onClick={handle} disabled={loading} style={{ width:"100%", padding:"12px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:15, fontWeight:600, cursor: loading ? "default" : "pointer", letterSpacing:.3, opacity: loading ? .7 : 1 }}>
+          {loading ? "Entrando..." : "Entrar"}
         </button>
-        <p style={{ textAlign:"center", fontSize:11, color:"#aaa", marginTop:20, marginBottom:0 }}>
-          Demo: usuário <b>sindico</b> / senha <b>vilareal140</b>
-        </p>
       </div>
     </div>
   );
@@ -117,26 +124,58 @@ const Login = ({ onLogin }) => {
 // ─── App Principal ───────────────────────────────────────
 
 export default function App() {
-  const [logado, setLogado] = useState(false);
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [aba, setAba] = useState("dashboard");
-  const [moradores, setMoradores] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("vr_moradores")) || MOCK_MORADORES; } catch { return MOCK_MORADORES; }
-  });
-  const [cobrancas, setCobrancas] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("vr_cobrancas")) || gerarCobrancas(MOCK_MORADORES, mesAtual()); } catch { return gerarCobrancas(MOCK_MORADORES, mesAtual()); }
-  });
-  const [taxa, setTaxa] = useState(() => parseFloat(localStorage.getItem("vr_taxa")) || 180);
+  const [moradores, setMoradores] = useState([]);
+  const [cobrancas, setCobrancas] = useState([]);
+  const [taxa, setTaxa] = useState(180);
   const [mesSel, setMesSel] = useState(mesAtual);
   const [toast, setToast] = useState(null);
   const [modal, setModal] = useState(null); // { type, data }
   const [novoMorador, setNovoMorador] = useState({ nome:"", unidade:"", email:"", telefone:"" });
   const [pagForm, setPagForm] = useState({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
-  const [verSenha, setVerSenha] = useState(false);
   const fileRef = useRef();
 
-  useEffect(() => { localStorage.setItem("vr_moradores", JSON.stringify(moradores)); }, [moradores]);
-  useEffect(() => { localStorage.setItem("vr_cobrancas", JSON.stringify(cobrancas)); }, [cobrancas]);
-  useEffect(() => { localStorage.setItem("vr_taxa", taxa); }, [taxa]);
+  // ── Autenticação ──
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); });
+    return unsub;
+  }, []);
+
+  // ── Listeners em tempo real do Firestore (só depois de logado) ──
+  useEffect(() => {
+    if (!user) return;
+    const unsubM = onSnapshot(collection(db, "moradores"), (snap) => {
+      setMoradores(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const unsubC = onSnapshot(collection(db, "cobrancas"), (snap) => {
+      setCobrancas(snap.docs.map(d => d.data()));
+    });
+    const unsubCfg = onSnapshot(doc(db, "config", "geral"), (d) => {
+      if (d.exists()) setTaxa(d.data().taxa ?? 180);
+    });
+    return () => { unsubM(); unsubC(); unsubCfg(); };
+  }, [user]);
+
+  // ── Popular o banco na primeira vez (só roda se "moradores" estiver vazio) ──
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const snap = await getDocs(collection(db, "moradores"));
+      if (snap.empty) {
+        const batch = writeBatch(db);
+        MOCK_MORADORES.forEach((m) => {
+          const ref = doc(collection(db, "moradores"));
+          batch.set(ref, m);
+          batch.set(doc(db, "cobrancas", `${ref.id}_${mesAtual()}`), {
+            moradorId: ref.id, mes: mesAtual(), status:"pendente", comprovante:null, dataPagamento:null, obs:""
+          });
+        });
+        await batch.commit();
+      }
+    })();
+  }, [user]);
 
   const showToast = (msg, type="success") => setToast({ msg, type });
 
@@ -146,28 +185,37 @@ export default function App() {
   const totalArrecadado = pagos * taxa;
   const totalPendente = pendentes * taxa;
 
-  // Gerar cobranças para mês se não existir
-  const garantirMes = (mes) => {
-    const existe = cobrancas.some(c => c.mes === mes);
-    if (!existe) {
-      const novas = gerarCobrancas(moradores, mes);
-      setCobrancas(prev => [...prev, ...novas]);
-    }
+  // Garante que existe cobrança para cada morador no mês informado
+  const garantirMes = async (mes) => {
+    const existentes = new Set(cobrancas.filter(c => c.mes === mes).map(c => c.moradorId));
+    const batch = writeBatch(db);
+    let mudou = false;
+    moradores.forEach(m => {
+      if (!existentes.has(m.id)) {
+        batch.set(doc(db, "cobrancas", `${m.id}_${mes}`), { moradorId:m.id, mes, status:"pendente", comprovante:null, dataPagamento:null, obs:"" });
+        mudou = true;
+      }
+    });
+    if (mudou) await batch.commit();
   };
+
+  // Garante o mês atual sempre que a lista de moradores estiver pronta
+  useEffect(() => {
+    if (user && moradores.length > 0) garantirMes(mesSel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, moradores.length]);
 
   const mudarMes = (m) => { setMesSel(m); garantirMes(m); };
 
   const registrarPagamento = (moradorId) => {
     const arq = pagForm.arquivo;
-    let arquivoBase64 = "";
-    let arquivoNome = pagForm.arquivoNome;
 
-    const salvar = (base64 = "") => {
-      setCobrancas(prev => prev.map(c =>
-        c.moradorId === moradorId && c.mes === mesSel
-          ? { ...c, status:"pago", dataPagamento: new Date().toLocaleDateString("pt-BR"), obs: pagForm.obs, comprovante: base64, arquivoNome }
-          : c
-      ));
+    const salvar = async (base64 = "") => {
+      await setDoc(doc(db, "cobrancas", `${moradorId}_${mesSel}`), {
+        moradorId, mes: mesSel, status:"pago",
+        dataPagamento: new Date().toLocaleDateString("pt-BR"),
+        obs: pagForm.obs, comprovante: base64, arquivoNome: pagForm.arquivoNome
+      }, { merge:true });
       setModal(null);
       setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
       showToast("Pagamento registrado com sucesso!");
@@ -182,43 +230,47 @@ export default function App() {
     }
   };
 
-  const estornarPagamento = (moradorId) => {
-    setCobrancas(prev => prev.map(c =>
-      c.moradorId === moradorId && c.mes === mesSel
-        ? { ...c, status:"pendente", dataPagamento:null, obs:"", comprovante:null, arquivoNome:"" }
-        : c
-    ));
+  const estornarPagamento = async (moradorId) => {
+    await setDoc(doc(db, "cobrancas", `${moradorId}_${mesSel}`), {
+      moradorId, mes: mesSel, status:"pendente", dataPagamento:null, obs:"", comprovante:null, arquivoNome:""
+    }, { merge:true });
     setModal(null);
     showToast("Pagamento estornado.", "error");
   };
 
-  const adicionarMorador = () => {
+  const adicionarMorador = async () => {
     if (!novoMorador.nome || !novoMorador.unidade || !novoMorador.email) {
       showToast("Preencha nome, unidade e e-mail.", "error"); return;
     }
-    const id = Date.now();
-    const m = { ...novoMorador, id };
-    const novosM = [...moradores, m];
-    setMoradores(novosM);
-    // adicionar cobrança para mês atual
-    setCobrancas(prev => [...prev, { moradorId: id, mes: mesSel, status:"pendente", comprovante:null, dataPagamento:null, obs:"" }]);
+    const ref = await addDoc(collection(db, "moradores"), novoMorador);
+    await setDoc(doc(db, "cobrancas", `${ref.id}_${mesSel}`), {
+      moradorId: ref.id, mes: mesSel, status:"pendente", comprovante:null, dataPagamento:null, obs:""
+    });
     setNovoMorador({ nome:"", unidade:"", email:"", telefone:"" });
     setModal(null);
     showToast("Morador cadastrado!");
   };
 
-  const removerMorador = (id) => {
-    setMoradores(prev => prev.filter(m => m.id !== id));
-    setCobrancas(prev => prev.filter(c => c.moradorId !== id));
+  const removerMorador = async (id) => {
+    await deleteDoc(doc(db, "moradores", id));
+    const q = query(collection(db, "cobrancas"), where("moradorId", "==", id));
+    const snap = await getDocs(q);
+    const batch = writeBatch(db);
+    snap.forEach(d => batch.delete(d.ref));
+    if (!snap.empty) await batch.commit();
     showToast("Morador removido.", "error");
   };
 
   const enviarLembretes = () => {
     const devedores = cobMes.filter(c => c.status !== "pago").map(c => moradores.find(m => m.id === c.moradorId)).filter(Boolean);
     if (devedores.length === 0) { showToast("Todos já pagaram! Nenhum lembrete necessário."); return; }
-    // Simula envio (em produção: integrar EmailJS ou Firebase Functions)
     const lista = devedores.map(d => `• ${d.nome} (${d.unidade})`).join("\n");
     showToast(`📧 Lembretes enviados para ${devedores.length} morador(es):\n${lista}`);
+  };
+
+  const salvarTaxa = async (novaTaxa) => {
+    await setDoc(doc(db, "config", "geral"), { taxa: novaTaxa }, { merge:true });
+    showToast("Taxa atualizada com sucesso!");
   };
 
   const mesesDisponiveis = () => {
@@ -235,7 +287,15 @@ export default function App() {
     { id:"config",    icon:"⚙️",  label:"Configurações" },
   ];
 
-  if (!logado) return <Login onLogin={() => setLogado(true)} />;
+  if (!authChecked) {
+    return (
+      <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#1E3A5F", color:"#fff", fontFamily:"'Inter',sans-serif" }}>
+        Carregando...
+      </div>
+    );
+  }
+
+  if (!user) return <Login />;
 
   return (
     <div style={{ display:"flex", minHeight:"100vh", fontFamily:"'Inter',sans-serif", background:"#F0F4F8" }}>
@@ -253,7 +313,7 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <button onClick={() => setLogado(false)} style={{ margin:"0 16px", padding:"9px", background:"rgba(176,58,46,.25)", border:"1px solid rgba(176,58,46,.4)", borderRadius:8, color:"#ff9a8b", cursor:"pointer", fontSize:13, fontWeight:600 }}>
+        <button onClick={() => signOut(auth)} style={{ margin:"0 16px", padding:"9px", background:"rgba(176,58,46,.25)", border:"1px solid rgba(176,58,46,.4)", borderRadius:8, color:"#ff9a8b", cursor:"pointer", fontSize:13, fontWeight:600 }}>
           Sair
         </button>
       </aside>
@@ -267,7 +327,6 @@ export default function App() {
             <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:"0 0 8px", fontSize:26 }}>Dashboard</h2>
             <p style={{ color:"#6B7A8D", margin:"0 0 28px", fontSize:14 }}>Visão geral do condomínio · {mesLabel(mesSel)}</p>
 
-            {/* Seletor de mês */}
             <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:28 }}>
               <label style={{ fontSize:13, color:"#1E3A5F", fontWeight:600 }}>Mês de referência:</label>
               <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"7px 12px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, color:"#1E3A5F", background:"#fff" }}>
@@ -275,7 +334,6 @@ export default function App() {
               </select>
             </div>
 
-            {/* Cards */}
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:16, marginBottom:32 }}>
               {[
                 { label:"Total de Unidades", valor: moradores.length, icon:"🏠", cor:"#1E3A5F" },
@@ -292,7 +350,6 @@ export default function App() {
               ))}
             </div>
 
-            {/* Barra de progresso */}
             <div style={{ background:"#fff", borderRadius:12, padding:24, boxShadow:"0 2px 8px rgba(0,0,0,.06)", marginBottom:24 }}>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
                 <span style={{ fontSize:13, fontWeight:600, color:"#1E3A5F" }}>Taxa de adimplência — {mesLabel(mesSel)}</span>
@@ -303,7 +360,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Botão lembrete */}
             <button onClick={enviarLembretes} style={{ padding:"12px 24px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:9, fontSize:14, fontWeight:600, cursor:"pointer" }}>
               📧 Enviar Lembretes por E-mail ({pendentes} pendente{pendentes!==1?"s":""})
             </button>
@@ -425,27 +481,20 @@ export default function App() {
               <h3 style={{ color:"#1E3A5F", margin:"0 0 20px", fontSize:15, fontWeight:700 }}>Taxa mensal de condomínio</h3>
               <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Valor (R$)</label>
               <input type="number" value={taxa} onChange={e=>setTaxa(parseFloat(e.target.value)||0)} style={{ display:"block", width:"100%", padding:"10px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:16, color:"#1E3A5F", marginTop:8, boxSizing:"border-box" }} />
-              <button onClick={() => showToast("Taxa atualizada com sucesso!")} style={{ marginTop:16, padding:"10px 24px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer" }}>
+              <button onClick={() => salvarTaxa(taxa)} style={{ marginTop:16, padding:"10px 24px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer" }}>
                 Salvar
               </button>
               <hr style={{ margin:"28px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
-              <h3 style={{ color:"#1E3A5F", margin:"0 0 12px", fontSize:15, fontWeight:700 }}>Credenciais de acesso</h3>
+              <h3 style={{ color:"#1E3A5F", margin:"0 0 12px", fontSize:15, fontWeight:700 }}>Conta conectada</h3>
               <div style={{ fontSize:13, color:"#6B7A8D", lineHeight:1.8, background:"#F0F4F8", borderRadius:8, padding:"12px 16px" }}>
-                <div>Usuário: <b style={{color:"#1E3A5F"}}>sindico</b></div>
-                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  Senha: <b style={{color:"#1E3A5F", letterSpacing: verSenha ? 0 : 2}}>{verSenha ? "vilareal140" : "••••••••••••"}</b>
-                  <button onClick={() => setVerSenha(v => !v)} style={{ background:"none", border:"none", cursor:"pointer", fontSize:14, padding:"2px 4px", color:"#2E6DA4" }} title={verSenha ? "Ocultar senha" : "Mostrar senha"}>
-                    {verSenha ? "🙈" : "👁️"}
-                  </button>
-                </div>
-                <div style={{ marginTop:8, fontSize:11, color:"#aaa" }}>Para alterar senha, edite o arquivo de configuração ou integre ao Firebase Auth.</div>
+                <div>E-mail: <b style={{color:"#1E3A5F"}}>{user?.email}</b></div>
+                <div style={{ marginTop:8, fontSize:11, color:"#aaa" }}>Login gerenciado pelo Firebase Authentication. Para trocar a senha, use o painel do Firebase (Authentication → Users).</div>
               </div>
               <hr style={{ margin:"28px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
               <h3 style={{ color:"#1E3A5F", margin:"0 0 12px", fontSize:15, fontWeight:700 }}>Sobre o sistema</h3>
               <div style={{ fontSize:12, color:"#6B7A8D", lineHeight:1.8 }}>
                 <div>🏢 Condomínio Vila Real 140</div>
-                <div>📦 Versão 1.0 · Dados salvos localmente</div>
-                <div>🔧 Para produção: integre Firebase Firestore + Auth</div>
+                <div>📦 Versão 2.0 · Dados em tempo real via Firebase</div>
               </div>
             </div>
           </div>

@@ -135,7 +135,13 @@ export default function App() {
   const [modal, setModal] = useState(null); // { type, data }
   const [novoMorador, setNovoMorador] = useState({ nome:"", unidade:"", email:"", telefone:"" });
   const [pagForm, setPagForm] = useState({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
+  const [despesas, setDespesas] = useState([]);
+  const [novaDespesa, setNovaDespesa] = useState({ tipo:"agua", descricao:"", valor:"", mes: mesAtual(), arquivo:null, arquivoNome:"" });
+  const [servicos, setServicos] = useState([]);
+  const [novoServico, setNovoServico] = useState({ titulo:"", descricao:"" });
+  const [concluirForm, setConcluirForm] = useState({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" });
   const fileRef = useRef();
+  const fileRefDespesa = useRef();
 
   // ── Autenticação ──
   useEffect(() => {
@@ -155,7 +161,13 @@ export default function App() {
     const unsubCfg = onSnapshot(doc(db, "config", "geral"), (d) => {
       if (d.exists()) setTaxa(d.data().taxa ?? 180);
     });
-    return () => { unsubM(); unsubC(); unsubCfg(); };
+    const unsubD = onSnapshot(collection(db, "despesas"), (snap) => {
+      setDespesas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const unsubS = onSnapshot(collection(db, "servicos"), (snap) => {
+      setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { unsubM(); unsubC(); unsubCfg(); unsubD(); unsubS(); };
   }, [user]);
 
   // ── Popular o banco na primeira vez (só roda se "moradores" estiver vazio) ──
@@ -197,6 +209,75 @@ export default function App() {
       }
     });
     if (mudou) await batch.commit();
+  };
+
+  // ── Despesas (Água/Luz) ──
+  const adicionarDespesa = () => {
+    if (!novaDespesa.valor || !novaDespesa.mes) { showToast("Preencha o valor e o mês.", "error"); return; }
+    const salvar = async (base64 = "") => {
+      await addDoc(collection(db, "despesas"), {
+        tipo: novaDespesa.tipo, descricao: novaDespesa.descricao,
+        valor: parseFloat(novaDespesa.valor) || 0, mes: novaDespesa.mes,
+        status: "pendente", dataPagamento: null,
+        comprovante: base64, arquivoNome: novaDespesa.arquivoNome
+      });
+      setNovaDespesa({ tipo:"agua", descricao:"", valor:"", mes: mesAtual(), arquivo:null, arquivoNome:"" });
+      setModal(null);
+      showToast("Despesa registrada!");
+    };
+    if (novaDespesa.arquivo) {
+      const reader = new FileReader();
+      reader.onload = (e) => salvar(e.target.result);
+      reader.readAsDataURL(novaDespesa.arquivo);
+    } else {
+      salvar();
+    }
+  };
+
+  const marcarDespesaPaga = async (id) => {
+    await setDoc(doc(db, "despesas", id), { status:"pago", dataPagamento: new Date().toLocaleDateString("pt-BR") }, { merge:true });
+    showToast("Despesa marcada como paga!");
+  };
+
+  const removerDespesa = async (id) => {
+    await deleteDoc(doc(db, "despesas", id));
+    showToast("Despesa removida.", "error");
+  };
+
+  // ── Serviços / Manutenção ──
+  const adicionarServico = async () => {
+    if (!novoServico.titulo) { showToast("Dê um título ao serviço.", "error"); return; }
+    await addDoc(collection(db, "servicos"), {
+      titulo: novoServico.titulo, descricao: novoServico.descricao,
+      status: "pendente", dataAbertura: new Date().toLocaleDateString("pt-BR"),
+      dataInicio:null, dataFim:null, valorMaterial:null, valorMaoDeObra:null, obsConclusao:""
+    });
+    setNovoServico({ titulo:"", descricao:"" });
+    setModal(null);
+    showToast("Serviço registrado!");
+  };
+
+  const concluirServico = async (id) => {
+    await setDoc(doc(db, "servicos", id), {
+      status:"concluido",
+      dataInicio: concluirForm.dataInicio, dataFim: concluirForm.dataFim,
+      valorMaterial: parseFloat(concluirForm.valorMaterial) || 0,
+      valorMaoDeObra: parseFloat(concluirForm.valorMaoDeObra) || 0,
+      obsConclusao: concluirForm.obs
+    }, { merge:true });
+    setConcluirForm({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" });
+    setModal(null);
+    showToast("Serviço concluído com sucesso!");
+  };
+
+  const reabrirServico = async (id) => {
+    await setDoc(doc(db, "servicos", id), { status:"pendente" }, { merge:true });
+    showToast("Serviço reaberto.", "error");
+  };
+
+  const removerServico = async (id) => {
+    await deleteDoc(doc(db, "servicos", id));
+    showToast("Serviço removido.", "error");
   };
 
   // Garante o mês atual sempre que a lista de moradores estiver pronta
@@ -284,6 +365,8 @@ export default function App() {
     { id:"dashboard", icon:"📊", label:"Dashboard" },
     { id:"cobrancas", icon:"💰", label:"Cobranças" },
     { id:"moradores", icon:"👥", label:"Moradores" },
+    { id:"despesas",  icon:"💧", label:"Água/Luz" },
+    { id:"servicos",  icon:"🔧", label:"Serviços" },
     { id:"config",    icon:"⚙️",  label:"Configurações" },
   ];
 
@@ -472,100 +555,48 @@ export default function App() {
           </div>
         )}
 
-        {/* ── Configurações ── */}
-        {aba === "config" && (
+        {/* ── Despesas (Água/Luz) ── */}
+        {aba === "despesas" && (
           <div>
-            <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:"0 0 8px", fontSize:26 }}>Configurações</h2>
-            <p style={{ color:"#6B7A8D", margin:"0 0 28px", fontSize:14 }}>Ajuste os parâmetros do condomínio</p>
-            <div style={{ background:"#fff", borderRadius:12, padding:28, boxShadow:"0 2px 8px rgba(0,0,0,.06)", maxWidth:480 }}>
-              <h3 style={{ color:"#1E3A5F", margin:"0 0 20px", fontSize:15, fontWeight:700 }}>Taxa mensal de condomínio</h3>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Valor (R$)</label>
-              <input type="number" value={taxa} onChange={e=>setTaxa(parseFloat(e.target.value)||0)} style={{ display:"block", width:"100%", padding:"10px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:16, color:"#1E3A5F", marginTop:8, boxSizing:"border-box" }} />
-              <button onClick={() => salvarTaxa(taxa)} style={{ marginTop:16, padding:"10px 24px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer" }}>
-                Salvar
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20, flexWrap:"wrap", gap:12 }}>
+              <div>
+                <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:26 }}>Água &amp; Luz</h2>
+                <p style={{ color:"#6B7A8D", margin:"6px 0 0", fontSize:14 }}>Contas e despesas fixas do condomínio</p>
+              </div>
+              <button onClick={() => setModal({ type:"novaDespesa" })} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                + Nova Despesa
               </button>
-              <hr style={{ margin:"28px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
-              <h3 style={{ color:"#1E3A5F", margin:"0 0 12px", fontSize:15, fontWeight:700 }}>Conta conectada</h3>
-              <div style={{ fontSize:13, color:"#6B7A8D", lineHeight:1.8, background:"#F0F4F8", borderRadius:8, padding:"12px 16px" }}>
-                <div>E-mail: <b style={{color:"#1E3A5F"}}>{user?.email}</b></div>
-                <div style={{ marginTop:8, fontSize:11, color:"#aaa" }}>Login gerenciado pelo Firebase Authentication. Para trocar a senha, use o painel do Firebase (Authentication → Users).</div>
-              </div>
-              <hr style={{ margin:"28px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
-              <h3 style={{ color:"#1E3A5F", margin:"0 0 12px", fontSize:15, fontWeight:700 }}>Sobre o sistema</h3>
-              <div style={{ fontSize:12, color:"#6B7A8D", lineHeight:1.8 }}>
-                <div>🏢 Condomínio Vila Real 140</div>
-                <div>📦 Versão 2.0 · Dados em tempo real via Firebase</div>
-              </div>
             </div>
-          </div>
-        )}
-      </main>
 
-      {/* ── Modais ── */}
-      {modal?.type === "pagar" && (
-        <Modal title={`Registrar Pagamento — ${modal.data.unidade}`} onClose={() => setModal(null)}>
-          <p style={{ fontSize:13, color:"#6B7A8D", margin:"0 0 20px" }}>Morador: <b style={{color:"#1E3A5F"}}>{modal.data.nome}</b> · Taxa: <b style={{color:"#C9933A"}}>R$ {taxa.toFixed(2).replace(".",",")}</b></p>
-          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Observação (opcional)</label>
-          <input value={pagForm.obs} onChange={e=>setPagForm(p=>({...p,obs:e.target.value}))} placeholder="Ex: Pago via Pix" style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:8, marginBottom:18, boxSizing:"border-box" }} />
-          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Comprovante (imagem ou PDF)</label>
-          <div onClick={() => fileRef.current.click()} style={{ marginTop:8, border:"2px dashed #D0DAE6", borderRadius:8, padding:"20px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:"#6B7A8D", fontSize:13 }}>
-            {pagForm.arquivoNome ? <><span style={{color:"#2E6DA4", fontWeight:600}}>📎 {pagForm.arquivoNome}</span></> : <><div style={{fontSize:24,marginBottom:6}}>📁</div>Clique para selecionar arquivo</>}
-          </div>
-          <input ref={fileRef} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f = e.target.files[0]; if(f) setPagForm(p => ({...p, arquivo:f, arquivoNome:f.name})); }} />
-          <div style={{ display:"flex", gap:10, marginTop:24, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"9px 20px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={() => registrarPagamento(modal.data.moradorId)} style={{ padding:"9px 24px", background:"#2E7D32", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Confirmar Pagamento</button>
-          </div>
-        </Modal>
-      )}
-
-      {modal?.type === "comprovante" && (
-        <Modal title={`Comprovante — ${modal.data.nome}`} onClose={() => setModal(null)}>
-          {modal.data.comprovante?.startsWith("data:image") ? (
-            <img src={modal.data.comprovante} alt="comprovante" style={{ width:"100%", borderRadius:8, border:"1px solid #E8EDF3" }} />
-          ) : modal.data.comprovante?.startsWith("data:application/pdf") ? (
-            <div style={{ textAlign:"center", padding:24 }}>
-              <div style={{ fontSize:48, marginBottom:12 }}>📄</div>
-              <p style={{ color:"#1E3A5F", fontWeight:600, marginBottom:16 }}>{modal.data.arquivoNome || "comprovante.pdf"}</p>
-              <a href={modal.data.comprovante} download={modal.data.arquivoNome || "comprovante.pdf"} style={{ padding:"10px 24px", background:"#2E6DA4", color:"#fff", borderRadius:8, textDecoration:"none", fontSize:13, fontWeight:600 }}>⬇ Baixar PDF</a>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:16, marginBottom:24 }}>
+              {[
+                { label:"Total Pago", valor:`R$ ${despesas.filter(d=>d.status==="pago").reduce((s,d)=>s+d.valor,0).toFixed(2).replace(".",",")}`, icon:"✅", cor:"#2E7D32" },
+                { label:"Total Pendente", valor:`R$ ${despesas.filter(d=>d.status!=="pago").reduce((s,d)=>s+d.valor,0).toFixed(2).replace(".",",")}`, icon:"⏳", cor:"#B03A2E" },
+                { label:"Contas Cadastradas", valor: despesas.length, icon:"📋", cor:"#2E6DA4" },
+              ].map((c,i) => (
+                <div key={i} style={{ background:"#fff", borderRadius:12, padding:"18px 18px 14px", boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderTop:`3px solid ${c.cor}` }}>
+                  <div style={{ fontSize:20, marginBottom:6 }}>{c.icon}</div>
+                  <div style={{ fontSize:19, fontWeight:700, color:c.cor }}>{c.valor}</div>
+                  <div style={{ fontSize:12, color:"#6B7A8D", marginTop:4 }}>{c.label}</div>
+                </div>
+              ))}
             </div>
-          ) : (
-            <p style={{ color:"#6B7A8D", textAlign:"center" }}>Nenhum comprovante anexado.</p>
-          )}
-        </Modal>
-      )}
 
-      {modal?.type === "estorno" && (
-        <Modal title="Confirmar Estorno" onClose={() => setModal(null)}>
-          <p style={{ color:"#2C3E50", fontSize:14 }}>Deseja estornar o pagamento de <b>{modal.data.nome}</b>? O status voltará para <b>Pendente</b>.</p>
-          <div style={{ display:"flex", gap:10, marginTop:20, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"9px 20px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={() => estornarPagamento(modal.data.moradorId)} style={{ padding:"9px 24px", background:"#B03A2E", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>↩ Confirmar Estorno</button>
-          </div>
-        </Modal>
-      )}
-
-      {modal?.type === "novoMorador" && (
-        <Modal title="Cadastrar Novo Morador" onClose={() => setModal(null)}>
-          {[
-            { label:"Nome completo *", key:"nome", placeholder:"Ex: João da Silva" },
-            { label:"Unidade *", key:"unidade", placeholder:"Ex: Apto 103" },
-            { label:"E-mail *", key:"email", placeholder:"joao@email.com", type:"email" },
-            { label:"Telefone", key:"telefone", placeholder:"(85) 99999-0000" },
-          ].map(f => (
-            <div key={f.key} style={{ marginBottom:16 }}>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>{f.label}</label>
-              <input type={f.type||"text"} value={novoMorador[f.key]} onChange={e=>setNovoMorador(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, boxSizing:"border-box" }} />
-            </div>
-          ))}
-          <div style={{ display:"flex", gap:10, marginTop:8, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"9px 20px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={adicionarMorador} style={{ padding:"9px 24px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Cadastrar</button>
-          </div>
-        </Modal>
-      )}
-
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-    </div>
-  );
-}
+            <div style={{ background:"#fff", borderRadius:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)", overflow:"hidden" }}>
+              <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                <thead>
+                  <tr style={{ background:"#F0F4F8" }}>
+                    {["Tipo","Descrição","Mês","Valor","Status","Data Pgto","Ações"].map(h => (
+                      <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontSize:12, fontWeight:700, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5, borderBottom:"1px solid #E8EDF3" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...despesas].sort((a,b)=>b.mes.localeCompare(a.mes)).map((d) => (
+                    <tr key={d.id} style={{ borderBottom:"1px solid #F0F4F8" }}>
+                      <td style={{ padding:"13px 16px", fontSize:18 }}>{d.tipo==="agua" ? "💧" : d.tipo==="luz" ? "⚡" : "📦"}</td>
+                      <td style={{ padding:"13px 16px", fontSize:13, color:"#2C3E50" }}>{d.descricao || (d.tipo==="agua"?"Conta de água":d.tipo==="luz"?"Conta de luz":"Outra despesa")}</td>
+                      <td style={{ padding:"13px 16px", fontSize:13, color:"#6B7A8D" }}>{mesLabel(d.mes)}</td>
+                      <td style={{ padding:"13px 16px", fontSize:13, fontWeight:600, color:"#1E3A5F" }}>R$ {d.valor.toFixed(2).replace(".",",")}</td>
+                      <td style={{ padding:"13px 16px" }}><Badge status={d.status} /></td>
+                      <td style={{ padding:"13px 16px",

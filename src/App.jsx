@@ -120,7 +120,7 @@ const Login = () => {
         </div>
         <div style={{ marginBottom:16 }}>
           <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#1E3A5F", marginBottom:6, textTransform:"uppercase", letterSpacing:.5 }}>E-mail</label>
-          <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="sindico@vilareal140-ddf4d.firebaseapp.com" style={{ width:"100%", padding:"10px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, color:"#1E3A5F", outline:"none", boxSizing:"border-box" }} />
+          <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="seu@email.com" style={{ width:"100%", padding:"10px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, color:"#1E3A5F", outline:"none", boxSizing:"border-box" }} />
         </div>
         <div style={{ marginBottom:20 }}>
           <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#1E3A5F", marginBottom:6, textTransform:"uppercase", letterSpacing:.5 }}>Senha</label>

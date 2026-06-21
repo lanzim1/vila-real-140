@@ -534,9 +534,14 @@ export default function App() {
           ))}
         </nav>
         {readOnly ? (
-          <div style={{ margin:"0 16px", padding:"9px", background:"rgba(201,147,58,.2)", border:"1px solid rgba(201,147,58,.4)", borderRadius:8, color:"#F0D9A8", fontSize:12, fontWeight:600, textAlign:"center" }}>
-            👁️ Modo Visualização
-          </div>
+          <button
+            onClick={async () => { await signOut(auth); window.location.href = window.location.origin + window.location.pathname; }}
+            title="Sair do modo visualização e voltar para a tela de login"
+            style={{ margin:"0 16px", padding:"9px", background:"rgba(201,147,58,.2)", border:"1px solid rgba(201,147,58,.4)", borderRadius:8, color:"#F0D9A8", fontSize:12, fontWeight:600, textAlign:"center", cursor:"pointer", lineHeight:1.5 }}
+          >
+            👁️ Modo Visualização<br/>
+            <span style={{ fontSize:11, fontWeight:400, opacity:.85 }}>Sair</span>
+          </button>
         ) : (
           <button onClick={() => signOut(auth)} style={{ margin:"0 16px", padding:"9px", background:"rgba(176,58,46,.25)", border:"1px solid rgba(176,58,46,.4)", borderRadius:8, color:"#ff9a8b", cursor:"pointer", fontSize:13, fontWeight:600 }}>
             Sair

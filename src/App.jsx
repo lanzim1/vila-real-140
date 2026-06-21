@@ -93,6 +93,7 @@ const Badge = ({ status }) => {
 const Login = () => {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [verPass, setVerPass] = useState(false);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -123,7 +124,12 @@ const Login = () => {
         </div>
         <div style={{ marginBottom:20 }}>
           <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#1E3A5F", marginBottom:6, textTransform:"uppercase", letterSpacing:.5 }}>Senha</label>
-          <input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="••••••••" style={{ width:"100%", padding:"10px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, color:"#1E3A5F", outline:"none", boxSizing:"border-box" }} />
+          <div style={{ position:"relative" }}>
+            <input type={verPass ? "text" : "password"} value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="••••••••" style={{ width:"100%", padding:"10px 40px 10px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, color:"#1E3A5F", outline:"none", boxSizing:"border-box" }} />
+            <button type="button" onClick={() => setVerPass(v => !v)} title={verPass ? "Ocultar senha" : "Mostrar senha"} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", fontSize:16, padding:4, lineHeight:1 }}>
+              {verPass ? "🙈" : "👁️"}
+            </button>
+          </div>
         </div>
         {err && <p style={{ color:"#B03A2E", fontSize:13, margin:"0 0 14px", textAlign:"center" }}>{err}</p>}
         <button onClick={handle} disabled={loading} style={{ width:"100%", padding:"12px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:15, fontWeight:600, cursor: loading ? "default" : "pointer", letterSpacing:.3, opacity: loading ? .7 : 1 }}>

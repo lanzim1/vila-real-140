@@ -131,6 +131,7 @@ export default function App() {
   const [modal, setModal] = useState(null); // { type, data }
   const [novoMorador, setNovoMorador] = useState({ nome:"", unidade:"", email:"", telefone:"" });
   const [pagForm, setPagForm] = useState({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
+  const [verSenha, setVerSenha] = useState(false);
   const fileRef = useRef();
 
   useEffect(() => { localStorage.setItem("vr_moradores", JSON.stringify(moradores)); }, [moradores]);
@@ -431,7 +432,12 @@ export default function App() {
               <h3 style={{ color:"#1E3A5F", margin:"0 0 12px", fontSize:15, fontWeight:700 }}>Credenciais de acesso</h3>
               <div style={{ fontSize:13, color:"#6B7A8D", lineHeight:1.8, background:"#F0F4F8", borderRadius:8, padding:"12px 16px" }}>
                 <div>Usuário: <b style={{color:"#1E3A5F"}}>sindico</b></div>
-                <div>Senha: <b style={{color:"#1E3A5F"}}>vilareal140</b></div>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  Senha: <b style={{color:"#1E3A5F", letterSpacing: verSenha ? 0 : 2}}>{verSenha ? "vilareal140" : "••••••••••••"}</b>
+                  <button onClick={() => setVerSenha(v => !v)} style={{ background:"none", border:"none", cursor:"pointer", fontSize:14, padding:"2px 4px", color:"#2E6DA4" }} title={verSenha ? "Ocultar senha" : "Mostrar senha"}>
+                    {verSenha ? "🙈" : "👁️"}
+                  </button>
+                </div>
                 <div style={{ marginTop:8, fontSize:11, color:"#aaa" }}>Para alterar senha, edite o arquivo de configuração ou integre ao Firebase Auth.</div>
               </div>
               <hr style={{ margin:"28px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />

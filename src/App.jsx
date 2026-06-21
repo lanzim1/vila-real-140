@@ -599,4 +599,270 @@ export default function App() {
                       <td style={{ padding:"13px 16px", fontSize:13, color:"#6B7A8D" }}>{mesLabel(d.mes)}</td>
                       <td style={{ padding:"13px 16px", fontSize:13, fontWeight:600, color:"#1E3A5F" }}>R$ {d.valor.toFixed(2).replace(".",",")}</td>
                       <td style={{ padding:"13px 16px" }}><Badge status={d.status} /></td>
-                      <td style={{ padding:"13px 16px",
+                      <td style={{ padding:"13px 16px", fontSize:12, color:"#6B7A8D" }}>{d.dataPagamento || "—"}</td>
+                      <td style={{ padding:"13px 16px" }}>
+                        <div style={{ display:"flex", gap:8 }}>
+                          {d.status !== "pago" && (
+                            <button onClick={() => marcarDespesaPaga(d.id)} style={{ padding:"5px 12px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                              ✓ Marcar Paga
+                            </button>
+                          )}
+                          {d.comprovante && (
+                            <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} style={{ padding:"5px 12px", background:"#E3F2FD", color:"#1565C0", border:"1px solid #90CAF9", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                              📄 Ver
+                            </button>
+                          )}
+                          <button onClick={() => { if(window.confirm("Remover esta despesa?")) removerDespesa(d.id); }} style={{ padding:"5px 12px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                            Remover
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {despesas.length === 0 && (
+                    <tr><td colSpan={7} style={{ padding:24, textAlign:"center", color:"#9aa6b5", fontSize:13 }}>Nenhuma despesa cadastrada ainda.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── Serviços / Manutenção ── */}
+        {aba === "servicos" && (
+          <div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20, flexWrap:"wrap", gap:12 }}>
+              <div>
+                <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:26 }}>Serviços &amp; Manutenção</h2>
+                <p style={{ color:"#6B7A8D", margin:"6px 0 0", fontSize:14 }}>Acompanhe consertos e melhorias do condomínio</p>
+              </div>
+              <button onClick={() => setModal({ type:"novoServico" })} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                + Novo Serviço
+              </button>
+            </div>
+
+            <h3 style={{ fontSize:14, color:"#1E3A5F", fontWeight:700, margin:"24px 0 12px" }}>🟡 Pendentes ({servicos.filter(s=>s.status==="pendente").length})</h3>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:16, marginBottom:8 }}>
+              {servicos.filter(s=>s.status==="pendente").map(s => (
+                <div key={s.id} style={{ background:"#fff", borderRadius:12, padding:20, boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderLeft:"4px solid #F57F17" }}>
+                  <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:15, marginBottom:4 }}>{s.titulo}</div>
+                  {s.descricao && <div style={{ fontSize:13, color:"#6B7A8D", marginBottom:8 }}>{s.descricao}</div>}
+                  <div style={{ fontSize:11, color:"#9aa6b5" }}>Aberto em {s.dataAbertura}</div>
+                  <div style={{ display:"flex", gap:8, marginTop:14 }}>
+                    <button onClick={() => { setConcluirForm({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" }); setModal({ type:"concluirServico", data:s }); }} style={{ padding:"6px 14px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                      ✓ Concluir
+                    </button>
+                    <button onClick={() => { if(window.confirm(`Remover serviço "${s.titulo}"?`)) removerServico(s.id); }} style={{ padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {servicos.filter(s=>s.status==="pendente").length === 0 && (
+                <div style={{ color:"#9aa6b5", fontSize:13, padding:"8px 4px" }}>Nenhum serviço pendente. 🎉</div>
+              )}
+            </div>
+
+            <h3 style={{ fontSize:14, color:"#1E3A5F", fontWeight:700, margin:"32px 0 12px" }}>✅ Concluídos ({servicos.filter(s=>s.status==="concluido").length})</h3>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:16 }}>
+              {servicos.filter(s=>s.status==="concluido").map(s => (
+                <div key={s.id} style={{ background:"#fff", borderRadius:12, padding:20, boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderLeft:"4px solid #2E7D32" }}>
+                  <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:15, marginBottom:4 }}>{s.titulo}</div>
+                  {s.descricao && <div style={{ fontSize:13, color:"#6B7A8D", marginBottom:10 }}>{s.descricao}</div>}
+                  <div style={{ fontSize:12, color:"#6B7A8D", lineHeight:1.8, background:"#F0F4F8", borderRadius:8, padding:"10px 12px" }}>
+                    <div>📅 Início: <b style={{color:"#1E3A5F"}}>{s.dataInicio || "—"}</b> · Fim: <b style={{color:"#1E3A5F"}}>{s.dataFim || "—"}</b></div>
+                    <div>🧱 Material: <b style={{color:"#1E3A5F"}}>R$ {(s.valorMaterial||0).toFixed(2).replace(".",",")}</b></div>
+                    <div>👷 Mão de obra: <b style={{color:"#1E3A5F"}}>R$ {(s.valorMaoDeObra||0).toFixed(2).replace(".",",")}</b></div>
+                    <div>💰 Total: <b style={{color:"#C9933A"}}>R$ {((s.valorMaterial||0)+(s.valorMaoDeObra||0)).toFixed(2).replace(".",",")}</b></div>
+                    {s.obsConclusao && <div style={{marginTop:4}}>📝 {s.obsConclusao}</div>}
+                  </div>
+                  <div style={{ display:"flex", gap:8, marginTop:12 }}>
+                    <button onClick={() => reabrirServico(s.id)} style={{ padding:"6px 14px", background:"#FFF8E1", color:"#F57F17", border:"1px solid #FFE082", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                      ↩ Reabrir
+                    </button>
+                    <button onClick={() => { if(window.confirm(`Remover serviço "${s.titulo}"?`)) removerServico(s.id); }} style={{ padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {servicos.filter(s=>s.status==="concluido").length === 0 && (
+                <div style={{ color:"#9aa6b5", fontSize:13, padding:"8px 4px" }}>Nenhum serviço concluído ainda.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Configurações ── */}
+        {aba === "config" && (
+          <div>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:"0 0 8px", fontSize:26 }}>Configurações</h2>
+            <p style={{ color:"#6B7A8D", margin:"0 0 28px", fontSize:14 }}>Ajuste os parâmetros do condomínio</p>
+            <div style={{ background:"#fff", borderRadius:12, padding:28, boxShadow:"0 2px 8px rgba(0,0,0,.06)", maxWidth:480 }}>
+              <h3 style={{ color:"#1E3A5F", margin:"0 0 20px", fontSize:15, fontWeight:700 }}>Taxa mensal de condomínio</h3>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Valor (R$)</label>
+              <input type="number" value={taxa} onChange={e=>setTaxa(parseFloat(e.target.value)||0)} style={{ display:"block", width:"100%", padding:"10px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:16, color:"#1E3A5F", marginTop:8, boxSizing:"border-box" }} />
+              <button onClick={() => salvarTaxa(taxa)} style={{ marginTop:16, padding:"10px 24px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer" }}>
+                Salvar
+              </button>
+              <hr style={{ margin:"28px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
+              <h3 style={{ color:"#1E3A5F", margin:"0 0 12px", fontSize:15, fontWeight:700 }}>Conta conectada</h3>
+              <div style={{ fontSize:13, color:"#6B7A8D", lineHeight:1.8, background:"#F0F4F8", borderRadius:8, padding:"12px 16px" }}>
+                <div>E-mail: <b style={{color:"#1E3A5F"}}>{user?.email}</b></div>
+                <div style={{ marginTop:8, fontSize:11, color:"#aaa" }}>Login gerenciado pelo Firebase Authentication. Para trocar a senha, use o painel do Firebase (Authentication → Users).</div>
+              </div>
+              <hr style={{ margin:"28px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
+              <h3 style={{ color:"#1E3A5F", margin:"0 0 12px", fontSize:15, fontWeight:700 }}>Sobre o sistema</h3>
+              <div style={{ fontSize:12, color:"#6B7A8D", lineHeight:1.8 }}>
+                <div>🏢 Condomínio Vila Real 140</div>
+                <div>📦 Versão 2.0 · Dados em tempo real via Firebase</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* ── Modais ── */}
+      {modal?.type === "pagar" && (
+        <Modal title={`Registrar Pagamento — ${modal.data.unidade}`} onClose={() => setModal(null)}>
+          <p style={{ fontSize:13, color:"#6B7A8D", margin:"0 0 20px" }}>Morador: <b style={{color:"#1E3A5F"}}>{modal.data.nome}</b> · Taxa: <b style={{color:"#C9933A"}}>R$ {taxa.toFixed(2).replace(".",",")}</b></p>
+          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Observação (opcional)</label>
+          <input value={pagForm.obs} onChange={e=>setPagForm(p=>({...p,obs:e.target.value}))} placeholder="Ex: Pago via Pix" style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:8, marginBottom:18, boxSizing:"border-box" }} />
+          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Comprovante (imagem ou PDF)</label>
+          <div onClick={() => fileRef.current.click()} style={{ marginTop:8, border:"2px dashed #D0DAE6", borderRadius:8, padding:"20px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:"#6B7A8D", fontSize:13 }}>
+            {pagForm.arquivoNome ? <><span style={{color:"#2E6DA4", fontWeight:600}}>📎 {pagForm.arquivoNome}</span></> : <><div style={{fontSize:24,marginBottom:6}}>📁</div>Clique para selecionar arquivo</>}
+          </div>
+          <input ref={fileRef} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f = e.target.files[0]; if(f) setPagForm(p => ({...p, arquivo:f, arquivoNome:f.name})); }} />
+          <div style={{ display:"flex", gap:10, marginTop:24, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"9px 20px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={() => registrarPagamento(modal.data.moradorId)} style={{ padding:"9px 24px", background:"#2E7D32", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Confirmar Pagamento</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "comprovante" && (
+        <Modal title={`Comprovante — ${modal.data.nome}`} onClose={() => setModal(null)}>
+          {modal.data.comprovante?.startsWith("data:image") ? (
+            <img src={modal.data.comprovante} alt="comprovante" style={{ width:"100%", borderRadius:8, border:"1px solid #E8EDF3" }} />
+          ) : modal.data.comprovante?.startsWith("data:application/pdf") ? (
+            <div style={{ textAlign:"center", padding:24 }}>
+              <div style={{ fontSize:48, marginBottom:12 }}>📄</div>
+              <p style={{ color:"#1E3A5F", fontWeight:600, marginBottom:16 }}>{modal.data.arquivoNome || "comprovante.pdf"}</p>
+              <a href={modal.data.comprovante} download={modal.data.arquivoNome || "comprovante.pdf"} style={{ padding:"10px 24px", background:"#2E6DA4", color:"#fff", borderRadius:8, textDecoration:"none", fontSize:13, fontWeight:600 }}>⬇ Baixar PDF</a>
+            </div>
+          ) : (
+            <p style={{ color:"#6B7A8D", textAlign:"center" }}>Nenhum comprovante anexado.</p>
+          )}
+        </Modal>
+      )}
+
+      {modal?.type === "estorno" && (
+        <Modal title="Confirmar Estorno" onClose={() => setModal(null)}>
+          <p style={{ color:"#2C3E50", fontSize:14 }}>Deseja estornar o pagamento de <b>{modal.data.nome}</b>? O status voltará para <b>Pendente</b>.</p>
+          <div style={{ display:"flex", gap:10, marginTop:20, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"9px 20px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={() => estornarPagamento(modal.data.moradorId)} style={{ padding:"9px 24px", background:"#B03A2E", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>↩ Confirmar Estorno</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "novoMorador" && (
+        <Modal title="Cadastrar Novo Morador" onClose={() => setModal(null)}>
+          {[
+            { label:"Nome completo *", key:"nome", placeholder:"Ex: João da Silva" },
+            { label:"Unidade *", key:"unidade", placeholder:"Ex: Apto 103" },
+            { label:"E-mail *", key:"email", placeholder:"joao@email.com", type:"email" },
+            { label:"Telefone", key:"telefone", placeholder:"(85) 99999-0000" },
+          ].map(f => (
+            <div key={f.key} style={{ marginBottom:16 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>{f.label}</label>
+              <input type={f.type||"text"} value={novoMorador[f.key]} onChange={e=>setNovoMorador(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, boxSizing:"border-box" }} />
+            </div>
+          ))}
+          <div style={{ display:"flex", gap:10, marginTop:8, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"9px 20px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={adicionarMorador} style={{ padding:"9px 24px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Cadastrar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "novaDespesa" && (
+        <Modal title="Nova Despesa — Água/Luz" onClose={() => setModal(null)}>
+          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Tipo</label>
+          <select value={novaDespesa.tipo} onChange={e=>setNovaDespesa(p=>({...p,tipo:e.target.value}))} style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, marginBottom:16, boxSizing:"border-box", background:"#fff" }}>
+            <option value="agua">💧 Água</option>
+            <option value="luz">⚡ Luz</option>
+            <option value="outro">📦 Outra despesa</option>
+          </select>
+          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Descrição (opcional)</label>
+          <input value={novaDespesa.descricao} onChange={e=>setNovaDespesa(p=>({...p,descricao:e.target.value}))} placeholder="Ex: Conta Enel referente a Junho" style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, marginBottom:16, boxSizing:"border-box" }} />
+          <div style={{ display:"flex", gap:12 }}>
+            <div style={{ flex:1 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Valor (R$) *</label>
+              <input type="number" value={novaDespesa.valor} onChange={e=>setNovaDespesa(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, boxSizing:"border-box" }} />
+            </div>
+            <div style={{ flex:1 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Mês de referência *</label>
+              <input type="month" value={novaDespesa.mes} onChange={e=>setNovaDespesa(p=>({...p,mes:e.target.value}))} style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, boxSizing:"border-box" }} />
+            </div>
+          </div>
+          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5, display:"block", marginTop:16 }}>Comprovante (opcional)</label>
+          <div onClick={() => fileRefDespesa.current.click()} style={{ marginTop:8, border:"2px dashed #D0DAE6", borderRadius:8, padding:"18px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:"#6B7A8D", fontSize:13 }}>
+            {novaDespesa.arquivoNome ? <span style={{color:"#2E6DA4", fontWeight:600}}>📎 {novaDespesa.arquivoNome}</span> : <>📁 Clique para selecionar arquivo</>}
+          </div>
+          <input ref={fileRefDespesa} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f = e.target.files[0]; if(f) setNovaDespesa(p => ({...p, arquivo:f, arquivoNome:f.name})); }} />
+          <div style={{ display:"flex", gap:10, marginTop:22, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"9px 20px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={adicionarDespesa} style={{ padding:"9px 24px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "novoServico" && (
+        <Modal title="Novo Serviço a Fazer" onClose={() => setModal(null)}>
+          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Título *</label>
+          <input value={novoServico.titulo} onChange={e=>setNovoServico(p=>({...p,titulo:e.target.value}))} placeholder="Ex: Consertar o portão da garagem" style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, marginBottom:16, boxSizing:"border-box" }} />
+          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Descrição (opcional)</label>
+          <textarea value={novoServico.descricao} onChange={e=>setNovoServico(p=>({...p,descricao:e.target.value}))} placeholder="Detalhes do que precisa ser feito" rows={3} style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, boxSizing:"border-box", fontFamily:"inherit", resize:"vertical" }} />
+          <div style={{ display:"flex", gap:10, marginTop:22, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"9px 20px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={adicionarServico} style={{ padding:"9px 24px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "concluirServico" && (
+        <Modal title={`Concluir Serviço — ${modal.data.titulo}`} onClose={() => setModal(null)}>
+          <div style={{ display:"flex", gap:12, marginBottom:16 }}>
+            <div style={{ flex:1 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Data de início</label>
+              <input type="date" value={concluirForm.dataInicio} onChange={e=>setConcluirForm(p=>({...p,dataInicio:e.target.value}))} style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, boxSizing:"border-box" }} />
+            </div>
+            <div style={{ flex:1 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Data de fim</label>
+              <input type="date" value={concluirForm.dataFim} onChange={e=>setConcluirForm(p=>({...p,dataFim:e.target.value}))} style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, boxSizing:"border-box" }} />
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:12, marginBottom:16 }}>
+            <div style={{ flex:1 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Material (R$)</label>
+              <input type="number" value={concluirForm.valorMaterial} onChange={e=>setConcluirForm(p=>({...p,valorMaterial:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, boxSizing:"border-box" }} />
+            </div>
+            <div style={{ flex:1 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Mão de obra (R$)</label>
+              <input type="number" value={concluirForm.valorMaoDeObra} onChange={e=>setConcluirForm(p=>({...p,valorMaoDeObra:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, boxSizing:"border-box" }} />
+            </div>
+          </div>
+          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Observações (opcional)</label>
+          <textarea value={concluirForm.obs} onChange={e=>setConcluirForm(p=>({...p,obs:e.target.value}))} rows={2} placeholder="Ex: Trocado motor do portão, fornecedor X" style={{ display:"block", width:"100%", padding:"9px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, marginTop:6, boxSizing:"border-box", fontFamily:"inherit", resize:"vertical" }} />
+          <div style={{ display:"flex", gap:10, marginTop:22, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"9px 20px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={() => concluirServico(modal.data.id)} style={{ padding:"9px 24px", background:"#2E7D32", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Confirmar Conclusão</button>
+          </div>
+        </Modal>
+      )}
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+    </div>
+  );
+}

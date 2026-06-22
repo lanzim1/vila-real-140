@@ -232,6 +232,12 @@ export default function App() {
   const totalArrecadado = pagos * taxa;
   const totalPendente = pendentes * taxa;
 
+  // ── Saldo de caixa (total geral, não filtrado por mês) ──
+  const totalEntradas = cobrancas.filter(c => c.status === "pago").length * taxa;
+  const totalSaidasDespesas = despesas.filter(d => d.status === "pago").reduce((s, d) => s + (d.valor || 0), 0);
+  const totalSaidasServicos = servicos.filter(s => s.status === "concluido").reduce((s, sv) => s + (sv.valorMaterial || 0) + (sv.valorMaoDeObra || 0), 0);
+  const saldoCaixa = totalEntradas - totalSaidasDespesas - totalSaidasServicos;
+
   // Garante que existe cobrança para cada morador no mês informado
   const garantirMes = async (mes) => {
     const existentes = new Set(cobrancas.filter(c => c.mes === mes).map(c => c.moradorId));
@@ -425,6 +431,10 @@ export default function App() {
         ["Pendentes / Atrasados", String(pendentes)],
         ["Arrecadado", `R$ ${totalArrecadado.toFixed(2).replace(".",",")}`],
         ["A receber", `R$ ${totalPendente.toFixed(2).replace(".",",")}`],
+        ["Total entradas (geral)", `R$ ${totalEntradas.toFixed(2).replace(".",",")}`],
+        ["Total despesas pagas (geral)", `R$ ${totalSaidasDespesas.toFixed(2).replace(".",",")}`],
+        ["Total serviços (geral)", `R$ ${totalSaidasServicos.toFixed(2).replace(".",",")}`],
+        ["SALDO DE CAIXA", `R$ ${saldoCaixa.toFixed(2).replace(".",",")}`],
       ],
     });
     y = docPdf.lastAutoTable.finalY + 12;
@@ -556,7 +566,25 @@ export default function App() {
         {aba === "dashboard" && (
           <div>
             <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:"0 0 8px", fontSize:26 }}>Dashboard</h2>
-            <p style={{ color:"#6B7A8D", margin:"0 0 28px", fontSize:14 }}>Visão geral do condomínio · {mesLabel(mesSel)}</p>
+            <p style={{ color:"#6B7A8D", margin:"0 0 20px", fontSize:14 }}>Visão geral do condomínio · {mesLabel(mesSel)}</p>
+
+            {/* Card de Saldo de Caixa */}
+            <div style={{ background: saldoCaixa >= 0 ? "linear-gradient(135deg,#1E3A5F,#2E6DA4)" : "linear-gradient(135deg,#7B241C,#B03A2E)", borderRadius:14, padding:"22px 28px", marginBottom:28, boxShadow:"0 4px 20px rgba(0,0,0,.15)", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
+              <div>
+                <div style={{ color:"rgba(255,255,255,.7)", fontSize:12, fontWeight:600, textTransform:"uppercase", letterSpacing:.8, marginBottom:6 }}>💰 Saldo de Caixa — Geral</div>
+                <div style={{ color:"#fff", fontSize:34, fontWeight:800, letterSpacing:-.5 }}>
+                  R$ {saldoCaixa.toFixed(2).replace(".",",")}
+                </div>
+                <div style={{ color:"rgba(255,255,255,.6)", fontSize:11, marginTop:6 }}>
+                  Entradas: R$ {totalEntradas.toFixed(2).replace(".",",")} &nbsp;·&nbsp;
+                  Despesas: R$ {totalSaidasDespesas.toFixed(2).replace(".",",")} &nbsp;·&nbsp;
+                  Serviços: R$ {totalSaidasServicos.toFixed(2).replace(".",",")}
+                </div>
+              </div>
+              <div style={{ fontSize:48, opacity:.3 }}>
+                {saldoCaixa >= 0 ? "📈" : "📉"}
+              </div>
+            </div>
 
             <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:28 }}>
               <label style={{ fontSize:13, color:"#1E3A5F", fontWeight:600 }}>Mês de referência:</label>

@@ -210,10 +210,12 @@ export default function App() {
   const showToast = (msg, type="success") => setToast({ msg, type });
 
   const cobMes = cobrancas.filter(c => c.mes === mesSel);
-  const pagos     = cobMes.filter(c => c.status === "pago").length;
-  const pendentes = cobMes.filter(c => c.status !== "pago").length;
+  const pagos      = cobMes.filter(c => c.status === "pago").length;
+  const pendentes  = cobMes.filter(c => c.status === "pendente").length;
+  const atrasados  = cobMes.filter(c => c.status === "atrasado").length;
+  const nPagos     = pendentes + atrasados;
   const totalArrecadado = pagos * taxa;
-  const totalPendente   = pendentes * taxa;
+  const totalPendente   = nPagos * taxa;
 
   const totalEntradas        = cobrancas.filter(c => c.status === "pago").length * taxa;
   const totalSaidasDespesas  = despesas.filter(d => d.status === "pago").reduce((s,d) => s+(d.valor||0), 0);
@@ -229,7 +231,30 @@ export default function App() {
     if (mudou) await batch.commit();
   };
 
-  useEffect(() => { if (user && moradores.length > 0) garantirMes(mesSel); }, [user, moradores.length]);
+  // ── Marcar cobranças vencidas como "atrasado" ──
+  const atualizarAtrasados = async () => {
+    const hoje = new Date();
+    hoje.setHours(0,0,0,0);
+    const batch = writeBatch(db);
+    let mudou = false;
+    cobrancas.forEach(c => {
+      if (c.status !== "pendente") return;
+      const venc = dataVencimentoMes(c.mes);
+      venc.setHours(0,0,0,0);
+      if (hoje > venc) {
+        batch.set(doc(db, "cobrancas", `${c.moradorId}_${c.mes}`), { status:"atrasado" }, { merge:true });
+        mudou = true;
+      }
+    });
+    if (mudou) await batch.commit();
+  };
+
+  useEffect(() => {
+    if (user && moradores.length > 0) {
+      garantirMes(mesSel);
+      atualizarAtrasados();
+    }
+  }, [user, moradores.length, cobrancas.length, diaVencimento]);
 
   const mudarMes = (m) => { setMesSel(m); garantirMes(m); };
 
@@ -244,7 +269,10 @@ export default function App() {
   };
 
   const estornarPagamento = async (moradorId) => {
-    await setDoc(doc(db, "cobrancas", `${moradorId}_${mesSel}`), { moradorId, mes:mesSel, status:"pendente", dataPagamento:null, obs:"", comprovante:null, arquivoNome:"" }, { merge:true });
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const venc = dataVencimentoMes(mesSel); venc.setHours(0,0,0,0);
+    const novoStatus = hoje > venc ? "atrasado" : "pendente";
+    await setDoc(doc(db, "cobrancas", `${moradorId}_${mesSel}`), { moradorId, mes:mesSel, status:novoStatus, dataPagamento:null, obs:"", comprovante:null, arquivoNome:"" }, { merge:true });
     setModal(null); showToast("Pagamento estornado.", "error");
   };
 
@@ -368,8 +396,8 @@ export default function App() {
         // 5 dias antes: envia pra TODOS os moradores do mês
         destinatarios = moradores;
       } else {
-        // Dia do vencimento: só os que NÃO pagaram
-        const naoPagaram = cobMes.filter(c => c.status !== "pago").map(c => c.moradorId);
+        // Dia do vencimento: pendentes E atrasados
+        const naoPagaram = cobMes.filter(c => c.status === "pendente" || c.status === "atrasado").map(c => c.moradorId);
         destinatarios    = moradores.filter(m => naoPagaram.includes(m.id));
       }
 
@@ -622,11 +650,12 @@ export default function App() {
 
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit,minmax(160px,1fr))", gap:12, marginBottom:20 }}>
               {[
-                { label:"Unidades",       valor: moradores.length,                                                   icon:"🏠", cor:"#1E3A5F" },
-                { label:"Pagamentos",     valor: pagos,                                                              icon:"✅", cor:"#2E7D32" },
-                { label:"Pendentes",      valor: pendentes,                                                          icon:"⏳", cor:"#B03A2E" },
-                { label:"Arrecadado",     valor: `R$ ${totalArrecadado.toFixed(2).replace(".",",")}`,                icon:"💵", cor:"#C9933A" },
-                { label:"A Receber",      valor: `R$ ${totalPendente.toFixed(2).replace(".",",")}`,                  icon:"📋", cor:"#2E6DA4" },
+                { label:"Unidades",   valor: moradores.length,                                              icon:"🏠", cor:"#1E3A5F" },
+                { label:"Pagamentos", valor: pagos,                                                         icon:"✅", cor:"#2E7D32" },
+                { label:"Pendentes",  valor: pendentes,                                                     icon:"⏳", cor:"#F57F17" },
+                { label:"Atrasados",  valor: atrasados,                                                     icon:"🚨", cor:"#B03A2E" },
+                { label:"Arrecadado", valor:`R$ ${totalArrecadado.toFixed(2).replace(".",",")}`,            icon:"💵", cor:"#C9933A" },
+                { label:"A Receber",  valor:`R$ ${totalPendente.toFixed(2).replace(".",",")}`,              icon:"📋", cor:"#2E6DA4" },
               ].map((c,i) => (
                 <div key={i} style={{ background:"#fff", borderRadius:12, padding:"14px 14px 12px", boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderTop:`3px solid ${c.cor}` }}>
                   <div style={{ fontSize:20, marginBottom:6 }}>{c.icon}</div>
@@ -654,7 +683,7 @@ export default function App() {
               )}
               {!readOnly && (
                 <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"12px 18px", background:"#C9933A", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, flex: isMobile?"1 1 100%":"none" }}>
-                  {enviandoEmails ? "📧 Enviando..." : `⚠️ Cobrar pendentes (${pendentes})`}
+                  {enviandoEmails ? "📧 Enviando..." : `⚠️ Cobrar pendentes/atrasados (${nPagos})`}
                 </button>
               )}
               <button onClick={exportarPDF} style={{ padding:"12px 18px", background:"#fff", color:"#1E3A5F", border:"1.5px solid #1E3A5F", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", flex: isMobile?"1 1 100%":"none" }}>📄 Exportar PDF</button>

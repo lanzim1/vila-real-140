@@ -259,11 +259,99 @@ export default function App() {
   const mudarMes = (m) => { setMesSel(m); garantirMes(m); };
 
   // ── Pagamentos ──
+  // ── Gerar recibo de pagamento em PDF ──
+  const gerarReciboPDF = (morador, dataPagamento, obs) => {
+    const docPdf  = new jsPDF();
+    const AZUL    = [30, 58, 95];
+    const DOURADO = [201, 147, 58];
+    const numRecibo = `${mesSel.replace("-","")}-${morador.id?.slice(0,6).toUpperCase() || "000000"}`;
+
+    // Cabeçalho
+    docPdf.setFillColor(...AZUL);
+    docPdf.rect(0, 0, 210, 38, "F");
+    docPdf.setTextColor(255,255,255);
+    docPdf.setFontSize(18);
+    docPdf.setFont("helvetica","bold");
+    docPdf.text("🏢 Condomínio Vila Real 140", 14, 16);
+    docPdf.setFontSize(10);
+    docPdf.setFont("helvetica","normal");
+    docPdf.text("Recibo de Pagamento de Taxa Condominial", 14, 26);
+    docPdf.setTextColor(...DOURADO);
+    docPdf.text(`Nº ${numRecibo}`, 14, 33);
+
+    // Corpo
+    docPdf.setTextColor(30,30,30);
+    let y = 52;
+    docPdf.setFontSize(11);
+    docPdf.setFont("helvetica","bold");
+    docPdf.text("DADOS DO MORADOR", 14, y); y += 7;
+    docPdf.setDrawColor(201,147,58);
+    docPdf.setLineWidth(0.5);
+    docPdf.line(14, y, 196, y); y += 8;
+
+    const campos = [
+      ["Nome",             morador.nome],
+      ["Unidade",          morador.unidade],
+      ["E-mail",           morador.email],
+      ["Telefone",         morador.telefone || "—"],
+    ];
+    docPdf.setFont("helvetica","normal");
+    docPdf.setFontSize(10);
+    campos.forEach(([label, valor]) => {
+      docPdf.setFont("helvetica","bold");   docPdf.text(`${label}:`, 14, y);
+      docPdf.setFont("helvetica","normal"); docPdf.text(valor, 60, y);
+      y += 8;
+    });
+
+    y += 6;
+    docPdf.setFont("helvetica","bold");
+    docPdf.setFontSize(11);
+    docPdf.text("DADOS DO PAGAMENTO", 14, y); y += 7;
+    docPdf.line(14, y, 196, y); y += 8;
+
+    const pagCampos = [
+      ["Referência",       mesLabelEmail(mesSel)],
+      ["Valor pago",       `R$ ${taxa.toFixed(2).replace(".",",")}`],
+      ["Data do pagamento",dataPagamento],
+      ["Vencimento",       formatarDataBR(dataVencimentoMes(mesSel))],
+      ["Observação",       obs || "—"],
+    ];
+    docPdf.setFontSize(10);
+    pagCampos.forEach(([label, valor]) => {
+      docPdf.setFont("helvetica","bold");   docPdf.text(`${label}:`, 14, y);
+      docPdf.setFont("helvetica","normal"); docPdf.text(String(valor), 60, y);
+      y += 8;
+    });
+
+    // Destaque do valor
+    y += 6;
+    docPdf.setFillColor(232,245,233);
+    docPdf.roundedRect(14, y, 182, 18, 3, 3, "F");
+    docPdf.setTextColor(46,125,50);
+    docPdf.setFont("helvetica","bold");
+    docPdf.setFontSize(13);
+    docPdf.text(`✓  Pagamento confirmado: R$ ${taxa.toFixed(2).replace(".",",")}`, 20, y+12);
+
+    // Rodapé
+    y += 36;
+    docPdf.setTextColor(107,122,141);
+    docPdf.setFont("helvetica","normal");
+    docPdf.setFontSize(9);
+    docPdf.line(14, y, 196, y); y += 6;
+    docPdf.text(`Documento gerado automaticamente em ${new Date().toLocaleString("pt-BR")}`, 14, y); y += 5;
+    docPdf.text("Condomínio Vila Real 140 — Sistema de Gestão Condominial", 14, y);
+
+    docPdf.save(`recibo-${morador.unidade.replace(/\s/g,"-")}-${mesSel}.pdf`);
+  };
+
   const registrarPagamento = (moradorId) => {
+    const morador = moradores.find(m => m.id === moradorId);
+    const dataPgto = new Date().toLocaleDateString("pt-BR");
     const salvar = async (base64="") => {
-      await setDoc(doc(db, "cobrancas", `${moradorId}_${mesSel}`), { moradorId, mes:mesSel, status:"pago", dataPagamento:new Date().toLocaleDateString("pt-BR"), obs:pagForm.obs, comprovante:base64, arquivoNome:pagForm.arquivoNome }, { merge:true });
+      await setDoc(doc(db, "cobrancas", `${moradorId}_${mesSel}`), { moradorId, mes:mesSel, status:"pago", dataPagamento:dataPgto, obs:pagForm.obs, comprovante:base64, arquivoNome:pagForm.arquivoNome }, { merge:true });
       setModal(null); setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
-      showToast("Pagamento registrado com sucesso!");
+      showToast("Pagamento registrado! Recibo gerado.");
+      if (morador) gerarReciboPDF(morador, dataPgto, pagForm.obs);
     };
     if (pagForm.arquivo) { const r=new FileReader(); r.onload=e=>salvar(e.target.result); r.readAsDataURL(pagForm.arquivo); } else salvar();
   };
@@ -1059,6 +1147,11 @@ export default function App() {
                       <span style={{ fontSize:16 }}>{icone}</span>
                       <span style={{ fontSize:11, fontWeight:600, color:corBorda, textTransform:"capitalize" }}>{c.status}</span>
                       <span style={{ fontSize:12, color:"#1E3A5F", fontWeight:600 }}>R$ {taxa.toFixed(2).replace(".",",")}</span>
+                      {c.status === "pago" && (
+                        <button onClick={() => gerarReciboPDF(m, c.dataPagamento, c.obs)} style={{ fontSize:11, padding:"3px 8px", background:"#F3E5F5", color:"#6A1B9A", border:"1px solid #CE93D8", borderRadius:6, cursor:"pointer", fontWeight:600, marginTop:2 }}>
+                          📄 Recibo
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

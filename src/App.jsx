@@ -149,6 +149,7 @@ export default function App() {
   const [toast, setToast]           = useState(null);
   const [modal, setModal]           = useState(null);
   const [novoMorador, setNovoMorador] = useState({ nome:"", unidade:"", email:"", telefone:"" });
+  const [editMorador, setEditMorador] = useState(null); // { id, nome, unidade, email, telefone }
   const [pagForm, setPagForm]         = useState({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
   const [despesas, setDespesas]       = useState([]);
   const [novaDespesa, setNovaDespesa] = useState({ tipo:"agua", descricao:"", valor:"", mes: mesAtual(), arquivo:null, arquivoNome:"" });
@@ -260,6 +261,17 @@ export default function App() {
     const snap = await getDocs(query(collection(db, "cobrancas"), where("moradorId","==",id)));
     const batch = writeBatch(db); snap.forEach(d => batch.delete(d.ref));
     if (!snap.empty) await batch.commit(); showToast("Morador removido.", "error");
+  };
+
+  const salvarEdicaoMorador = async () => {
+    if (!editMorador.nome || !editMorador.unidade || !editMorador.email) {
+      showToast("Preencha nome, unidade e e-mail.", "error"); return;
+    }
+    const { id, ...dados } = editMorador;
+    await setDoc(doc(db, "moradores", id), dados, { merge:true });
+    setEditMorador(null);
+    setModal(null);
+    showToast("Morador atualizado com sucesso!");
   };
 
   // ── Despesas ──
@@ -728,7 +740,12 @@ export default function App() {
                       <div>📧 {m.email}</div>
                       {m.telefone && <div>📱 {m.telefone}</div>}
                     </div>
-                    {!readOnly && <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ marginTop:12, padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>Remover</button>}
+                    {!readOnly && (
+                      <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
+                        <button onClick={() => { setEditMorador({ id:m.id, nome:m.nome, unidade:m.unidade, email:m.email, telefone:m.telefone||"" }); setModal({ type:"editarMorador" }); }} style={{ padding:"6px 14px", background:"#E3F2FD", color:"#1565C0", border:"1px solid #90CAF9", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✏️ Editar</button>
+                        <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>Remover</button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -961,6 +978,32 @@ export default function App() {
           <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
             <button onClick={adicionarMorador} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Cadastrar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "editarMorador" && editMorador && (
+        <Modal title="Editar Morador" onClose={() => setModal(null)} isMobile={isMobile}>
+          {[
+            { label:"Nome *",    key:"nome",     placeholder:"Ex: João da Silva"    },
+            { label:"Unidade *", key:"unidade",  placeholder:"Ex: Apto 103"         },
+            { label:"E-mail *",  key:"email",    placeholder:"joao@email.com", type:"email" },
+            { label:"Telefone",  key:"telefone", placeholder:"(85) 99999-0000"      },
+          ].map(f => (
+            <div key={f.key} style={{ marginBottom:14 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>{f.label}</label>
+              <input
+                type={f.type||"text"}
+                value={editMorador[f.key]}
+                onChange={e => setEditMorador(p => ({ ...p, [f.key]: e.target.value }))}
+                placeholder={f.placeholder}
+                style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }}
+              />
+            </div>
+          ))}
+          <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={salvarEdicaoMorador} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Salvar</button>
           </div>
         </Modal>
       )}

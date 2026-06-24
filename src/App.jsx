@@ -3,10 +3,17 @@ import { auth, db } from "./firebase";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import emailjs from "@emailjs/browser";
 import {
   collection, doc, onSnapshot, setDoc, addDoc, deleteDoc,
-  getDocs, query, where, writeBatch
+  getDocs, query, where, writeBatch, getDoc
 } from "firebase/firestore";
+
+// ── EmailJS ──
+const EJS_PUBLIC  = "miqPVueWYbnAe6ijd";
+const EJS_SERVICE = "service_h0a4utj";
+const EJS_TEMPLATE = "template_yzl1x2m";
+emailjs.init(EJS_PUBLIC);
 
 const MOCK_MORADORES = [
   { nome: "Carlos Mendes",  unidade: "Apto 101", email: "carlos@email.com",   telefone: "(85) 99123-0001" },
@@ -136,6 +143,8 @@ export default function App() {
   const [moradores, setMoradores]   = useState([]);
   const [cobrancas, setCobrancas]   = useState([]);
   const [taxa, setTaxa]             = useState(180);
+  const [diaVencimento, setDiaVencimento] = useState(10);
+  const [enviandoEmails, setEnviandoEmails] = useState(false);
   const [mesSel, setMesSel]         = useState(mesAtual);
   const [toast, setToast]           = useState(null);
   const [modal, setModal]           = useState(null);
@@ -169,7 +178,12 @@ export default function App() {
     if (!user) return;
     const u1 = onSnapshot(collection(db, "moradores"), s => setMoradores(s.docs.map(d => ({ id:d.id, ...d.data() }))));
     const u2 = onSnapshot(collection(db, "cobrancas"), s => setCobrancas(s.docs.map(d => d.data())));
-    const u3 = onSnapshot(doc(db, "config", "geral"),  d => { if (d.exists()) setTaxa(d.data().taxa ?? 180); });
+    const u3 = onSnapshot(doc(db, "config", "geral"),  d => {
+      if (d.exists()) {
+        setTaxa(d.data().taxa ?? 180);
+        setDiaVencimento(d.data().diaVencimento ?? 10);
+      }
+    });
     const u4 = onSnapshot(collection(db, "despesas"),  s => setDespesas(s.docs.map(d => ({ id:d.id, ...d.data() }))));
     const u5 = onSnapshot(collection(db, "servicos"),  s => setServicos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
     return () => { u1(); u2(); u3(); u4(); u5(); };
@@ -285,6 +299,121 @@ export default function App() {
   };
 
   const salvarTaxa = async (v) => { await setDoc(doc(db,"config","geral"), { taxa:v }, { merge:true }); showToast("Taxa atualizada!"); };
+
+  const salvarDiaVencimento = async (v) => {
+    await setDoc(doc(db,"config","geral"), { diaVencimento: parseInt(v) }, { merge:true });
+    showToast("Dia de vencimento salvo!");
+  };
+
+  // ── Envio de e-mails ──
+  const dataVencimentoMes = (mes) => {
+    const [y, m] = mes.split("-");
+    return new Date(parseInt(y), parseInt(m)-1, diaVencimento);
+  };
+
+  const formatarDataBR = (date) =>
+    `${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}/${date.getFullYear()}`;
+
+  const enviarEmailMorador = async (morador, assunto, mensagem) => {
+    await emailjs.send(EJS_SERVICE, EJS_TEMPLATE, {
+      nome_morador:   morador.nome,
+      unidade:        morador.unidade,
+      valor:          `R$ ${taxa.toFixed(2).replace(".",",")}`,
+      data_vencimento: formatarDataBR(dataVencimentoMes(mesSel)),
+      assunto,
+      mensagem,
+      email_destino:  morador.email,
+    });
+  };
+
+  const dispararEmails = async (tipo) => {
+    // tipo: "lembrete" (5 dias antes) ou "vencimento" (dia do vencimento)
+    setEnviandoEmails(true);
+    const chave = `${mesSel}_${tipo}`;
+    try {
+      // Verifica se já foi enviado hoje
+      const registroRef = doc(db, "emails_enviados", chave);
+      const registro    = await getDoc(registroRef);
+      if (registro.exists()) {
+        const ultimoEnvio = registro.data().dataEnvio;
+        const hoje        = new Date().toLocaleDateString("pt-BR");
+        if (ultimoEnvio === hoje) {
+          showToast(`E-mails de ${tipo==="lembrete"?"lembrete":"vencimento"} já foram enviados hoje.`);
+          setEnviandoEmails(false);
+          return;
+        }
+      }
+
+      // Define quem recebe
+      let destinatarios;
+      if (tipo === "lembrete") {
+        // 5 dias antes: envia pra TODOS os moradores do mês
+        destinatarios = moradores;
+      } else {
+        // Dia do vencimento: só os que NÃO pagaram
+        const naoPagaram = cobMes.filter(c => c.status !== "pago").map(c => c.moradorId);
+        destinatarios    = moradores.filter(m => naoPagaram.includes(m.id));
+      }
+
+      if (destinatarios.length === 0) {
+        showToast("Nenhum e-mail para enviar — todos já pagaram! ✅");
+        setEnviandoEmails(false);
+        return;
+      }
+
+      const vencimento = formatarDataBR(dataVencimentoMes(mesSel));
+      let enviados = 0;
+
+      for (const m of destinatarios) {
+        try {
+          if (tipo === "lembrete") {
+            await enviarEmailMorador(m,
+              `Lembrete de Vencimento — ${mesLabel(mesSel)}`,
+              `Informamos que a taxa de condomínio referente a ${mesLabel(mesSel)} vencerá em 5 dias (${vencimento}).\n\nPor favor, efetue o pagamento até a data de vencimento para evitar multas.`
+            );
+          } else {
+            await enviarEmailMorador(m,
+              `Vencimento Hoje — ${mesLabel(mesSel)}`,
+              `Informamos que a taxa de condomínio referente a ${mesLabel(mesSel)} vence hoje (${vencimento}) e consta como pendente em nosso sistema.\n\nCaso já tenha efetuado o pagamento, desconsidere este e-mail.`
+            );
+          }
+          enviados++;
+          // Pequena pausa para não sobrecarregar o EmailJS
+          await new Promise(r => setTimeout(r, 300));
+        } catch (err) {
+          console.error(`Erro ao enviar para ${m.email}:`, err);
+        }
+      }
+
+      // Registra o envio no Firestore
+      await setDoc(registroRef, {
+        tipo, mes: mesSel, dataEnvio: new Date().toLocaleDateString("pt-BR"),
+        enviados, total: destinatarios.length
+      });
+
+      showToast(`✅ ${enviados} e-mail(s) enviado(s) com sucesso!`);
+    } catch (err) {
+      console.error("Erro no envio:", err);
+      showToast("Erro ao enviar e-mails. Verifique o EmailJS.", "error");
+    } finally {
+      setEnviandoEmails(false);
+    }
+  };
+
+  // ── Verificação automática ao abrir o app ──
+  useEffect(() => {
+    if (!user || readOnly || moradores.length === 0 || !diaVencimento) return;
+    const hoje     = new Date();
+    const venc     = dataVencimentoMes(mesSel);
+    const diffDias = Math.round((venc - hoje) / (1000*60*60*24));
+
+    if (diffDias === 5) {
+      dispararEmails("lembrete");
+    } else if (diffDias === 0) {
+      dispararEmails("vencimento");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, moradores.length, diaVencimento]);
 
   const mesesDisponiveis = () => {
     const s = new Set(cobrancas.map(c=>c.mes)); s.add(mesAtual());
@@ -500,8 +629,17 @@ export default function App() {
             </div>
 
             <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-              {!readOnly && <button onClick={enviarLembretes} style={{ padding:"12px 18px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", flex: isMobile ? "1 1 100%" : "none" }}>📧 Lembretes ({pendentes})</button>}
-              <button onClick={exportarPDF} style={{ padding:"12px 18px", background:"#fff", color:"#1E3A5F", border:"1.5px solid #1E3A5F", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", flex: isMobile ? "1 1 100%" : "none" }}>📄 Exportar PDF</button>
+              {!readOnly && (
+                <button onClick={() => dispararEmails("lembrete")} disabled={enviandoEmails} style={{ padding:"12px 18px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, flex: isMobile?"1 1 100%":"none" }}>
+                  {enviandoEmails ? "📧 Enviando..." : `📧 Lembrete a todos (${moradores.length})`}
+                </button>
+              )}
+              {!readOnly && (
+                <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"12px 18px", background:"#C9933A", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, flex: isMobile?"1 1 100%":"none" }}>
+                  {enviandoEmails ? "📧 Enviando..." : `⚠️ Cobrar pendentes (${pendentes})`}
+                </button>
+              )}
+              <button onClick={exportarPDF} style={{ padding:"12px 18px", background:"#fff", color:"#1E3A5F", border:"1.5px solid #1E3A5F", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", flex: isMobile?"1 1 100%":"none" }}>📄 Exportar PDF</button>
             </div>
           </div>
         )}
@@ -518,7 +656,7 @@ export default function App() {
                 <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, color:"#1E3A5F", background:"#fff" }}>
                   {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
                 </select>
-                {!readOnly && !isMobile && <button onClick={enviarLembretes} style={{ padding:"9px 16px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>📧 Lembretes</button>}
+                {!readOnly && !isMobile && <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"9px 16px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>{enviandoEmails?"📧 Enviando...":"📧 Cobrar pendentes"}</button>}
               </div>
             </div>
 
@@ -729,7 +867,32 @@ export default function App() {
               <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Valor (R$)</label>
               <input type="number" value={taxa} onChange={e=>setTaxa(parseFloat(e.target.value)||0)} style={{ display:"block", width:"100%", padding:"12px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:16, color:"#1E3A5F", marginTop:8, boxSizing:"border-box" }} />
               <button onClick={() => salvarTaxa(taxa)} style={{ marginTop:14, padding:"11px 24px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer" }}>Salvar</button>
+
               <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
+
+              <h3 style={{ color:"#1E3A5F", margin:"0 0 6px", fontSize:15, fontWeight:700 }}>📅 Dia de vencimento</h3>
+              <p style={{ color:"#6B7A8D", fontSize:12, margin:"0 0 14px" }}>O sistema enviará e-mails automaticamente 5 dias antes e no dia do vencimento.</p>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Dia do mês (1–28)</label>
+              <div style={{ display:"flex", gap:10, alignItems:"flex-end", marginTop:8 }}>
+                <input type="number" min={1} max={28} value={diaVencimento} onChange={e=>setDiaVencimento(parseInt(e.target.value)||10)} style={{ width:100, padding:"12px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:16, color:"#1E3A5F", boxSizing:"border-box" }} />
+                <button onClick={() => salvarDiaVencimento(diaVencimento)} style={{ padding:"12px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer" }}>Salvar</button>
+              </div>
+
+              <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
+
+              <h3 style={{ color:"#1E3A5F", margin:"0 0 6px", fontSize:15, fontWeight:700 }}>📧 Disparar e-mails manualmente</h3>
+              <p style={{ color:"#6B7A8D", fontSize:12, margin:"0 0 14px" }}>Use estes botões caso queira enviar fora do disparo automático. O sistema evita duplicatas no mesmo dia.</p>
+              <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                <button onClick={() => dispararEmails("lembrete")} disabled={enviandoEmails} style={{ padding:"10px 18px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>
+                  {enviandoEmails ? "Enviando..." : `📧 Lembrete a todos (${moradores.length})`}
+                </button>
+                <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"10px 18px", background:"#C9933A", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>
+                  {enviandoEmails ? "Enviando..." : `⚠️ Cobrar pendentes (${pendentes})`}
+                </button>
+              </div>
+
+              <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
+
               <h3 style={{ color:"#1E3A5F", margin:"0 0 10px", fontSize:15, fontWeight:700 }}>Conta conectada</h3>
               <div style={{ fontSize:13, color:"#6B7A8D", lineHeight:1.8, background:"#F0F4F8", borderRadius:8, padding:"12px 16px" }}>
                 <div>E-mail: <b style={{color:"#1E3A5F"}}>{user?.email}</b></div>

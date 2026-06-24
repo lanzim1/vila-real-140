@@ -775,12 +775,15 @@ export default function App() {
                       <div>📧 {m.email}</div>
                       {m.telefone && <div>📱 {m.telefone}</div>}
                     </div>
-                    {!readOnly && (
-                      <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
-                        <button onClick={() => { setEditMorador({ id:m.id, nome:m.nome, unidade:m.unidade, email:m.email, telefone:m.telefone||"" }); setModal({ type:"editarMorador" }); }} style={{ padding:"6px 14px", background:"#E3F2FD", color:"#1565C0", border:"1px solid #90CAF9", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✏️ Editar</button>
-                        <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>Remover</button>
-                      </div>
-                    )}
+                    <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
+                      <button onClick={() => setModal({ type:"historico", data:m })} style={{ padding:"6px 14px", background:"#F3E5F5", color:"#6A1B9A", border:"1px solid #CE93D8", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>📋 Histórico</button>
+                      {!readOnly && (
+                        <>
+                          <button onClick={() => { setEditMorador({ id:m.id, nome:m.nome, unidade:m.unidade, email:m.email, telefone:m.telefone||"" }); setModal({ type:"editarMorador" }); }} style={{ padding:"6px 14px", background:"#E3F2FD", color:"#1565C0", border:"1px solid #90CAF9", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✏️ Editar</button>
+                          <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>Remover</button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -1016,6 +1019,54 @@ export default function App() {
           </div>
         </Modal>
       )}
+
+      {modal?.type === "historico" && modal.data && (() => {
+        const m = modal.data;
+        const cobMorador = cobrancas
+          .filter(c => c.moradorId === m.id)
+          .sort((a,b) => b.mes.localeCompare(a.mes));
+        const totalPago   = cobMorador.filter(c=>c.status==="pago").length;
+        const totalAtraso = cobMorador.filter(c=>c.status==="atrasado").length;
+        return (
+          <Modal title={`Histórico — ${m.nome}`} onClose={() => setModal(null)} isMobile={isMobile}>
+            <div style={{ marginBottom:16, background:"#F0F4F8", borderRadius:10, padding:"12px 16px" }}>
+              <div style={{ fontSize:13, color:"#1E3A5F", fontWeight:600 }}>{m.unidade}</div>
+              <div style={{ fontSize:12, color:"#6B7A8D", marginTop:4, lineHeight:1.8 }}>
+                📧 {m.email}{m.telefone ? ` · 📱 ${m.telefone}` : ""}
+              </div>
+              <div style={{ display:"flex", gap:16, marginTop:10, flexWrap:"wrap" }}>
+                <div style={{ fontSize:12 }}>✅ <b style={{color:"#2E7D32"}}>{totalPago}</b> pagamento{totalPago!==1?"s":""} em dia</div>
+                <div style={{ fontSize:12 }}>🚨 <b style={{color:"#B03A2E"}}>{totalAtraso}</b> atraso{totalAtraso!==1?"s":""}</div>
+                <div style={{ fontSize:12 }}>📋 <b style={{color:"#1E3A5F"}}>{cobMorador.length}</b> meses no sistema</div>
+              </div>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:8, maxHeight: isMobile ? "55vh" : "400px", overflowY:"auto" }}>
+              {cobMorador.length === 0 && (
+                <div style={{ color:"#9aa6b5", fontSize:13, textAlign:"center", padding:20 }}>Nenhum registro encontrado.</div>
+              )}
+              {cobMorador.map((c, i) => {
+                const corBorda = c.status==="pago" ? "#2E7D32" : c.status==="atrasado" ? "#B03A2E" : "#F57F17";
+                const bgStatus = c.status==="pago" ? "#E8F5E9" : c.status==="atrasado" ? "#FFEBEE" : "#FFF8E1";
+                const icone    = c.status==="pago" ? "✅" : c.status==="atrasado" ? "🚨" : "⏳";
+                return (
+                  <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background:bgStatus, borderRadius:10, borderLeft:`4px solid ${corBorda}` }}>
+                    <div>
+                      <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:13 }}>{mesLabel(c.mes)}</div>
+                      {c.dataPagamento && <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>Pago em {c.dataPagamento}</div>}
+                      {c.obs && <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>📝 {c.obs}</div>}
+                    </div>
+                    <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4 }}>
+                      <span style={{ fontSize:16 }}>{icone}</span>
+                      <span style={{ fontSize:11, fontWeight:600, color:corBorda, textTransform:"capitalize" }}>{c.status}</span>
+                      <span style={{ fontSize:12, color:"#1E3A5F", fontWeight:600 }}>R$ {taxa.toFixed(2).replace(".",",")}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Modal>
+        );
+      })()}
 
       {modal?.type === "editarMorador" && editMorador && (
         <Modal title="Editar Morador" onClose={() => setModal(null)} isMobile={isMobile}>

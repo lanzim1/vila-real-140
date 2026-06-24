@@ -326,15 +326,21 @@ export default function App() {
   const formatarDataBR = (date) =>
     `${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}/${date.getFullYear()}`;
 
+  const mesLabelEmail = (m) => {
+    const [y, mo] = m.split("-");
+    const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+    return `${meses[parseInt(mo) - 1]} de ${y}`;
+  };
+
   const enviarEmailMorador = async (morador, assunto, mensagem) => {
     await emailjs.send(EJS_SERVICE, EJS_TEMPLATE, {
-      nome_morador:   morador.nome,
-      unidade:        morador.unidade,
-      valor:          `R$ ${taxa.toFixed(2).replace(".",",")}`,
+      nome_morador:    morador.nome,
+      unidade:         morador.unidade,
+      valor:           taxa.toFixed(2).replace(".",","),
       data_vencimento: formatarDataBR(dataVencimentoMes(mesSel)),
       assunto,
       mensagem,
-      email_destino:  morador.email,
+      email_destino:   morador.email,
     });
   };
 
@@ -380,13 +386,13 @@ export default function App() {
         try {
           if (tipo === "lembrete") {
             await enviarEmailMorador(m,
-              `Lembrete de Vencimento — ${mesLabel(mesSel)}`,
-              `Informamos que a taxa de condomínio referente a ${mesLabel(mesSel)} vencerá em 5 dias (${vencimento}).\n\nPor favor, efetue o pagamento até a data de vencimento para evitar multas.`
+              `Lembrete de Vencimento — ${mesLabelEmail(mesSel)}`,
+              `Informamos que a taxa de condomínio referente a ${mesLabelEmail(mesSel)} vencerá em 5 dias (${vencimento}).\n\nPor favor, efetue o pagamento até a data de vencimento para evitar multas.`
             );
           } else {
             await enviarEmailMorador(m,
-              `Vencimento Hoje — ${mesLabel(mesSel)}`,
-              `Informamos que a taxa de condomínio referente a ${mesLabel(mesSel)} vence hoje (${vencimento}) e consta como pendente em nosso sistema.\n\nCaso já tenha efetuado o pagamento, desconsidere este e-mail.`
+              `Vencimento Hoje — ${mesLabelEmail(mesSel)}`,
+              `Informamos que a taxa de condomínio referente a ${mesLabelEmail(mesSel)} vence hoje (${vencimento}) e consta como pendente em nosso sistema.\n\nCaso já tenha efetuado o pagamento, desconsidere este e-mail.`
             );
           }
           enviados++;

@@ -10,9 +10,10 @@ import {
 } from "firebase/firestore";
 
 // ── EmailJS ──
-const EJS_PUBLIC  = "miqPVueWYbnAe6ijd";
-const EJS_SERVICE = "service_h0a4utj";
+const EJS_PUBLIC   = "miqPVueWYbnAe6ijd";
+const EJS_SERVICE  = "service_h0a4utj";
 const EJS_TEMPLATE = "template_yzl1x2m";
+const EJS_TEMPLATE_CONFIRMACAO = "template_d8f6dzq";
 emailjs.init(EJS_PUBLIC);
 
 const MOCK_MORADORES = [
@@ -350,8 +351,24 @@ export default function App() {
     const salvar = async (base64="") => {
       await setDoc(doc(db, "cobrancas", `${moradorId}_${mesSel}`), { moradorId, mes:mesSel, status:"pago", dataPagamento:dataPgto, obs:pagForm.obs, comprovante:base64, arquivoNome:pagForm.arquivoNome }, { merge:true });
       setModal(null); setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
-      showToast("Pagamento registrado! Recibo gerado.");
-      if (morador) gerarReciboPDF(morador, dataPgto, pagForm.obs);
+      showToast("Pagamento registrado! Recibo e e-mail enviados.");
+      if (morador) {
+        gerarReciboPDF(morador, dataPgto, pagForm.obs);
+        // Envia e-mail de confirmação
+        try {
+          await emailjs.send(EJS_SERVICE, EJS_TEMPLATE_CONFIRMACAO, {
+            email_destino:  morador.email,
+            nome_morador:   morador.nome,
+            unidade:        morador.unidade,
+            mes_referencia: mesLabelEmail(mesSel),
+            valor:          taxa.toFixed(2).replace(".",","),
+            data_pagamento: dataPgto,
+            obs:            pagForm.obs ? `Observação: ${pagForm.obs}` : "",
+          });
+        } catch(e) {
+          console.error("Erro ao enviar e-mail de confirmação:", e);
+        }
+      }
     };
     if (pagForm.arquivo) { const r=new FileReader(); r.onload=e=>salvar(e.target.result); r.readAsDataURL(pagForm.arquivo); } else salvar();
   };

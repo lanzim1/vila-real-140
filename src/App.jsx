@@ -780,6 +780,90 @@ export default function App() {
               </div>
             </div>
 
+            {/* ── Gráficos ── */}
+            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16, marginBottom:20 }}>
+
+              {/* Gráfico de barras — arrecadação por mês */}
+              {(() => {
+                const ultimos6 = mesesDisponiveis().slice(0,6).reverse();
+                const maxVal   = Math.max(...ultimos6.map(m => cobrancas.filter(c=>c.mes===m&&c.status==="pago").length * taxa), 1);
+                return (
+                  <div style={{ background:"#fff", borderRadius:12, padding:18, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#1E3A5F", marginBottom:16 }}>💵 Arrecadação por mês</div>
+                    <div style={{ display:"flex", alignItems:"flex-end", gap: isMobile ? 6 : 10, height:110, paddingBottom:24, position:"relative" }}>
+                      {ultimos6.map((m,i) => {
+                        const val  = cobrancas.filter(c=>c.mes===m&&c.status==="pago").length * taxa;
+                        const pct  = Math.round((val/maxVal)*100);
+                        const ativo = m === mesSel;
+                        return (
+                          <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+                            <div style={{ fontSize:10, color:"#1E3A5F", fontWeight:600 }}>
+                              {val > 0 ? `${(val/1000).toFixed(1)}k` : ""}
+                            </div>
+                            <div style={{ width:"100%", height:`${Math.max(pct,4)}%`, background: ativo ? "#C9933A" : "#2E6DA4", borderRadius:"4px 4px 0 0", transition:"height .5s ease", minHeight:4 }} />
+                            <div style={{ position:"absolute", bottom:0, fontSize:9, color: ativo ? "#C9933A" : "#6B7A8D", fontWeight: ativo ? 700 : 400, whiteSpace:"nowrap" }}>
+                              {mesLabel(m).split("/")[0]}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ fontSize:11, color:"#9aa6b5", textAlign:"center", marginTop:4 }}>Últimos {ultimos6.length} meses · Dourado = mês atual</div>
+                  </div>
+                );
+              })()}
+
+              {/* Gráfico de pizza — adimplência do mês */}
+              {(() => {
+                const total   = cobMes.length || 1;
+                const pPagos  = pagos / total;
+                const pPend   = pendentes / total;
+                const pAtraso = atrasados / total;
+                const toAngle = (p) => p * 360;
+                const polarToXY = (cx, cy, r, angleDeg) => {
+                  const rad = (angleDeg - 90) * Math.PI / 180;
+                  return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+                };
+                const slice = (startDeg, endDeg, color) => {
+                  if (endDeg - startDeg < 0.5) return null;
+                  const cx=80, cy=80, r=65;
+                  const [x1,y1] = polarToXY(cx,cy,r,startDeg);
+                  const [x2,y2] = polarToXY(cx,cy,r,endDeg);
+                  const large   = (endDeg-startDeg) > 180 ? 1 : 0;
+                  return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${color}" />`;
+                };
+                let a = 0;
+                const s1 = slice(a, a+toAngle(pPagos),  "#2E7D32"); a+=toAngle(pPagos);
+                const s2 = slice(a, a+toAngle(pPend),   "#F57F17"); a+=toAngle(pPend);
+                const s3 = slice(a, a+toAngle(pAtraso), "#B03A2E"); a+=toAngle(pAtraso);
+                const svg = `<svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">${s1||""}${s2||""}${s3||""}<circle cx="80" cy="80" r="35" fill="white"/><text x="80" y="76" text-anchor="middle" font-size="14" font-weight="bold" fill="#1E3A5F">${moradores.length?Math.round((pagos/moradores.length)*100):0}%</text><text x="80" y="92" text-anchor="middle" font-size="9" fill="#6B7A8D">adimplente</text></svg>`;
+                return (
+                  <div style={{ background:"#fff", borderRadius:12, padding:18, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#1E3A5F", marginBottom:12 }}>🥧 Situação — {mesLabel(mesSel)}</div>
+                    <div style={{ display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
+                      <div style={{ width:130, flexShrink:0 }} dangerouslySetInnerHTML={{ __html: svg }} />
+                      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                        {[
+                          { cor:"#2E7D32", label:"Pagos",     qtd: pagos     },
+                          { cor:"#F57F17", label:"Pendentes", qtd: pendentes  },
+                          { cor:"#B03A2E", label:"Atrasados", qtd: atrasados  },
+                        ].map((item,i) => (
+                          <div key={i} style={{ display:"flex", alignItems:"center", gap:8, fontSize:13 }}>
+                            <div style={{ width:12, height:12, borderRadius:3, background:item.cor, flexShrink:0 }} />
+                            <span style={{ color:"#1E3A5F", fontWeight:600 }}>{item.qtd}</span>
+                            <span style={{ color:"#6B7A8D" }}>{item.label}</span>
+                          </div>
+                        ))}
+                        <div style={{ fontSize:11, color:"#9aa6b5", marginTop:4 }}>
+                          Total: {cobMes.length} unidades
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
             <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
               {!readOnly && (
                 <button onClick={() => dispararEmails("lembrete")} disabled={enviandoEmails} style={{ padding:"12px 18px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, flex: isMobile?"1 1 100%":"none" }}>

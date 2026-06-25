@@ -157,8 +157,9 @@ export default function App() {
   const [servicos, setServicos]       = useState([]);
   const [novoServico, setNovoServico] = useState({ titulo:"", descricao:"" });
   const [concluirForm, setConcluirForm] = useState({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" });
-  const [obsMes, setObsMes]   = useState("");
+  const [obsMes, setObsMes]     = useState("");
   const [obsSalva, setObsSalva] = useState("");
+  const [logs, setLogs]         = useState([]);
   const fileRef        = useRef();
   const fileRefDespesa = useRef();
 
@@ -192,10 +193,13 @@ export default function App() {
     const u5 = onSnapshot(collection(db, "servicos"),  s => setServicos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
     const u6 = onSnapshot(doc(db, "observacoes", mesSel), d => {
       const texto = d.exists() ? (d.data().texto || "") : "";
-      setObsMes(texto);
-      setObsSalva(texto);
+      setObsMes(texto); setObsSalva(texto);
     });
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
+    const u7 = onSnapshot(
+      query(collection(db, "logs")),
+      s => setLogs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
+    );
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); };
   }, [user]);
 
   // ── Popular na primeira vez ──
@@ -216,6 +220,18 @@ export default function App() {
   }, [user]);
 
   const showToast = (msg, type="success") => setToast({ msg, type });
+
+  const registrarLog = async (icone, descricao) => {
+    try {
+      await addDoc(collection(db, "logs"), {
+        icone,
+        descricao,
+        usuario: user?.email || "sistema",
+        timestamp: Date.now(),
+        dataHora: new Date().toLocaleString("pt-BR"),
+      });
+    } catch(e) { console.error("Erro ao registrar log:", e); }
+  };
 
   const cobMes = cobrancas.filter(c => c.mes === mesSel);
   const pagos      = cobMes.filter(c => c.status === "pago").length;
@@ -368,6 +384,7 @@ export default function App() {
       showToast("Pagamento registrado! Recibo e e-mail enviados.");
       if (morador) {
         gerarReciboPDF(morador, dataPgto, pagForm.obs);
+        registrarLog("✅", `Pagamento registrado: ${morador.nome} (${morador.unidade}) — ${mesLabel(mesSel)} — R$ ${taxa.toFixed(2).replace(".",",")}`);
         // Envia e-mail de confirmação
         try {
           await emailjs.send(EJS_SERVICE, EJS_TEMPLATE_CONFIRMACAO, {
@@ -392,6 +409,8 @@ export default function App() {
     const venc = dataVencimentoMes(mesSel); venc.setHours(0,0,0,0);
     const novoStatus = hoje > venc ? "atrasado" : "pendente";
     await setDoc(doc(db, "cobrancas", `${moradorId}_${mesSel}`), { moradorId, mes:mesSel, status:novoStatus, dataPagamento:null, obs:"", comprovante:null, arquivoNome:"" }, { merge:true });
+    const m = moradores.find(x => x.id === moradorId);
+    registrarLog("↩️", `Pagamento estornado: ${m?.nome || moradorId} (${m?.unidade || ""}) — ${mesLabel(mesSel)}`);
     setModal(null); showToast("Pagamento estornado.", "error");
   };
 
@@ -400,6 +419,7 @@ export default function App() {
     if (!novoMorador.nome || !novoMorador.unidade || !novoMorador.email) { showToast("Preencha nome, unidade e e-mail.", "error"); return; }
     const ref = await addDoc(collection(db, "moradores"), novoMorador);
     await setDoc(doc(db, "cobrancas", `${ref.id}_${mesSel}`), { moradorId:ref.id, mes:mesSel, status:"pendente", comprovante:null, dataPagamento:null, obs:"" });
+    registrarLog("👤", `Morador cadastrado: ${novoMorador.nome} (${novoMorador.unidade})`);
     setNovoMorador({ nome:"", unidade:"", email:"", telefone:"" }); setModal(null); showToast("Morador cadastrado!");
   };
 
@@ -407,7 +427,9 @@ export default function App() {
     await deleteDoc(doc(db, "moradores", id));
     const snap = await getDocs(query(collection(db, "cobrancas"), where("moradorId","==",id)));
     const batch = writeBatch(db); snap.forEach(d => batch.delete(d.ref));
-    if (!snap.empty) await batch.commit(); showToast("Morador removido.", "error");
+    if (!snap.empty) await batch.commit();
+    registrarLog("🗑️", `Morador removido: ID ${id}`);
+    showToast("Morador removido.", "error");
   };
 
   const salvarEdicaoMorador = async () => {
@@ -416,9 +438,8 @@ export default function App() {
     }
     const { id, ...dados } = editMorador;
     await setDoc(doc(db, "moradores", id), dados, { merge:true });
-    setEditMorador(null);
-    setModal(null);
-    showToast("Morador atualizado com sucesso!");
+    registrarLog("✏️", `Morador editado: ${editMorador.nome} (${editMorador.unidade})`);
+    setEditMorador(null); setModal(null); showToast("Morador atualizado com sucesso!");
   };
 
   // ── Despesas ──
@@ -426,30 +447,51 @@ export default function App() {
     if (!novaDespesa.valor || !novaDespesa.mes) { showToast("Preencha o valor e o mês.", "error"); return; }
     const salvar = async (base64="") => {
       await addDoc(collection(db, "despesas"), { tipo:novaDespesa.tipo, descricao:novaDespesa.descricao, valor:parseFloat(novaDespesa.valor)||0, mes:novaDespesa.mes, status:"pendente", dataPagamento:null, comprovante:base64, arquivoNome:novaDespesa.arquivoNome });
+      registrarLog("💧", `Despesa registrada: ${novaDespesa.descricao||novaDespesa.tipo} — R$ ${novaDespesa.valor} (${mesLabel(novaDespesa.mes)})`);
       setNovaDespesa({ tipo:"agua", descricao:"", valor:"", mes:mesAtual(), arquivo:null, arquivoNome:"" }); setModal(null); showToast("Despesa registrada!");
     };
     if (novaDespesa.arquivo) { const r=new FileReader(); r.onload=e=>salvar(e.target.result); r.readAsDataURL(novaDespesa.arquivo); } else salvar();
   };
 
   const marcarDespesaPaga = async (id) => {
+    const d = despesas.find(x=>x.id===id);
     await setDoc(doc(db,"despesas",id), { status:"pago", dataPagamento:new Date().toLocaleDateString("pt-BR") }, { merge:true });
+    registrarLog("💰", `Despesa paga: ${d?.descricao||d?.tipo||id} — R$ ${d?.valor?.toFixed(2)||""}`);
     showToast("Despesa marcada como paga!");
   };
-  const removerDespesa = async (id) => { await deleteDoc(doc(db,"despesas",id)); showToast("Despesa removida.","error"); };
+  const removerDespesa = async (id) => {
+    const d = despesas.find(x=>x.id===id);
+    await deleteDoc(doc(db,"despesas",id));
+    registrarLog("🗑️", `Despesa removida: ${d?.descricao||d?.tipo||id}`);
+    showToast("Despesa removida.","error");
+  };
 
   // ── Serviços ──
   const adicionarServico = async () => {
     if (!novoServico.titulo) { showToast("Dê um título ao serviço.","error"); return; }
     await addDoc(collection(db,"servicos"), { titulo:novoServico.titulo, descricao:novoServico.descricao, status:"pendente", dataAbertura:new Date().toLocaleDateString("pt-BR"), dataInicio:null, dataFim:null, valorMaterial:null, valorMaoDeObra:null, obsConclusao:"" });
+    registrarLog("🔧", `Serviço registrado: ${novoServico.titulo}`);
     setNovoServico({ titulo:"", descricao:"" }); setModal(null); showToast("Serviço registrado!");
   };
 
   const concluirServico = async (id) => {
+    const s = servicos.find(x=>x.id===id);
     await setDoc(doc(db,"servicos",id), { status:"concluido", dataInicio:concluirForm.dataInicio, dataFim:concluirForm.dataFim, valorMaterial:parseFloat(concluirForm.valorMaterial)||0, valorMaoDeObra:parseFloat(concluirForm.valorMaoDeObra)||0, obsConclusao:concluirForm.obs }, { merge:true });
+    registrarLog("✅", `Serviço concluído: ${s?.titulo||id} — Total: R$ ${((parseFloat(concluirForm.valorMaterial)||0)+(parseFloat(concluirForm.valorMaoDeObra)||0)).toFixed(2).replace(".",",")}`);
     setConcluirForm({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" }); setModal(null); showToast("Serviço concluído!");
   };
-  const reabrirServico  = async (id) => { await setDoc(doc(db,"servicos",id), { status:"pendente" }, { merge:true }); showToast("Serviço reaberto.","error"); };
-  const removerServico  = async (id) => { await deleteDoc(doc(db,"servicos",id)); showToast("Serviço removido.","error"); };
+  const reabrirServico = async (id) => {
+    const s = servicos.find(x=>x.id===id);
+    await setDoc(doc(db,"servicos",id), { status:"pendente" }, { merge:true });
+    registrarLog("🔄", `Serviço reaberto: ${s?.titulo||id}`);
+    showToast("Serviço reaberto.","error");
+  };
+  const removerServico = async (id) => {
+    const s = servicos.find(x=>x.id===id);
+    await deleteDoc(doc(db,"servicos",id));
+    registrarLog("🗑️", `Serviço removido: ${s?.titulo||id}`);
+    showToast("Serviço removido.","error");
+  };
 
   const enviarLembretes = () => {
     const dev = cobMes.filter(c=>c.status!=="pago").map(c=>moradores.find(m=>m.id===c.moradorId)).filter(Boolean);
@@ -639,6 +681,7 @@ export default function App() {
     { id:"moradores", icon:"👥", label:"Moradores"  },
     { id:"despesas",  icon:"💧", label:"Água/Luz"   },
     { id:"servicos",  icon:"🔧", label:"Serviços"   },
+    { id:"historico", icon:"📋", label:"Histórico"  },
     ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config." }] : []),
   ];
 
@@ -1153,6 +1196,42 @@ export default function App() {
               ))}
               {servicos.filter(s=>s.status==="concluido").length===0 && <div style={{ color:"#9aa6b5", fontSize:13, padding:"4px 0" }}>Nenhum serviço concluído ainda.</div>}
             </div>
+          </div>
+        )}
+
+        {/* ── Histórico ── */}
+        {aba === "historico" && (
+          <div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
+              <div>
+                <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Histórico de Atividades</h2>
+                <p style={{ color:"#6B7A8D", margin:"4px 0 0", fontSize:13 }}>{logs.length} registro{logs.length!==1?"s":""} no sistema</p>
+              </div>
+              {!readOnly && logs.length > 0 && (
+                <button onClick={async () => { if(window.confirm("Limpar todo o histórico?")) { const batch = writeBatch(db); logs.forEach(l => batch.delete(doc(db,"logs",l.id))); await batch.commit(); showToast("Histórico limpo."); }}} style={{ padding:"8px 16px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:8, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                  🗑️ Limpar histórico
+                </button>
+              )}
+            </div>
+
+            {logs.length === 0 ? (
+              <div style={{ background:"#fff", borderRadius:12, padding:40, textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+                <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
+                <div style={{ color:"#9aa6b5", fontSize:14 }}>Nenhuma atividade registrada ainda.<br/>As ações realizadas no sistema aparecerão aqui.</div>
+              </div>
+            ) : (
+              <div style={{ background:"#fff", borderRadius:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)", overflow:"hidden" }}>
+                {logs.map((log, i) => (
+                  <div key={log.id} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"14px 18px", borderBottom: i < logs.length-1 ? "1px solid #F0F4F8" : "none", background: i%2===0 ? "#fff" : "#FAFBFC" }}>
+                    <div style={{ fontSize:22, flexShrink:0, marginTop:1 }}>{log.icone}</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, color:"#2C3E50", lineHeight:1.5 }}>{log.descricao}</div>
+                      <div style={{ fontSize:11, color:"#9aa6b5", marginTop:3 }}>{log.dataHora}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

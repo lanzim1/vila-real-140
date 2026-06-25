@@ -272,7 +272,7 @@ export default function App() {
     docPdf.setTextColor(255,255,255);
     docPdf.setFontSize(18);
     docPdf.setFont("helvetica","bold");
-    docPdf.text("🏢 Condomínio Vila Real 140", 14, 16);
+    docPdf.text("Condomínio Vila Real 140", 14, 16);
     docPdf.setFontSize(10);
     docPdf.setFont("helvetica","normal");
     docPdf.text("Recibo de Pagamento de Taxa Condominial", 14, 26);
@@ -330,7 +330,7 @@ export default function App() {
     docPdf.setTextColor(46,125,50);
     docPdf.setFont("helvetica","bold");
     docPdf.setFontSize(13);
-    docPdf.text(`✓  Pagamento confirmado: R$ ${taxa.toFixed(2).replace(".",",")}`, 20, y+12);
+    docPdf.text(`Pagamento confirmado: R$ ${taxa.toFixed(2).replace(".",",")}`, 20, y+12);
 
     // Rodapé
     y += 36;

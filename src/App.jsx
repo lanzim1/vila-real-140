@@ -789,6 +789,171 @@ export default function App() {
     docPdf.save(`relatorio-vilareal-${mesSel}.pdf`); showToast("PDF gerado com sucesso!");
   };
 
+  const exportarPrestacaoContas = () => {
+    const docPdf = new jsPDF();
+    const AZUL    = [30, 58, 95];
+    const DOURADO = [201, 147, 58];
+    const VERDE   = [46, 125, 50];
+    const VERM    = [176, 58, 46];
+    const W = 210;
+    const X = 14;
+
+    // Capa
+    docPdf.setFillColor(...AZUL);
+    docPdf.rect(0, 0, W, 80, "F");
+    docPdf.setFillColor(...DOURADO);
+    docPdf.rect(0, 80, W, 4, "F");
+    docPdf.setTextColor(255,255,255);
+    docPdf.setFont("helvetica","bold");
+    docPdf.setFontSize(22);
+    docPdf.text("Condominio Vila Real 140", W/2, 30, { align:"center" });
+    docPdf.setFontSize(14);
+    docPdf.setFont("helvetica","normal");
+    docPdf.text("Prestacao de Contas", W/2, 42, { align:"center" });
+    docPdf.setFontSize(18);
+    docPdf.setFont("helvetica","bold");
+    docPdf.setTextColor(...DOURADO);
+    docPdf.text(mesLabelEmail(mesSel), W/2, 58, { align:"center" });
+    docPdf.setFontSize(10);
+    docPdf.setFont("helvetica","normal");
+    docPdf.setTextColor(200,220,255);
+    docPdf.text(`Gerado em ${new Date().toLocaleDateString("pt-BR")}`, W/2, 70, { align:"center" });
+
+    let y = 96;
+
+    const secao = (titulo) => {
+      if (y > 250) { docPdf.addPage(); y = 20; }
+      docPdf.setFontSize(12); docPdf.setFont("helvetica","bold"); docPdf.setTextColor(...AZUL);
+      docPdf.text(titulo, X, y); y += 5;
+      docPdf.setDrawColor(...DOURADO); docPdf.setLineWidth(0.5);
+      docPdf.line(X, y, W-14, y); y += 6;
+    };
+
+    // Resumo
+    secao("1. Resumo Executivo");
+    const inadimplentes = cobMes.filter(c => c.status !== "pago");
+    const despMes = despesas.filter(d => d.mes === mesSel);
+    const servMes = servicos.filter(s => {
+      if (!s.dataFim) return false;
+      const partes = s.dataFim.split("/");
+      if (partes.length < 3) return false;
+      return `${partes[2]}-${partes[1]}` === mesSel;
+    });
+    const totalServMes = servMes.reduce((s,sv)=>(sv.valorMaterial||0)+(sv.valorMaoDeObra||0)+s, 0);
+    const totalDespMes = despMes.filter(d=>d.status==="pago").reduce((s,d)=>s+d.valor,0);
+    autoTable(docPdf, {
+      startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:10}, headStyles:{fillColor:AZUL},
+      head:[["Indicador","Valor"]],
+      body:[
+        ["Unidades do condominio", String(moradores.length)],
+        ["Pagamentos recebidos", `${pagos} unidades`],
+        ["Inadimplentes", `${inadimplentes.length} unidades`],
+        ["Taxa mensal", `R$ ${taxa.toFixed(2).replace(".",",")}`],
+        ["Total arrecadado", `R$ ${totalArrecadado.toFixed(2).replace(".",",")}`],
+        ["Total a receber", `R$ ${totalPendente.toFixed(2).replace(".",",")}`],
+        ["Despesas pagas", `R$ ${totalDespMes.toFixed(2).replace(".",",")}`],
+        ["Servicos realizados", `R$ ${totalServMes.toFixed(2).replace(".",",")}`],
+        ["Saldo de caixa (geral)", `R$ ${saldoCaixa.toFixed(2).replace(".",",")}`],
+      ],
+      didParseCell: (data) => {
+        if (data.row.index === 8) {
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.fillColor = saldoCaixa >= 0 ? [232,245,233] : [255,235,238];
+          data.cell.styles.textColor = saldoCaixa >= 0 ? VERDE : VERM;
+        }
+      }
+    });
+    y = docPdf.lastAutoTable.finalY + 14;
+
+    // Receitas
+    secao("2. Receitas - Pagamentos Recebidos");
+    const pagosMes = cobMes.filter(c => c.status === "pago");
+    autoTable(docPdf, {
+      startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
+      head:[["Unidade","Morador","Data Pgto","Valor"]],
+      body: pagosMes.length ? pagosMes.map(c => {
+        const m = moradores.find(x=>x.id===c.moradorId);
+        return [m?.unidade||"", m?.nome||"", c.dataPagamento||"", `R$ ${taxa.toFixed(2).replace(".",",")}`];
+      }) : [["","Nenhum pagamento registrado","",""]],
+      foot:[[{ content:`Total: R$ ${totalArrecadado.toFixed(2).replace(".",",")}`, colSpan:4, styles:{halign:"right",fontStyle:"bold",fillColor:AZUL,textColor:[255,255,255]} }]],
+    });
+    y = docPdf.lastAutoTable.finalY + 14;
+
+    // Inadimplentes
+    secao("3. Inadimplencia");
+    autoTable(docPdf, {
+      startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:VERM},
+      head:[["Unidade","Morador","Status","Valor em Aberto"]],
+      body: inadimplentes.length ? inadimplentes.map(c => {
+        const m = moradores.find(x=>x.id===c.moradorId);
+        return [m?.unidade||"", m?.nome||"", c.status==="atrasado"?"Atrasado":"Pendente", `R$ ${taxa.toFixed(2).replace(".",",")}`];
+      }) : [["","Todos os moradores pagaram!","",""]],
+    });
+    y = docPdf.lastAutoTable.finalY + 14;
+
+    // Despesas
+    secao("4. Despesas - Agua, Luz e Outros");
+    autoTable(docPdf, {
+      startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
+      head:[["Tipo","Descricao","Status","Valor"]],
+      body: despMes.length ? despMes.map(d=>[
+        d.tipo==="agua"?"Agua":d.tipo==="luz"?"Luz":"Outro",
+        d.descricao||"",
+        d.status==="pago"?"Pago":"Pendente",
+        `R$ ${d.valor.toFixed(2).replace(".",",")}`,
+      ]) : [["","Nenhuma despesa registrada","",""]],
+      foot: despMes.length ? [[{ content:`Total: R$ ${despMes.reduce((s,d)=>s+d.valor,0).toFixed(2).replace(".",",")}`, colSpan:4, styles:{halign:"right",fontStyle:"bold",fillColor:AZUL,textColor:[255,255,255]} }]] : undefined,
+    });
+    y = docPdf.lastAutoTable.finalY + 14;
+
+    // Servicos
+    secao("5. Servicos e Manutencoes");
+    autoTable(docPdf, {
+      startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
+      head:[["Servico","Inicio","Fim","Material","Mao de obra","Total"]],
+      body: servMes.length ? servMes.map(s=>[
+        s.titulo, s.dataInicio||"", s.dataFim||"",
+        `R$ ${(s.valorMaterial||0).toFixed(2).replace(".",",")}`,
+        `R$ ${(s.valorMaoDeObra||0).toFixed(2).replace(".",",")}`,
+        `R$ ${((s.valorMaterial||0)+(s.valorMaoDeObra||0)).toFixed(2).replace(".",",")}`,
+      ]) : [["","","","","","Nenhum servico concluido no mes"]],
+      foot: servMes.length ? [[{ content:`Total: R$ ${totalServMes.toFixed(2).replace(".",",")}`, colSpan:6, styles:{halign:"right",fontStyle:"bold",fillColor:AZUL,textColor:[255,255,255]} }]] : undefined,
+    });
+    y = docPdf.lastAutoTable.finalY + 14;
+
+    // Observacoes
+    if (obsSalva) {
+      secao("6. Observacoes do Mes");
+      docPdf.setFontSize(10); docPdf.setFont("helvetica","normal"); docPdf.setTextColor(44,62,80);
+      const linhasObs = docPdf.splitTextToSize(obsSalva, W-28);
+      docPdf.text(linhasObs, X, y);
+      y += linhasObs.length * 5 + 14;
+    }
+
+    // Assinatura
+    if (y > 240) { docPdf.addPage(); y = 20; }
+    y += 16;
+    docPdf.setDrawColor(150,150,150); docPdf.setLineWidth(0.3);
+    docPdf.line(X, y, 90, y);
+    docPdf.setFontSize(9); docPdf.setFont("helvetica","normal"); docPdf.setTextColor(107,122,141);
+    docPdf.text("Assinatura do Sindico", X, y+5);
+    docPdf.text("Data: ___/___/______", X, y+12);
+
+    // Rodape em todas as paginas
+    const totalPags = docPdf.getNumberOfPages();
+    for (let i=1; i<=totalPags; i++) {
+      docPdf.setPage(i);
+      docPdf.setFillColor(...AZUL);
+      docPdf.rect(0, 287, W, 10, "F");
+      docPdf.setFontSize(8); docPdf.setFont("helvetica","normal"); docPdf.setTextColor(255,255,255);
+      docPdf.text(`Condominio Vila Real 140 - Prestacao de Contas - ${mesLabelEmail(mesSel)}`, X, 293);
+      docPdf.text(`Pagina ${i} de ${totalPags}`, W-14, 293, { align:"right" });
+    }
+
+    docPdf.save(`prestacao-contas-vilareal-${mesSel}.pdf`);
+    showToast("Prestacao de contas gerada!");
+  };
+
   const navItems = [
     { id:"dashboard", icon:"📊", label:"Dashboard" },
     { id:"cobrancas", icon:"💰", label:"Cobranças"  },
@@ -1093,6 +1258,7 @@ export default function App() {
                 </button>
               )}
               <button onClick={exportarPDF} style={{ padding:"12px 18px", background:"#fff", color:"#1E3A5F", border:"1.5px solid #1E3A5F", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", flex: isMobile?"1 1 100%":"none" }}>📄 Exportar PDF</button>
+              <button onClick={exportarPrestacaoContas} style={{ padding:"12px 18px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", flex: isMobile?"1 1 100%":"none" }}>📑 Prestação de Contas</button>
             </div>
           </div>
         )}

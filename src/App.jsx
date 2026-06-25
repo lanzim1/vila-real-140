@@ -157,6 +157,8 @@ export default function App() {
   const [servicos, setServicos]       = useState([]);
   const [novoServico, setNovoServico] = useState({ titulo:"", descricao:"" });
   const [concluirForm, setConcluirForm] = useState({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" });
+  const [obsMes, setObsMes]   = useState("");
+  const [obsSalva, setObsSalva] = useState("");
   const fileRef        = useRef();
   const fileRefDespesa = useRef();
 
@@ -188,7 +190,12 @@ export default function App() {
     });
     const u4 = onSnapshot(collection(db, "despesas"),  s => setDespesas(s.docs.map(d => ({ id:d.id, ...d.data() }))));
     const u5 = onSnapshot(collection(db, "servicos"),  s => setServicos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
-    return () => { u1(); u2(); u3(); u4(); u5(); };
+    const u6 = onSnapshot(doc(db, "observacoes", mesSel), d => {
+      const texto = d.exists() ? (d.data().texto || "") : "";
+      setObsMes(texto);
+      setObsSalva(texto);
+    });
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
   }, [user]);
 
   // ── Popular na primeira vez ──
@@ -257,7 +264,14 @@ export default function App() {
     }
   }, [user, moradores.length, cobrancas.length, diaVencimento]);
 
-  const mudarMes = (m) => { setMesSel(m); garantirMes(m); };
+  const mudarMes = async (m) => {
+    setMesSel(m);
+    garantirMes(m);
+    const snap = await getDoc(doc(db, "observacoes", m));
+    const texto = snap.exists() ? (snap.data().texto || "") : "";
+    setObsMes(texto);
+    setObsSalva(texto);
+  };
 
   // ── Pagamentos ──
   // ── Gerar recibo de pagamento em PDF ──
@@ -445,6 +459,12 @@ export default function App() {
 
   const salvarTaxa = async (v) => { await setDoc(doc(db,"config","geral"), { taxa:v }, { merge:true }); showToast("Taxa atualizada!"); };
 
+  const salvarObsMes = async () => {
+    await setDoc(doc(db, "observacoes", mesSel), { texto: obsMes, mes: mesSel, atualizadoEm: new Date().toLocaleString("pt-BR") }, { merge:true });
+    setObsSalva(obsMes);
+    showToast("Observação salva!");
+  };
+
   const salvarDiaVencimento = async (v) => {
     await setDoc(doc(db,"config","geral"), { diaVencimento: parseInt(v) }, { merge:true });
     showToast("Dia de vencimento salvo!");
@@ -578,6 +598,13 @@ export default function App() {
     docPdf.text("Vila Real 140 — Relatório do Condomínio", X, y); y+=7;
     docPdf.setFontSize(10); docPdf.setTextColor(107,122,141);
     docPdf.text(`Período: ${mesLabel(mesSel)}  ·  Gerado em ${new Date().toLocaleDateString("pt-BR")}`, X, y); y+=10;
+    if (obsSalva) {
+      docPdf.setFontSize(10); docPdf.setTextColor(30,30,30);
+      docPdf.setFont("helvetica","bold"); docPdf.text("Observações do mês:", X, y); y+=5;
+      docPdf.setFont("helvetica","normal");
+      const linhas = docPdf.splitTextToSize(obsSalva, 182);
+      docPdf.text(linhas, X, y); y += linhas.length * 5 + 5;
+    }
     docPdf.setFontSize(12.5); docPdf.setTextColor(...AZUL); docPdf.text("Resumo Financeiro", X, y); y+=5;
     autoTable(docPdf, { startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
       head:[["Indicador","Valor"]],
@@ -862,6 +889,34 @@ export default function App() {
                   </div>
                 );
               })()}
+            </div>
+
+            {/* Observações do mês */}
+            <div style={{ background:"#fff", borderRadius:12, padding:18, boxShadow:"0 2px 8px rgba(0,0,0,.06)", marginBottom:20 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#1E3A5F", marginBottom:10 }}>📝 Observações — {mesLabel(mesSel)}</div>
+              {readOnly ? (
+                <div style={{ fontSize:13, color: obsSalva ? "#2C3E50" : "#9aa6b5", lineHeight:1.7, minHeight:40 }}>
+                  {obsSalva || "Nenhuma observação registrada para este mês."}
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    value={obsMes}
+                    onChange={e => setObsMes(e.target.value)}
+                    placeholder="Ex: Taxa extra por pintura da fachada. Reunião de condomínio dia 15..."
+                    rows={3}
+                    style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${obsMes !== obsSalva ? "#C9933A" : "#D0DAE6"}`, borderRadius:8, fontSize:13, boxSizing:"border-box", fontFamily:"inherit", resize:"vertical", color:"#2C3E50", lineHeight:1.6, outline:"none" }}
+                  />
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:8 }}>
+                    <span style={{ fontSize:11, color: obsMes !== obsSalva ? "#C9933A" : "#9aa6b5" }}>
+                      {obsMes !== obsSalva ? "Alterações não salvas" : obsSalva ? "Salvo" : ""}
+                    </span>
+                    <button onClick={salvarObsMes} disabled={obsMes === obsSalva} style={{ padding:"7px 18px", background: obsMes !== obsSalva ? "#1E3A5F" : "#E8EDF3", color: obsMes !== obsSalva ? "#fff" : "#9aa6b5", border:"none", borderRadius:7, fontSize:13, fontWeight:600, cursor: obsMes !== obsSalva ? "pointer" : "default" }}>
+                      Salvar
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>

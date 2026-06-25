@@ -8,7 +8,6 @@ import {
   collection, doc, onSnapshot, setDoc, addDoc, deleteDoc,
   getDocs, query, where, writeBatch, getDoc
 } from "firebase/firestore";
-
 // ── EmailJS ──
 const EJS_PUBLIC   = "miqPVueWYbnAe6ijd";
 const EJS_SERVICE  = "service_h0a4utj";
@@ -30,6 +29,10 @@ const VISITANTE_SENHA = "VisualizarVR140";
 
 const modoVisitante = typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).get("visualizar") === "1";
+
+const portalMoradorId = typeof window !== "undefined"
+  ? new URLSearchParams(window.location.search).get("morador")
+  : null;
 
 const mesAtual = () => {
   const d = new Date();
@@ -136,6 +139,117 @@ const Login = () => {
 };
 
 // ── App Principal ──
+// ── Portal do Morador ──
+function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
+  const [morador, setMorador]   = useState(null);
+  const [cobrancas, setCobrancas] = useState([]);
+  const [mesSel, setMesSel]     = useState(mesAtual());
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (!moradorId) return;
+    const u1 = onSnapshot(doc(db, "moradores", moradorId), d => {
+      if (d.exists()) setMorador({ id:d.id, ...d.data() });
+    });
+    const u2 = onSnapshot(
+      query(collection(db, "cobrancas"), where("moradorId","==",moradorId)),
+      s => setCobrancas(s.docs.map(d => d.data()).sort((a,b) => b.mes.localeCompare(a.mes)))
+    );
+    return () => { u1(); u2(); };
+  }, [moradorId]);
+
+  if (!morador) return (
+    <div style={{ minHeight:"100vh", background:"#1E3A5F", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontFamily:"'Inter',sans-serif" }}>
+      Carregando...
+    </div>
+  );
+
+  const cobMes    = cobrancas.find(c => c.mes === mesSel);
+  const totalPago = cobrancas.filter(c => c.status === "pago").length;
+  const meses     = [...new Set(cobrancas.map(c => c.mes))].sort().reverse();
+  const statusCor = cobMes?.status === "pago" ? "#2E7D32" : cobMes?.status === "atrasado" ? "#B03A2E" : "#F57F17";
+
+  return (
+    <div style={{ minHeight:"100vh", background:"#F0F4F8", fontFamily:"'Inter',sans-serif" }}>
+      {/* Cabeçalho */}
+      <div style={{ background:"linear-gradient(135deg,#1E3A5F,#2E6DA4)", padding: isMobile ? "24px 20px" : "32px 40px", color:"#fff" }}>
+        <div style={{ fontSize:13, opacity:.7, marginBottom:6 }}>🏢 Condomínio Vila Real 140</div>
+        <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize: isMobile ? 22 : 28, margin:"0 0 4px", fontWeight:700 }}>{morador.nome}</h1>
+        <div style={{ fontSize:14, opacity:.85 }}>{morador.unidade}{morador.proprietario ? ` · Prop: ${morador.proprietario}` : ""}</div>
+        {morador.email && <div style={{ fontSize:12, opacity:.7, marginTop:4 }}>📧 {morador.email}</div>}
+      </div>
+
+      <div style={{ padding: isMobile ? "20px 16px 40px" : "28px 40px 40px", maxWidth:640, margin:"0 auto" }}>
+
+        {/* Situação do mês */}
+        <div style={{ background:"#fff", borderRadius:14, padding:20, boxShadow:"0 2px 12px rgba(0,0,0,.08)", marginBottom:20 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, flexWrap:"wrap", gap:8 }}>
+            <span style={{ fontSize:14, fontWeight:700, color:"#1E3A5F" }}>Situação do mês</span>
+            <select value={mesSel} onChange={e=>setMesSel(e.target.value)} style={{ padding:"6px 10px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, color:"#1E3A5F", background:"#fff" }}>
+              {meses.map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
+            </select>
+          </div>
+          {cobMes ? (
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:"#F8FAFC", borderRadius:10, padding:16, borderLeft:`4px solid ${statusCor}` }}>
+              <div>
+                <div style={{ fontSize:22, fontWeight:800, color:statusCor, textTransform:"capitalize" }}>{cobMes.status}</div>
+                <div style={{ fontSize:13, color:"#6B7A8D", marginTop:4 }}>Taxa: R$ {taxa.toFixed(2).replace(".",",")}</div>
+                {cobMes.dataPagamento && <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>Pago em {cobMes.dataPagamento}</div>}
+                {cobMes.obs && <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>📝 {cobMes.obs}</div>}
+              </div>
+              <div style={{ fontSize:40, opacity:.3 }}>{cobMes.status==="pago"?"✅":cobMes.status==="atrasado"?"🚨":"⏳"}</div>
+            </div>
+          ) : (
+            <div style={{ color:"#9aa6b5", fontSize:13, textAlign:"center", padding:16 }}>Nenhum registro para este mês.</div>
+          )}
+        </div>
+
+        {/* Resumo geral */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:20 }}>
+          {[
+            { label:"Pagamentos em dia", valor: totalPago,                                         icon:"✅", cor:"#2E7D32" },
+            { label:"Atrasados",         valor: cobrancas.filter(c=>c.status==="atrasado").length, icon:"🚨", cor:"#B03A2E" },
+            { label:"Meses no sistema",  valor: cobrancas.length,                                  icon:"📋", cor:"#2E6DA4" },
+          ].map((c,i) => (
+            <div key={i} style={{ background:"#fff", borderRadius:12, padding:"14px 12px", boxShadow:"0 2px 8px rgba(0,0,0,.06)", textAlign:"center", borderTop:`3px solid ${c.cor}` }}>
+              <div style={{ fontSize:20, marginBottom:4 }}>{c.icon}</div>
+              <div style={{ fontSize:20, fontWeight:800, color:c.cor }}>{c.valor}</div>
+              <div style={{ fontSize:10, color:"#6B7A8D", marginTop:2, lineHeight:1.4 }}>{c.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Histórico */}
+        <div style={{ background:"#fff", borderRadius:14, padding:20, boxShadow:"0 2px 12px rgba(0,0,0,.08)" }}>
+          <div style={{ fontSize:14, fontWeight:700, color:"#1E3A5F", marginBottom:14 }}>📋 Histórico de pagamentos</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {cobrancas.map((c,i) => {
+              const cor = c.status==="pago"?"#2E7D32":c.status==="atrasado"?"#B03A2E":"#F57F17";
+              return (
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background: c.status==="pago"?"#E8F5E9":c.status==="atrasado"?"#FFEBEE":"#FFF8E1", borderRadius:10, borderLeft:`4px solid ${cor}` }}>
+                  <div>
+                    <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:13 }}>{mesLabel(c.mes)}</div>
+                    {c.dataPagamento && <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>Pago em {c.dataPagamento}</div>}
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:cor, textTransform:"capitalize" }}>{c.status}</div>
+                    <div style={{ fontSize:12, color:"#1E3A5F" }}>R$ {taxa.toFixed(2).replace(".",",")}</div>
+                  </div>
+                </div>
+              );
+            })}
+            {cobrancas.length === 0 && <div style={{ color:"#9aa6b5", fontSize:13, textAlign:"center", padding:16 }}>Nenhum registro encontrado.</div>}
+          </div>
+        </div>
+
+        <div style={{ textAlign:"center", marginTop:24, fontSize:11, color:"#9aa6b5" }}>
+          Vila Real 140 · Portal do Morador · Acesso somente leitura
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const isMobile = useIsMobile();
   const [user, setUser]             = useState(null);
@@ -166,7 +280,7 @@ export default function App() {
   // ── Autenticação ──
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u && modoVisitante) {
+      if (!u && (modoVisitante || portalMoradorId)) {
         try { await signInWithEmailAndPassword(auth, VISITANTE_EMAIL, VISITANTE_SENHA); }
         catch (e) { setAuthChecked(true); }
         return;
@@ -697,6 +811,11 @@ export default function App() {
 
   if (!user) return <Login />;
 
+  // ── Portal do morador (link individual) ──
+  if (portalMoradorId && user) {
+    return <PortalMorador moradorId={portalMoradorId} db={db} taxa={taxa} mesLabel={mesLabel} mesAtual={mesAtual} />;
+  }
+
   // ── helpers de estilo responsivo ──
   const pad    = isMobile ? "16px 16px 100px" : "32px 32px 40px";
   const h2size = isMobile ? 22 : 26;
@@ -1063,6 +1182,11 @@ export default function App() {
                       {m.telefone && <div>📱 {m.telefone}</div>}
                     </div>
                     <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
+                      <button onClick={() => {
+                        const link = `${window.location.origin}${window.location.pathname}?morador=${m.id}`;
+                        navigator.clipboard.writeText(link);
+                        showToast(`Link do ${m.unidade} copiado!`);
+                      }} style={{ padding:"6px 14px", background:"#E8F5E9", color:"#1B5E20", border:"1px solid #A5D6A7", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>🔗 Copiar link</button>
                       <button onClick={() => setModal({ type:"historico", data:m })} style={{ padding:"6px 14px", background:"#F3E5F5", color:"#6A1B9A", border:"1px solid #CE93D8", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>📋 Histórico</button>
                       {!readOnly && (
                         <>

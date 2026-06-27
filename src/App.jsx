@@ -1295,6 +1295,108 @@ export default function App() {
               <button onClick={exportarPDF} style={{ padding:"12px 18px", background:"#fff", color:"#1E3A5F", border:"1.5px solid #1E3A5F", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", flex: isMobile?"1 1 100%":"none" }}>📄 Exportar PDF</button>
               <button onClick={exportarPrestacaoContas} style={{ padding:"12px 18px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", flex: isMobile?"1 1 100%":"none" }}>📑 Prestação de Contas</button>
             </div>
+
+            {/* ── Dashboard Financeiro Anual ── */}
+            {(() => {
+              const anoAtual = new Date().getFullYear();
+              const mesesAno = Array.from({ length:12 }, (_,i) => `${anoAtual}-${String(i+1).padStart(2,"0")}`);
+              const mesesLabel = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+              const dadosMes = mesesAno.map((m, i) => {
+                const cobM    = cobrancas.filter(c => c.mes === m);
+                const pagosM  = cobM.filter(c => c.status === "pago").length;
+                const entrada = pagosM * taxa;
+                const despM   = despesas.filter(d => d.mes === m && d.status === "pago").reduce((s,d)=>s+d.valor,0);
+                const servM   = servicos.filter(s => {
+                  if (!s.dataFim) return false;
+                  const p = s.dataFim.split("/");
+                  return p.length === 3 && `${p[2]}-${p[1]}` === m;
+                }).reduce((s,sv)=>(sv.valorMaterial||0)+(sv.valorMaoDeObra||0)+s, 0);
+                return { mes: mesesLabel[i], entrada, saida: despM + servM, saldo: entrada - despM - servM };
+              });
+
+              const totalEntAno  = dadosMes.reduce((s,d)=>s+d.entrada,0);
+              const totalSaiAno  = dadosMes.reduce((s,d)=>s+d.saida,0);
+              const saldoAno     = totalEntAno - totalSaiAno;
+              const maxVal       = Math.max(...dadosMes.map(d=>Math.max(d.entrada,d.saida)), 1);
+
+              return (
+                <div style={{ marginTop:20 }}>
+                  <h3 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:"0 0 16px", fontSize:16 }}>
+                    📅 Visão Financeira Anual — {anoAtual}
+                  </h3>
+
+                  {/* Cards anuais */}
+                  <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(3,1fr)", gap:12, marginBottom:20 }}>
+                    {[
+                      { label:"Total arrecadado", valor:`R$ ${totalEntAno.toFixed(2).replace(".",",")}`, icon:"💵", cor:"#2E7D32" },
+                      { label:"Total de saídas",  valor:`R$ ${totalSaiAno.toFixed(2).replace(".",",")}`, icon:"📤", cor:"#B03A2E" },
+                      { label:"Saldo do ano",     valor:`R$ ${saldoAno.toFixed(2).replace(".",",")}`,   icon: saldoAno>=0?"📈":"📉", cor: saldoAno>=0?"#2E6DA4":"#B03A2E" },
+                    ].map((c,i)=>(
+                      <div key={i} style={{ background:"#fff", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderTop:`3px solid ${c.cor}` }}>
+                        <div style={{ fontSize:20, marginBottom:4 }}>{c.icon}</div>
+                        <div style={{ fontSize: isMobile?14:17, fontWeight:800, color:c.cor }}>{c.valor}</div>
+                        <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{c.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Gráfico de barras duplas */}
+                  <div style={{ background:"#fff", borderRadius:12, padding:18, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#1E3A5F", marginBottom:6 }}>Arrecadação vs Despesas — mês a mês</div>
+                    <div style={{ display:"flex", gap:12, marginBottom:12 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:"#6B7A8D" }}><div style={{ width:10, height:10, background:"#2E6DA4", borderRadius:2 }}/> Arrecadado</div>
+                      <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:"#6B7A8D" }}><div style={{ width:10, height:10, background:"#EF9A9A", borderRadius:2 }}/> Saídas</div>
+                    </div>
+                    <div style={{ display:"flex", alignItems:"flex-end", gap: isMobile?2:6, height:130, paddingBottom:28, position:"relative" }}>
+                      {dadosMes.map((d,i) => {
+                        const hEnt = maxVal > 0 ? Math.max((d.entrada/maxVal)*100, d.entrada>0?4:0) : 0;
+                        const hSai = maxVal > 0 ? Math.max((d.saida/maxVal)*100, d.saida>0?4:0) : 0;
+                        const atual = mesesAno[i] === mesSel;
+                        return (
+                          <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
+                            <div style={{ width:"100%", display:"flex", gap:1, alignItems:"flex-end", height:100 }}>
+                              <div style={{ flex:1, height:`${hEnt}%`, background: atual?"#C9933A":"#2E6DA4", borderRadius:"3px 3px 0 0", minHeight: d.entrada>0?3:0, transition:"height .5s" }} title={`Arrecadado: R$ ${d.entrada.toFixed(0)}`} />
+                              <div style={{ flex:1, height:`${hSai}%`, background:"#EF9A9A", borderRadius:"3px 3px 0 0", minHeight: d.saida>0?3:0, transition:"height .5s" }} title={`Saídas: R$ ${d.saida.toFixed(0)}`} />
+                            </div>
+                            <div style={{ position:"absolute", bottom:0, fontSize: isMobile?8:9, color: atual?"#C9933A":"#6B7A8D", fontWeight: atual?700:400 }}>{d.mes}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Tabela resumo anual */}
+                    <div style={{ marginTop:8, borderTop:"1px solid #F0F4F8", paddingTop:12, overflowX:"auto" }}>
+                      <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
+                        <thead>
+                          <tr style={{ background:"#F0F4F8" }}>
+                            {["Mês","Arrecadado","Saídas","Saldo"].map(h=>(
+                              <th key={h} style={{ padding:"6px 8px", textAlign:"left", color:"#1E3A5F", fontWeight:700 }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dadosMes.map((d,i) => (
+                            <tr key={i} style={{ borderBottom:"1px solid #F8FAFC", background: mesesAno[i]===mesSel?"#FFF8E1":"transparent" }}>
+                              <td style={{ padding:"5px 8px", fontWeight: mesesAno[i]===mesSel?700:400, color:"#1E3A5F" }}>{d.mes}</td>
+                              <td style={{ padding:"5px 8px", color:"#2E7D32" }}>R$ {d.entrada.toFixed(2).replace(".",",")}</td>
+                              <td style={{ padding:"5px 8px", color:"#B03A2E" }}>R$ {d.saida.toFixed(2).replace(".",",")}</td>
+                              <td style={{ padding:"5px 8px", color: d.saldo>=0?"#2E6DA4":"#B03A2E", fontWeight:600 }}>R$ {d.saldo.toFixed(2).replace(".",",")}</td>
+                            </tr>
+                          ))}
+                          <tr style={{ borderTop:"2px solid #D0DAE6", background:"#F0F4F8" }}>
+                            <td style={{ padding:"6px 8px", fontWeight:700, color:"#1E3A5F" }}>Total</td>
+                            <td style={{ padding:"6px 8px", fontWeight:700, color:"#2E7D32" }}>R$ {totalEntAno.toFixed(2).replace(".",",")}</td>
+                            <td style={{ padding:"6px 8px", fontWeight:700, color:"#B03A2E" }}>R$ {totalSaiAno.toFixed(2).replace(".",",")}</td>
+                            <td style={{ padding:"6px 8px", fontWeight:700, color: saldoAno>=0?"#2E6DA4":"#B03A2E" }}>R$ {saldoAno.toFixed(2).replace(".",",")}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

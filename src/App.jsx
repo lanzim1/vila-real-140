@@ -274,6 +274,8 @@ export default function App() {
   const [obsMes, setObsMes]     = useState("");
   const [obsSalva, setObsSalva] = useState("");
   const [logs, setLogs]         = useState([]);
+  const [acessos, setAcessos]   = useState([]);
+  const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const fileRef        = useRef();
   const fileRefDespesa = useRef();
 
@@ -313,7 +315,10 @@ export default function App() {
       query(collection(db, "logs")),
       s => setLogs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
     );
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); };
+    const u8 = onSnapshot(collection(db, "acessos"),
+      s => setAcessos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
+    );
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); };
   }, [user]);
 
   // ── Popular na primeira vez ──
@@ -605,6 +610,35 @@ export default function App() {
     await deleteDoc(doc(db,"servicos",id));
     registrarLog("🗑️", `Serviço removido: ${s?.titulo||id}`);
     showToast("Serviço removido.","error");
+  };
+
+  // ── Controle de Acessos ──
+  const registrarAcesso = async () => {
+    if (!novoAcesso.nome || !novoAcesso.motivo) { showToast("Preencha pelo menos nome e motivo.", "error"); return; }
+    const hoje = new Date();
+    const dataHoje = hoje.toLocaleDateString("pt-BR");
+    const horaAgora = hoje.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" });
+    await addDoc(collection(db, "acessos"), {
+      ...novoAcesso,
+      dataEntrada: novoAcesso.dataEntrada || dataHoje,
+      horaEntrada: novoAcesso.horaEntrada || horaAgora,
+      timestamp: Date.now(),
+    });
+    registrarLog("🚪", `Acesso registrado: ${novoAcesso.nome}${novoAcesso.empresa ? ` (${novoAcesso.empresa})` : ""} — ${novoAcesso.motivo}`);
+    setNovoAcesso({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
+    setModal(null);
+    showToast("Acesso registrado!");
+  };
+
+  const registrarSaida = async (id) => {
+    const hora = new Date().toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" });
+    await setDoc(doc(db, "acessos", id), { horaSaida: hora }, { merge:true });
+    showToast("Saída registrada!");
+  };
+
+  const removerAcesso = async (id) => {
+    await deleteDoc(doc(db, "acessos", id));
+    showToast("Registro removido.", "error");
   };
 
   const enviarLembretes = () => {
@@ -960,6 +994,7 @@ export default function App() {
     { id:"moradores", icon:"👥", label:"Moradores"  },
     { id:"despesas",  icon:"💧", label:"Água/Luz"   },
     { id:"servicos",  icon:"🔧", label:"Serviços"   },
+    { id:"acessos",   icon:"🚪", label:"Acessos"    },
     { id:"historico", icon:"📋", label:"Histórico"  },
     ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config." }] : []),
   ];
@@ -1489,6 +1524,81 @@ export default function App() {
           </div>
         )}
 
+        {/* ── Acessos ── */}
+        {aba === "acessos" && (
+          <div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
+              <div>
+                <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Controle de Acessos</h2>
+                <p style={{ color:"#6B7A8D", margin:"4px 0 0", fontSize:13 }}>Visitantes e prestadores de serviço</p>
+              </div>
+              {!readOnly && (
+                <button onClick={() => { setNovoAcesso({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" }); setModal({ type:"novoAcesso" }); }} style={{ padding:"10px 16px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
+                  + Registrar Entrada
+                </button>
+              )}
+            </div>
+
+            {/* Cards de resumo */}
+            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3,1fr)", gap:12, marginBottom:20 }}>
+              {[
+                { label:"Total de acessos",  valor: acessos.length,                                   icon:"🚪", cor:"#1E3A5F" },
+                { label:"Ainda no condomínio", valor: acessos.filter(a=>!a.horaSaida).length,          icon:"🟡", cor:"#F57F17" },
+                { label:"Saíram",             valor: acessos.filter(a=>!!a.horaSaida).length,          icon:"✅", cor:"#2E7D32" },
+              ].map((c,i) => (
+                <div key={i} style={{ background:"#fff", borderRadius:12, padding:"14px 14px 12px", boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderTop:`3px solid ${c.cor}` }}>
+                  <div style={{ fontSize:20, marginBottom:4 }}>{c.icon}</div>
+                  <div style={{ fontSize:20, fontWeight:700, color:c.cor }}>{c.valor}</div>
+                  <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{c.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Lista de acessos */}
+            {acessos.length === 0 ? (
+              <div style={{ background:"#fff", borderRadius:12, padding:40, textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+                <div style={{ fontSize:40, marginBottom:12 }}>🚪</div>
+                <div style={{ color:"#9aa6b5", fontSize:14 }}>Nenhum acesso registrado ainda.</div>
+              </div>
+            ) : (
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {acessos.map((a) => (
+                  <div key={a.id} style={{ background:"#fff", borderRadius:12, padding:16, boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderLeft:`4px solid ${a.horaSaida ? "#2E7D32" : "#F57F17"}` }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
+                      <div>
+                        <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{a.nome}</div>
+                        {a.empresa && <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>🏢 {a.empresa}</div>}
+                        <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>📋 {a.motivo}</div>
+                        {a.unidade && <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>🏠 {a.unidade}</div>}
+                      </div>
+                      <div style={{ textAlign:"right", flexShrink:0 }}>
+                        <div style={{ fontSize:12, color:"#1E3A5F", fontWeight:600 }}>{a.dataEntrada}</div>
+                        <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>Entrada: {a.horaEntrada}</div>
+                        {a.horaSaida
+                          ? <div style={{ fontSize:12, color:"#2E7D32", marginTop:2, fontWeight:600 }}>Saída: {a.horaSaida}</div>
+                          : <div style={{ fontSize:12, color:"#F57F17", marginTop:2, fontWeight:600 }}>No condomínio</div>
+                        }
+                      </div>
+                    </div>
+                    {!readOnly && (
+                      <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
+                        {!a.horaSaida && (
+                          <button onClick={() => registrarSaida(a.id)} style={{ padding:"6px 14px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                            ✓ Registrar Saída
+                          </button>
+                        )}
+                        <button onClick={() => { if(window.confirm("Remover este registro?")) removerAcesso(a.id); }} style={{ padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                          Remover
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Histórico ── */}
         {aba === "historico" && (
           <div>
@@ -1708,6 +1818,49 @@ export default function App() {
           <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
             <button onClick={salvarEdicaoMorador} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Salvar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "novoAcesso" && (
+        <Modal title="Registrar Entrada" onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Nome *</label>
+              <input value={novoAcesso.nome} onChange={e=>setNovoAcesso(p=>({...p,nome:e.target.value}))} placeholder="Ex: João Silva" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+            </div>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Empresa / Vínculo</label>
+              <input value={novoAcesso.empresa} onChange={e=>setNovoAcesso(p=>({...p,empresa:e.target.value}))} placeholder="Ex: Hidráulica ABC, Familiar do morador..." style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+            </div>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Motivo *</label>
+              <input value={novoAcesso.motivo} onChange={e=>setNovoAcesso(p=>({...p,motivo:e.target.value}))} placeholder="Ex: Conserto de encanamento, Visita ao morador..." style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+            </div>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Apartamento visitado</label>
+              <select value={novoAcesso.unidade} onChange={e=>setNovoAcesso(p=>({...p,unidade:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box", background:"#fff" }}>
+                <option value="">Área comum / Não especificado</option>
+                {[...moradores].sort((a,b)=>a.unidade.localeCompare(b.unidade)).map(m => (
+                  <option key={m.id} value={m.unidade}>{m.unidade} — {m.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Data de entrada</label>
+                <input type="date" value={novoAcesso.dataEntrada} onChange={e=>setNovoAcesso(p=>({...p,dataEntrada:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Hora de entrada</label>
+                <input type="time" value={novoAcesso.horaEntrada} onChange={e=>setNovoAcesso(p=>({...p,horaEntrada:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+              </div>
+            </div>
+            <p style={{ fontSize:11, color:"#9aa6b5", margin:0 }}>Se data/hora ficarem em branco, serão preenchidas automaticamente com o momento atual.</p>
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={registrarAcesso} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
           </div>
         </Modal>
       )}

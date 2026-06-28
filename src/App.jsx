@@ -55,27 +55,51 @@ function useIsMobile() {
   return isMobile;
 }
 
+// ── Design System ──
+const D = {
+  sidebar:    "#0F172A",
+  sidebarHov: "rgba(255,255,255,0.07)",
+  sidebarAct: "rgba(13,148,136,0.18)",
+  primary:    "#0D9488",
+  primaryDk:  "#0F766E",
+  gold:       "#D97706",
+  success:    "#059669",
+  danger:     "#DC2626",
+  warning:    "#F59E0B",
+  bgApp:      "#F1F5F9",
+  bgCard:     "#FFFFFF",
+  text:       "#0F172A",
+  textSec:    "#64748B",
+  textMut:    "#94A3B8",
+  border:     "#E2E8F0",
+  shadow:     "0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06)",
+  shadowMd:   "0 4px 12px rgba(0,0,0,.1), 0 16px 40px rgba(0,0,0,.08)",
+  radius:     14,
+  radiusSm:   8,
+};
+
 // ── Toast ──
 const Toast = ({ msg, type, onClose }) => {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, []);
-  const bg = type === "success" ? "#2E6DA4" : type === "error" ? "#B03A2E" : "#1E3A5F";
+  const bg = type === "error" ? D.danger : D.primary;
   return (
-    <div style={{ position:"fixed", bottom:80, right:16, left:16, background:bg, color:"#fff", padding:"12px 16px", borderRadius:10, fontSize:14, zIndex:9999, boxShadow:"0 4px 16px rgba(0,0,0,.25)", lineHeight:1.4, display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-      <span style={{ flex:1 }}>{msg}</span>
-      <button onClick={onClose} style={{ marginLeft:12, background:"none", border:"none", color:"#fff", cursor:"pointer", fontSize:18, lineHeight:1, flexShrink:0 }}>×</button>
+    <div style={{ position:"fixed", bottom:88, right:16, left:16, background:bg, color:"#fff", padding:"14px 18px", borderRadius:12, fontSize:14, zIndex:9999, boxShadow:D.shadowMd, display:"flex", alignItems:"center", gap:10 }}>
+      <span style={{ width:22, height:22, borderRadius:"50%", background:"rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontSize:11, fontWeight:700 }}>{type==="error"?"✕":"✓"}</span>
+      <span style={{ flex:1, lineHeight:1.5 }}>{msg}</span>
+      <button onClick={onClose} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", cursor:"pointer", fontSize:16, borderRadius:6, width:26, height:26, display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
     </div>
   );
 };
 
 // ── Modal ──
 const Modal = ({ title, onClose, children, isMobile }) => (
-  <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:1000, display:"flex", alignItems: isMobile ? "flex-end" : "center", justifyContent:"center" }}>
-    <div style={{ background:"#fff", borderRadius: isMobile ? "16px 16px 0 0" : 12, width:"100%", maxWidth: isMobile ? "100%" : 520, maxHeight: isMobile ? "92vh" : "90vh", overflow:"auto", boxShadow:"0 8px 40px rgba(0,0,0,.25)" }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"18px 20px 14px", borderBottom:"1px solid #e8edf3", position:"sticky", top:0, background:"#fff", zIndex:1 }}>
-        <span style={{ fontFamily:"'Playfair Display',serif", fontSize:16, color:"#1E3A5F", fontWeight:700 }}>{title}</span>
-        <button onClick={onClose} style={{ background:"none", border:"none", fontSize:24, cursor:"pointer", color:"#666", lineHeight:1, padding:"0 4px" }}>×</button>
+  <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.65)", zIndex:1000, display:"flex", alignItems: isMobile?"flex-end":"center", justifyContent:"center" }}>
+    <div style={{ background:"#fff", borderRadius: isMobile?"20px 20px 0 0":D.radius, width:"100%", maxWidth: isMobile?"100%":520, maxHeight: isMobile?"92vh":"90vh", overflow:"auto", boxShadow:D.shadowMd }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"20px 24px 16px", borderBottom:`1px solid ${D.border}`, position:"sticky", top:0, background:"#fff", zIndex:1 }}>
+        <span style={{ fontSize:16, color:D.text, fontWeight:700, letterSpacing:"-.3px" }}>{title}</span>
+        <button onClick={onClose} style={{ background:"#F1F5F9", border:"none", cursor:"pointer", color:D.textSec, width:32, height:32, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>×</button>
       </div>
-      <div style={{ padding:"18px 20px 28px" }}>{children}</div>
+      <div style={{ padding:"20px 24px 28px" }}>{children}</div>
     </div>
   </div>
 );
@@ -83,12 +107,17 @@ const Modal = ({ title, onClose, children, isMobile }) => (
 // ── Badge ──
 const Badge = ({ status }) => {
   const map = {
-    pago:     { label:"Pago",     bg:"#E8F5E9", color:"#2E7D32", border:"#A5D6A7" },
-    pendente: { label:"Pendente", bg:"#FFF8E1", color:"#F57F17", border:"#FFE082" },
-    atrasado: { label:"Atrasado", bg:"#FFEBEE", color:"#B03A2E", border:"#EF9A9A" },
+    pago:     { label:"Pago",     bg:"#DCFCE7", color:"#166534", dot:"#22C55E" },
+    pendente: { label:"Pendente", bg:"#FEF9C3", color:"#854D0E", dot:"#EAB308" },
+    atrasado: { label:"Atrasado", bg:"#FEE2E2", color:"#991B1B", dot:"#EF4444" },
   };
   const s = map[status] || map.pendente;
-  return <span style={{ padding:"3px 10px", borderRadius:20, fontSize:12, fontWeight:600, background:s.bg, color:s.color, border:`1px solid ${s.border}` }}>{s.label}</span>;
+  return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px 3px 8px", borderRadius:20, fontSize:12, fontWeight:600, background:s.bg, color:s.color }}>
+      <span style={{ width:6, height:6, borderRadius:"50%", background:s.dot, flexShrink:0 }} />
+      {s.label}
+    </span>
+  );
 };
 
 // ── Login ──
@@ -109,30 +138,36 @@ const Login = () => {
   };
 
   return (
-    <div style={{ minHeight:"100vh", background:"#1E3A5F", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Inter',sans-serif", padding:16 }}>
-      <div style={{ background:"#fff", borderRadius:16, padding:"36px 28px", width:"100%", maxWidth:400, boxShadow:"0 16px 48px rgba(0,0,0,0.3)" }}>
-        <div style={{ textAlign:"center", marginBottom:28 }}>
-          <div style={{ fontSize:40, marginBottom:8 }}>🏢</div>
-          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:22, color:"#1E3A5F", margin:0, fontWeight:700 }}>Vila Real 140</h1>
-          <p style={{ color:"#6B7A8D", fontSize:13, margin:"6px 0 0" }}>Sistema de Cobrança de Condomínio</p>
+    <div style={{ minHeight:"100vh", background:D.sidebar, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Inter',sans-serif", padding:16, position:"relative", overflow:"hidden" }}>
+      {/* Padrão decorativo */}
+      <div style={{ position:"absolute", inset:0, backgroundImage:`radial-gradient(circle at 20% 20%, rgba(13,148,136,0.15) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(13,148,136,0.1) 0%, transparent 50%)`, pointerEvents:"none" }} />
+      <div style={{ background:"#fff", borderRadius:20, padding:"40px 36px", width:"100%", maxWidth:420, boxShadow:"0 32px 80px rgba(0,0,0,0.4)", position:"relative" }}>
+        {/* Logo */}
+        <div style={{ textAlign:"center", marginBottom:32 }}>
+          <div style={{ width:64, height:64, borderRadius:16, background:`linear-gradient(135deg, ${D.primary}, ${D.primaryDk})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", boxShadow:`0 8px 24px rgba(13,148,136,0.35)` }}>
+            <span style={{ color:"#fff", fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:700 }}>VR</span>
+          </div>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, color:D.text, margin:0, fontWeight:700, letterSpacing:"-.5px" }}>Vila Real 140</h1>
+          <p style={{ color:D.textSec, fontSize:13, margin:"6px 0 0", letterSpacing:".2px" }}>Sistema de Gestão Condominial</p>
         </div>
         <div style={{ marginBottom:16 }}>
-          <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#1E3A5F", marginBottom:6, textTransform:"uppercase", letterSpacing:.5 }}>E-mail</label>
-          <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="seu@email.com" style={{ width:"100%", padding:"12px 14px", border:"1.5px solid #D0DAE6", borderRadius:10, fontSize:16, color:"#1E3A5F", outline:"none", boxSizing:"border-box" }} />
+          <label style={{ display:"block", fontSize:11, fontWeight:700, color:D.textSec, marginBottom:7, textTransform:"uppercase", letterSpacing:1 }}>E-mail</label>
+          <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="seu@email.com" style={{ width:"100%", padding:"12px 14px", border:`1.5px solid ${D.border}`, borderRadius:10, fontSize:15, color:D.text, outline:"none", boxSizing:"border-box", transition:"border .2s" }} onFocus={e=>e.target.style.borderColor=D.primary} onBlur={e=>e.target.style.borderColor=D.border} />
         </div>
-        <div style={{ marginBottom:22 }}>
-          <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#1E3A5F", marginBottom:6, textTransform:"uppercase", letterSpacing:.5 }}>Senha</label>
+        <div style={{ marginBottom:24 }}>
+          <label style={{ display:"block", fontSize:11, fontWeight:700, color:D.textSec, marginBottom:7, textTransform:"uppercase", letterSpacing:1 }}>Senha</label>
           <div style={{ position:"relative" }}>
-            <input type={verPass ? "text" : "password"} value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="••••••••" style={{ width:"100%", padding:"12px 44px 12px 14px", border:"1.5px solid #D0DAE6", borderRadius:10, fontSize:16, color:"#1E3A5F", outline:"none", boxSizing:"border-box" }} />
-            <button type="button" onClick={() => setVerPass(v=>!v)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", fontSize:18, padding:4, lineHeight:1 }}>
-              {verPass ? "🙈" : "👁️"}
+            <input type={verPass?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="••••••••" style={{ width:"100%", padding:"12px 44px 12px 14px", border:`1.5px solid ${D.border}`, borderRadius:10, fontSize:15, color:D.text, outline:"none", boxSizing:"border-box", transition:"border .2s" }} onFocus={e=>e.target.style.borderColor=D.primary} onBlur={e=>e.target.style.borderColor=D.border} />
+            <button type="button" onClick={()=>setVerPass(v=>!v)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", fontSize:17, padding:4, lineHeight:1, color:D.textMut }}>
+              {verPass?"🙈":"👁️"}
             </button>
           </div>
         </div>
-        {err && <p style={{ color:"#B03A2E", fontSize:13, margin:"0 0 14px", textAlign:"center" }}>{err}</p>}
-        <button onClick={handle} disabled={loading} style={{ width:"100%", padding:"14px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:10, fontSize:16, fontWeight:600, cursor: loading ? "default" : "pointer", opacity: loading ? .7 : 1 }}>
-          {loading ? "Entrando..." : "Entrar"}
+        {err && <div style={{ background:"#FEE2E2", color:"#991B1B", fontSize:13, padding:"10px 14px", borderRadius:8, marginBottom:16, textAlign:"center" }}>{err}</div>}
+        <button onClick={handle} disabled={loading} style={{ width:"100%", padding:"14px", background:`linear-gradient(135deg, ${D.primary}, ${D.primaryDk})`, color:"#fff", border:"none", borderRadius:10, fontSize:15, fontWeight:700, cursor: loading?"default":"pointer", opacity: loading?.75:1, letterSpacing:".3px", boxShadow:`0 4px 16px rgba(13,148,136,0.35)` }}>
+          {loading?"Verificando...":"Entrar"}
         </button>
+        <p style={{ textAlign:"center", fontSize:11, color:D.textMut, margin:"20px 0 0" }}>Condomínio Vila Real 140 · Sistema Privado</p>
       </div>
     </div>
   );
@@ -172,9 +207,9 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   return (
     <div style={{ minHeight:"100vh", background:"#F0F4F8", fontFamily:"'Inter',sans-serif" }}>
       {/* Cabeçalho */}
-      <div style={{ background:"linear-gradient(135deg,#1E3A5F,#2E6DA4)", padding: isMobile ? "24px 20px" : "32px 40px", color:"#fff" }}>
+      <div style={{ background:"linear-gradient(135deg,#0F172A,#0F766E)", padding: isMobile ? "24px 20px" : "32px 40px", color:"#fff" }}>
         <div style={{ fontSize:13, opacity:.7, marginBottom:6 }}>🏢 Condomínio Vila Real 140</div>
-        <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize: isMobile ? 22 : 28, margin:"0 0 4px", fontWeight:700 }}>{morador.nome}</h1>
+        <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize: isMobile?22:28, margin:"0 0 4px", fontWeight:700, letterSpacing:"-.5px" }}>{morador.nome}</h1>
         <div style={{ fontSize:14, opacity:.85 }}>{morador.unidade}{morador.proprietario ? ` · Prop: ${morador.proprietario}` : ""}</div>
         {morador.email && <div style={{ fontSize:12, opacity:.7, marginTop:4 }}>📧 {morador.email}</div>}
       </div>
@@ -182,7 +217,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
       <div style={{ padding: isMobile ? "20px 16px 40px" : "28px 40px 40px", maxWidth:640, margin:"0 auto" }}>
 
         {/* Situação do mês */}
-        <div style={{ background:"#fff", borderRadius:14, padding:20, boxShadow:"0 2px 12px rgba(0,0,0,.08)", marginBottom:20 }}>
+        <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, flexWrap:"wrap", gap:8 }}>
             <span style={{ fontSize:14, fontWeight:700, color:"#1E3A5F" }}>Situação do mês</span>
             <select value={mesSel} onChange={e=>setMesSel(e.target.value)} style={{ padding:"6px 10px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, color:"#1E3A5F", background:"#fff" }}>
@@ -194,8 +229,8 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
               <div>
                 <div style={{ fontSize:22, fontWeight:800, color:statusCor, textTransform:"capitalize" }}>{cobMes.status}</div>
                 <div style={{ fontSize:13, color:"#6B7A8D", marginTop:4 }}>Taxa: R$ {taxa.toFixed(2).replace(".",",")}</div>
-                {cobMes.dataPagamento && <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>Pago em {cobMes.dataPagamento}</div>}
-                {cobMes.obs && <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>📝 {cobMes.obs}</div>}
+                {cobMes.dataPagamento && <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>Pago em {cobMes.dataPagamento}</div>}
+                {cobMes.obs && <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>📝 {cobMes.obs}</div>}
               </div>
               <div style={{ fontSize:40, opacity:.3 }}>{cobMes.status==="pago"?"✅":cobMes.status==="atrasado"?"🚨":"⏳"}</div>
             </div>
@@ -211,7 +246,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
             { label:"Atrasados",         valor: cobrancas.filter(c=>c.status==="atrasado").length, icon:"🚨", cor:"#B03A2E" },
             { label:"Meses no sistema",  valor: cobrancas.length,                                  icon:"📋", cor:"#2E6DA4" },
           ].map((c,i) => (
-            <div key={i} style={{ background:"#fff", borderRadius:12, padding:"14px 12px", boxShadow:"0 2px 8px rgba(0,0,0,.06)", textAlign:"center", borderTop:`3px solid ${c.cor}` }}>
+            <div key={i} style={{ background:D.bgCard, borderRadius:D.radius, padding:"14px 12px", boxShadow:D.shadow, border:`1px solid ${D.border}`, textAlign:"center", borderTop:`3px solid ${c.cor}` }}>
               <div style={{ fontSize:20, marginBottom:4 }}>{c.icon}</div>
               <div style={{ fontSize:20, fontWeight:800, color:c.cor }}>{c.valor}</div>
               <div style={{ fontSize:10, color:"#6B7A8D", marginTop:2, lineHeight:1.4 }}>{c.label}</div>
@@ -220,7 +255,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
         </div>
 
         {/* Histórico */}
-        <div style={{ background:"#fff", borderRadius:14, padding:20, boxShadow:"0 2px 12px rgba(0,0,0,.08)" }}>
+        <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
           <div style={{ fontSize:14, fontWeight:700, color:"#1E3A5F", marginBottom:14 }}>📋 Histórico de pagamentos</div>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             {cobrancas.map((c,i) => {
@@ -1025,22 +1060,22 @@ export default function App() {
     const m = moradores.find(x => x.id === cob.moradorId);
     if (!m) return null;
     return (
-      <div style={{ background:"#fff", borderRadius:12, padding:16, boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderLeft:`4px solid ${cob.status==="pago"?"#2E7D32":"#B03A2E"}`, marginBottom:10 }}>
+      <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${cob.status==="pago"?D.success:cob.status==="atrasado"?D.danger:D.warning}`, marginBottom:10 }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
           <div>
             <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{m.unidade} — {m.nome}</div>
-            <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>{m.email}</div>
+            <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>{m.email}</div>
           </div>
           <Badge status={cob.status} />
         </div>
         {cob.dataPagamento && <div style={{ fontSize:12, color:"#9aa6b5", marginBottom:8 }}>Pago em {cob.dataPagamento}</div>}
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
           {cob.status !== "pago" ? (
-            !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ padding:"7px 14px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>✓ Registrar Pgto</button>
+            !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ padding:"7px 14px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>✓ Registrar Pgto</button>
           ) : (
             <>
-              {cob.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:cob.comprovante, nome:m.nome, arquivoNome:cob.arquivoNome } })} style={{ padding:"7px 14px", background:"#E3F2FD", color:"#1565C0", border:"1px solid #90CAF9", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>📄 Comprovante</button>}
-              {!readOnly && <button onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} style={{ padding:"7px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>↩ Estornar</button>}
+              {cob.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:cob.comprovante, nome:m.nome, arquivoNome:cob.arquivoNome } })} style={{ padding:"7px 14px", background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>📄 Comprovante</button>}
+              {!readOnly && <button onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} style={{ padding:"7px 14px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>↩ Estornar</button>}
             </>
           )}
         </div>
@@ -1049,123 +1084,148 @@ export default function App() {
   };
 
   const DespCard = ({ d }) => (
-    <div style={{ background:"#fff", borderRadius:12, padding:16, boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderLeft:`4px solid ${d.status==="pago"?"#2E7D32":"#B03A2E"}`, marginBottom:10 }}>
+    <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${d.status==="pago"?D.success:D.danger}`, marginBottom:10 }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
         <div>
           <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{d.tipo==="agua"?"💧":d.tipo==="luz"?"⚡":"📦"} {d.descricao || (d.tipo==="agua"?"Conta de água":d.tipo==="luz"?"Conta de luz":"Outra despesa")}</div>
-          <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>{mesLabel(d.mes)} · R$ {d.valor.toFixed(2).replace(".",",")}</div>
+          <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>{mesLabel(d.mes)} · R$ {d.valor.toFixed(2).replace(".",",")}</div>
         </div>
         <Badge status={d.status} />
       </div>
       {d.dataPagamento && <div style={{ fontSize:12, color:"#9aa6b5", marginBottom:8 }}>Pago em {d.dataPagamento}</div>}
       <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-        {d.status !== "pago" && !readOnly && <button onClick={() => marcarDespesaPaga(d.id)} style={{ padding:"7px 14px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>✓ Marcar Paga</button>}
-        {d.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} style={{ padding:"7px 14px", background:"#E3F2FD", color:"#1565C0", border:"1px solid #90CAF9", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>📄 Ver</button>}
-        {!readOnly && <button onClick={() => { if(window.confirm("Remover esta despesa?")) removerDespesa(d.id); }} style={{ padding:"7px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Remover</button>}
+        {d.status !== "pago" && !readOnly && <button onClick={() => marcarDespesaPaga(d.id)} style={{ padding:"7px 14px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>✓ Marcar Paga</button>}
+        {d.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} style={{ padding:"7px 14px", background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>📄 Ver</button>}
+        {!readOnly && <button onClick={() => { if(window.confirm("Remover esta despesa?")) removerDespesa(d.id); }} style={{ padding:"7px 14px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Remover</button>}
       </div>
     </div>
   );
 
   return (
-    <div style={{ display:"flex", flexDirection: isMobile ? "column" : "row", minHeight:"100vh", fontFamily:"'Inter',sans-serif", background:"#F0F4F8" }}>
+    <div style={{ display:"flex", flexDirection: isMobile ? "column" : "row", minHeight:"100vh", fontFamily:"'Inter',sans-serif", background:"#F8FAFC" }}>
 
       {/* ── Sidebar (desktop) ── */}
       {!isMobile && (
-        <aside style={{ width:220, background:"#1E3A5F", display:"flex", flexDirection:"column", padding:"0 0 24px", flexShrink:0 }}>
-          <div style={{ padding:"28px 20px 24px", borderBottom:"1px solid rgba(255,255,255,.1)" }}>
-            <div style={{ fontSize:22, marginBottom:4 }}>🏢</div>
-            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, color:"#fff", fontWeight:700, lineHeight:1.3 }}>Vila Real 140</div>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,.5)", marginTop:3 }}>Gestão de Condomínio</div>
+        <aside style={{ width:240, background:D.sidebar, display:"flex", flexDirection:"column", flexShrink:0 }}>
+          {/* Logo */}
+          <div style={{ padding:"28px 20px 24px", borderBottom:"1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+              <div style={{ width:40, height:40, borderRadius:10, background:`linear-gradient(135deg, ${D.primary}, ${D.primaryDk})`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <span style={{ color:"#fff", fontFamily:"'Playfair Display',serif", fontSize:14, fontWeight:700 }}>VR</span>
+              </div>
+              <div>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, color:"#fff", fontWeight:700, lineHeight:1.2 }}>Vila Real 140</div>
+                <div style={{ fontSize:11, color:"rgba(255,255,255,.4)", marginTop:2, letterSpacing:".3px" }}>Gestão Condominial</div>
+              </div>
+            </div>
           </div>
-          <nav style={{ flex:1, padding:"16px 0" }}>
+          {/* Nav */}
+          <nav style={{ flex:1, padding:"12px 10px" }}>
             {navItems.map(n => (
-              <button key={n.id} onClick={() => setAba(n.id)} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", padding:"11px 20px", background: aba===n.id ? "rgba(255,255,255,.12)" : "none", border:"none", cursor:"pointer", color: aba===n.id ? "#fff" : "rgba(255,255,255,.6)", fontSize:13.5, fontWeight: aba===n.id ? 600 : 400, textAlign:"left", borderLeft: aba===n.id ? "3px solid #C9933A" : "3px solid transparent" }}>
-                <span style={{ fontSize:16 }}>{n.icon}</span>{n.label}
+              <button key={n.id} onClick={() => setAba(n.id)} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", padding:"10px 12px", background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", color: aba===n.id ? "#fff" : "rgba(255,255,255,.55)", fontSize:13.5, fontWeight: aba===n.id ? 600 : 400, textAlign:"left", borderRadius:10, marginBottom:2, transition:"all .15s", outline:"none", borderLeft: aba===n.id ? `3px solid ${D.primary}` : "3px solid transparent" }}>
+                <span style={{ fontSize:17, minWidth:20, textAlign:"center" }}>{n.icon}</span>{n.label}
               </button>
             ))}
           </nav>
-          {readOnly ? (
-            <button onClick={async () => { await signOut(auth); window.location.href = window.location.origin + window.location.pathname; }} style={{ margin:"0 16px", padding:"9px", background:"rgba(201,147,58,.2)", border:"1px solid rgba(201,147,58,.4)", borderRadius:8, color:"#F0D9A8", fontSize:12, fontWeight:600, textAlign:"center", cursor:"pointer", lineHeight:1.5 }}>
-              👁️ Modo Visualização<br/><span style={{ fontSize:11, fontWeight:400, opacity:.85 }}>Sair</span>
-            </button>
-          ) : (
-            <button onClick={() => signOut(auth)} style={{ margin:"0 16px", padding:"9px", background:"rgba(176,58,46,.25)", border:"1px solid rgba(176,58,46,.4)", borderRadius:8, color:"#ff9a8b", cursor:"pointer", fontSize:13, fontWeight:600 }}>Sair</button>
-          )}
+          {/* Bottom */}
+          <div style={{ padding:"16px 10px" }}>
+            <div style={{ background:"rgba(255,255,255,.05)", borderRadius:10, padding:"10px 12px", marginBottom:10 }}>
+              <div style={{ fontSize:10, color:"rgba(255,255,255,.35)", textTransform:"uppercase", letterSpacing:1, marginBottom:3 }}>Conta</div>
+              <div style={{ fontSize:12, color:"rgba(255,255,255,.6)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{user?.email}</div>
+            </div>
+            {readOnly ? (
+              <button onClick={async () => { await signOut(auth); window.location.href = window.location.origin + window.location.pathname; }} style={{ width:"100%", padding:"9px 12px", background:"rgba(215,119,6,.15)", border:`1px solid rgba(215,119,6,.3)`, borderRadius:10, color:"#FCD34D", fontSize:12, fontWeight:600, textAlign:"center", cursor:"pointer" }}>
+                👁️ Modo Visualização — Sair
+              </button>
+            ) : (
+              <button onClick={() => signOut(auth)} style={{ width:"100%", padding:"9px 12px", background:"rgba(220,38,38,.15)", border:`1px solid rgba(220,38,38,.25)`, borderRadius:10, color:"#FCA5A5", cursor:"pointer", fontSize:13, fontWeight:600 }}>Sair</button>
+            )}
+          </div>
         </aside>
       )}
 
       {/* ── Barra de navegação inferior (mobile) ── */}
       {isMobile && (
-        <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:"#1E3A5F", display:"flex", zIndex:500, boxShadow:"0 -2px 12px rgba(0,0,0,.2)", borderTop:"1px solid rgba(255,255,255,.08)" }}>
+        <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:D.sidebar, display:"flex", zIndex:500, boxShadow:"0 -1px 0 rgba(255,255,255,.06), 0 -8px 24px rgba(0,0,0,.3)", paddingBottom:"env(safe-area-inset-bottom,0)" }}>
           {navItems.map(n => (
-            <button key={n.id} onClick={() => setAba(n.id)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"8px 2px", display:"flex", flexDirection:"column", alignItems:"center", gap:2, color: aba===n.id ? "#C9933A" : "rgba(255,255,255,.55)", borderTop: aba===n.id ? "2px solid #C9933A" : "2px solid transparent" }}>
-              <span style={{ fontSize:20 }}>{n.icon}</span>
-              <span style={{ fontSize:10, fontWeight: aba===n.id ? 700 : 400 }}>{n.label}</span>
+            <button key={n.id} onClick={() => setAba(n.id)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color: aba===n.id ? D.primary : "rgba(255,255,255,.4)", borderTop: aba===n.id ? `2px solid ${D.primary}` : "2px solid transparent", transition:"color .15s" }}>
+              <span style={{ fontSize:19 }}>{n.icon}</span>
+              <span style={{ fontSize:9.5, fontWeight: aba===n.id ? 700 : 400, letterSpacing:".2px" }}>{n.label}</span>
             </button>
           ))}
           {readOnly ? (
-            <button onClick={async () => { await signOut(auth); window.location.href = window.location.origin+window.location.pathname; }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"8px 2px", display:"flex", flexDirection:"column", alignItems:"center", gap:2, color:"rgba(201,147,58,.9)", borderTop:"2px solid transparent" }}>
-              <span style={{ fontSize:20 }}>👁️</span>
-              <span style={{ fontSize:10 }}>Sair</span>
+            <button onClick={async () => { await signOut(auth); window.location.href = window.location.origin+window.location.pathname; }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color:"rgba(252,211,77,.8)", borderTop:"2px solid transparent" }}>
+              <span style={{ fontSize:19 }}>👁️</span>
+              <span style={{ fontSize:9.5 }}>Sair</span>
             </button>
           ) : (
-            <button onClick={() => signOut(auth)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"8px 2px", display:"flex", flexDirection:"column", alignItems:"center", gap:2, color:"rgba(255,150,138,.85)", borderTop:"2px solid transparent" }}>
-              <span style={{ fontSize:20 }}>🚪</span>
-              <span style={{ fontSize:10 }}>Sair</span>
+            <button onClick={() => signOut(auth)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color:"rgba(252,165,165,.8)", borderTop:"2px solid transparent" }}>
+              <span style={{ fontSize:19 }}>🚪</span>
+              <span style={{ fontSize:9.5 }}>Sair</span>
             </button>
           )}
         </nav>
       )}
 
       {/* ── Conteúdo ── */}
-      <main style={{ flex:1, padding:pad, overflow:"auto" }}>
+      <main style={{ flex:1, padding:pad, overflow:"auto", background:D.bgApp }}>
 
         {/* ── Dashboard ── */}
         {aba === "dashboard" && (
           <div>
-            <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:"0 0 6px", fontSize:h2size }}>Dashboard</h2>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-.5px" }}>Dashboard</h2>
             <p style={{ color:"#6B7A8D", margin:"0 0 18px", fontSize:13 }}>Visão geral · {mesLabel(mesSel)}</p>
 
-            {/* Saldo de caixa */}
-            <div style={{ background: saldoCaixa>=0 ? "linear-gradient(135deg,#1E3A5F,#2E6DA4)" : "linear-gradient(135deg,#7B241C,#B03A2E)", borderRadius:14, padding: isMobile ? "18px 20px" : "22px 28px", marginBottom:20, boxShadow:"0 4px 20px rgba(0,0,0,.15)" }}>
-              <div style={{ color:"rgba(255,255,255,.7)", fontSize:11, fontWeight:600, textTransform:"uppercase", letterSpacing:.8, marginBottom:4 }}>💰 Saldo de Caixa — Geral</div>
-              <div style={{ color:"#fff", fontSize: isMobile ? 28 : 34, fontWeight:800, letterSpacing:-.5 }}>R$ {saldoCaixa.toFixed(2).replace(".",",")}</div>
-              <div style={{ color:"rgba(255,255,255,.6)", fontSize:11, marginTop:6, lineHeight:1.7 }}>
-                Entradas: R$ {totalEntradas.toFixed(2).replace(".",",")}  ·  Despesas: R$ {totalSaidasDespesas.toFixed(2).replace(".",",")}  ·  Serviços: R$ {totalSaidasServicos.toFixed(2).replace(".",",")}
+            {/* Saldo de caixa — Hero */}
+            <div style={{ background: saldoCaixa>=0 ? `linear-gradient(135deg, ${D.primary} 0%, ${D.primaryDk} 100%)` : `linear-gradient(135deg, #DC2626 0%, #991B1B 100%)`, borderRadius:18, padding: isMobile?"20px 22px":"28px 32px", marginBottom:20, boxShadow: saldoCaixa>=0 ? `0 8px 32px rgba(13,148,136,0.35)` : `0 8px 32px rgba(220,38,38,0.35)`, position:"relative", overflow:"hidden" }}>
+              <div style={{ position:"absolute", top:-20, right:-20, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,.06)", pointerEvents:"none" }} />
+              <div style={{ position:"absolute", bottom:-30, right:20, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,.04)", pointerEvents:"none" }} />
+              <div style={{ color:"rgba(255,255,255,.7)", fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:1.2, marginBottom:8 }}>Saldo de Caixa · Geral</div>
+              <div style={{ color:"#fff", fontSize: isMobile?30:38, fontWeight:800, letterSpacing:-1, lineHeight:1, marginBottom:10 }}>R$ {saldoCaixa.toFixed(2).replace(".",",")}</div>
+              <div style={{ display:"flex", gap: isMobile?12:24, flexWrap:"wrap" }}>
+                {[["Entradas", totalEntradas],["Despesas", totalSaidasDespesas],["Serviços", totalSaidasServicos]].map(([l,v])=>(
+                  <div key={l}>
+                    <div style={{ color:"rgba(255,255,255,.5)", fontSize:10, fontWeight:600, textTransform:"uppercase", letterSpacing:.8 }}>{l}</div>
+                    <div style={{ color:"rgba(255,255,255,.9)", fontSize:13, fontWeight:600 }}>R$ {v.toFixed(2).replace(".",",")}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:20, flexWrap:"wrap" }}>
-              <label style={{ fontSize:13, color:"#1E3A5F", fontWeight:600 }}>Mês:</label>
-              <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, color:"#1E3A5F", background:"#fff", flex:1, minWidth:120 }}>
+              <label style={{ fontSize:13, color:D.text, fontWeight:600 }}>Mês:</label>
+              <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, flex:1, minWidth:120 }}>
                 {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
               </select>
             </div>
 
-            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit,minmax(160px,1fr))", gap:12, marginBottom:20 }}>
+            <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(auto-fit,minmax(140px,1fr))", gap:12, marginBottom:20 }}>
               {[
-                { label:"Unidades",   valor: moradores.length,                                              icon:"🏠", cor:"#1E3A5F" },
-                { label:"Pagamentos", valor: pagos,                                                         icon:"✅", cor:"#2E7D32" },
-                { label:"Pendentes",  valor: pendentes,                                                     icon:"⏳", cor:"#F57F17" },
-                { label:"Atrasados",  valor: atrasados,                                                     icon:"🚨", cor:"#B03A2E" },
-                { label:"Arrecadado", valor:`R$ ${totalArrecadado.toFixed(2).replace(".",",")}`,            icon:"💵", cor:"#C9933A" },
-                { label:"A Receber",  valor:`R$ ${totalPendente.toFixed(2).replace(".",",")}`,              icon:"📋", cor:"#2E6DA4" },
+                { label:"Unidades",   valor: moradores.length,                                           icon:"🏠", cor:D.text,    bg:"#F8FAFC" },
+                { label:"Pagamentos", valor: pagos,                                                      icon:"✅", cor:D.success, bg:"#F0FDF4" },
+                { label:"Pendentes",  valor: pendentes,                                                  icon:"⏳", cor:D.warning, bg:"#FFFBEB" },
+                { label:"Atrasados",  valor: atrasados,                                                  icon:"🚨", cor:D.danger,  bg:"#FEF2F2" },
+                { label:"Arrecadado", valor:`R$ ${totalArrecadado.toFixed(2).replace(".",",")}`,         icon:"💵", cor:D.gold,    bg:"#FFFBEB" },
+                { label:"A Receber",  valor:`R$ ${totalPendente.toFixed(2).replace(".",",")}`,           icon:"📋", cor:D.primary, bg:"#F0FDFA" },
               ].map((c,i) => (
-                <div key={i} style={{ background:"#fff", borderRadius:12, padding:"14px 14px 12px", boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderTop:`3px solid ${c.cor}` }}>
-                  <div style={{ fontSize:20, marginBottom:6 }}>{c.icon}</div>
-                  <div style={{ fontSize: isMobile ? 18 : 22, fontWeight:700, color:c.cor }}>{c.valor}</div>
-                  <div style={{ fontSize:11, color:"#6B7A8D", marginTop:3 }}>{c.label}</div>
+                <div key={i} style={{ background:c.bg, borderRadius:D.radius, padding:"16px 16px 14px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                  <div style={{ fontSize:18, marginBottom:8 }}>{c.icon}</div>
+                  <div style={{ fontSize: isMobile?17:20, fontWeight:800, color:c.cor, letterSpacing:"-.5px" }}>{c.valor}</div>
+                  <div style={{ fontSize:11, color:D.textSec, marginTop:4, fontWeight:500 }}>{c.label}</div>
                 </div>
               ))}
             </div>
 
-            <div style={{ background:"#fff", borderRadius:12, padding:18, boxShadow:"0 2px 8px rgba(0,0,0,.06)", marginBottom:20 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
-                <span style={{ fontSize:13, fontWeight:600, color:"#1E3A5F" }}>Adimplência — {mesLabel(mesSel)}</span>
-                <span style={{ fontSize:13, fontWeight:700, color:"#2E7D32" }}>{moradores.length ? Math.round((pagos/moradores.length)*100) : 0}%</span>
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"18px 20px", boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+                <div>
+                  <span style={{ fontSize:13, fontWeight:700, color:D.text }}>Adimplência — {mesLabel(mesSel)}</span>
+                  <span style={{ fontSize:12, color:D.textSec, marginLeft:8 }}>{pagos} de {moradores.length} pagaram</span>
+                </div>
+                <span style={{ fontSize:18, fontWeight:800, color:D.success }}>{moradores.length?Math.round((pagos/moradores.length)*100):0}%</span>
               </div>
-              <div style={{ height:12, background:"#E8EDF3", borderRadius:6, overflow:"hidden" }}>
-                <div style={{ height:"100%", width:`${moradores.length?(pagos/moradores.length)*100:0}%`, background:"linear-gradient(90deg,#2E6DA4,#C9933A)", borderRadius:6, transition:"width .5s ease" }} />
+              <div style={{ height:10, background:D.border, borderRadius:10, overflow:"hidden" }}>
+                <div style={{ height:"100%", width:`${moradores.length?(pagos/moradores.length)*100:0}%`, background:`linear-gradient(90deg, ${D.primary}, ${D.success})`, borderRadius:10, transition:"width .6s ease" }} />
               </div>
             </div>
 
@@ -1177,7 +1237,7 @@ export default function App() {
                 const ultimos6 = mesesDisponiveis().slice(0,6).reverse();
                 const maxVal   = Math.max(...ultimos6.map(m => cobrancas.filter(c=>c.mes===m&&c.status==="pago").length * taxa), 1);
                 return (
-                  <div style={{ background:"#fff", borderRadius:12, padding:18, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
                     <div style={{ fontSize:13, fontWeight:700, color:"#1E3A5F", marginBottom:16 }}>💵 Arrecadação por mês</div>
                     <div style={{ display:"flex", alignItems:"flex-end", gap: isMobile ? 6 : 10, height:110, paddingBottom:24, position:"relative" }}>
                       {ultimos6.map((m,i) => {
@@ -1227,7 +1287,7 @@ export default function App() {
                 const s3 = slice(a, a+toAngle(pAtraso), "#B03A2E"); a+=toAngle(pAtraso);
                 const svg = `<svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">${s1||""}${s2||""}${s3||""}<circle cx="80" cy="80" r="35" fill="white"/><text x="80" y="76" text-anchor="middle" font-size="14" font-weight="bold" fill="#1E3A5F">${moradores.length?Math.round((pagos/moradores.length)*100):0}%</text><text x="80" y="92" text-anchor="middle" font-size="9" fill="#6B7A8D">adimplente</text></svg>`;
                 return (
-                  <div style={{ background:"#fff", borderRadius:12, padding:18, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
                     <div style={{ fontSize:13, fontWeight:700, color:"#1E3A5F", marginBottom:12 }}>🥧 Situação — {mesLabel(mesSel)}</div>
                     <div style={{ display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
                       <div style={{ width:130, flexShrink:0 }} dangerouslySetInnerHTML={{ __html: svg }} />
@@ -1254,7 +1314,7 @@ export default function App() {
             </div>
 
             {/* Observações do mês */}
-            <div style={{ background:"#fff", borderRadius:12, padding:18, boxShadow:"0 2px 8px rgba(0,0,0,.06)", marginBottom:20 }}>
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
               <div style={{ fontSize:13, fontWeight:700, color:"#1E3A5F", marginBottom:10 }}>📝 Observações — {mesLabel(mesSel)}</div>
               {readOnly ? (
                 <div style={{ fontSize:13, color: obsSalva ? "#2C3E50" : "#9aa6b5", lineHeight:1.7, minHeight:40 }}>
@@ -1267,13 +1327,13 @@ export default function App() {
                     onChange={e => setObsMes(e.target.value)}
                     placeholder="Ex: Taxa extra por pintura da fachada. Reunião de condomínio dia 15..."
                     rows={3}
-                    style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${obsMes !== obsSalva ? "#C9933A" : "#D0DAE6"}`, borderRadius:8, fontSize:13, boxSizing:"border-box", fontFamily:"inherit", resize:"vertical", color:"#2C3E50", lineHeight:1.6, outline:"none" }}
+                    style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${obsMes !== obsSalva ? D.gold : D.border}`, borderRadius:D.radiusSm, fontSize:13, boxSizing:"border-box", fontFamily:"inherit", resize:"vertical", color:"#2C3E50", lineHeight:1.6, outline:"none" }}
                   />
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:8 }}>
-                    <span style={{ fontSize:11, color: obsMes !== obsSalva ? "#C9933A" : "#9aa6b5" }}>
+                    <span style={{ fontSize:11, color: obsMes !== obsSalva ? D.gold : D.textMut }}>
                       {obsMes !== obsSalva ? "Alterações não salvas" : obsSalva ? "Salvo" : ""}
                     </span>
-                    <button onClick={salvarObsMes} disabled={obsMes === obsSalva} style={{ padding:"7px 18px", background: obsMes !== obsSalva ? "#1E3A5F" : "#E8EDF3", color: obsMes !== obsSalva ? "#fff" : "#9aa6b5", border:"none", borderRadius:7, fontSize:13, fontWeight:600, cursor: obsMes !== obsSalva ? "pointer" : "default" }}>
+                    <button onClick={salvarObsMes} disabled={obsMes === obsSalva} style={{ padding:"7px 18px", background: obsMes !== obsSalva ? D.primary : D.border, color: obsMes !== obsSalva ? "#fff" : D.textMut, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: obsMes !== obsSalva ? "pointer" : "default" }}>
                       Salvar
                     </button>
                   </div>
@@ -1283,17 +1343,17 @@ export default function App() {
 
             <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
               {!readOnly && (
-                <button onClick={() => dispararEmails("lembrete")} disabled={enviandoEmails} style={{ padding:"12px 18px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, flex: isMobile?"1 1 100%":"none" }}>
-                  {enviandoEmails ? "📧 Enviando..." : `📧 Lembrete a todos (${moradores.length})`}
+                <button onClick={() => dispararEmails("lembrete")} disabled={enviandoEmails} style={{ padding:"11px 18px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:enviandoEmails?"default":"pointer", opacity:enviandoEmails?.7:1, flex:isMobile?"1 1 100%":"none", boxShadow:`0 2px 8px rgba(13,148,136,0.3)` }}>
+                  {enviandoEmails?"📧 Enviando...":`📧 Lembrete a todos (${moradores.length})`}
                 </button>
               )}
               {!readOnly && (
-                <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"12px 18px", background:"#C9933A", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, flex: isMobile?"1 1 100%":"none" }}>
-                  {enviandoEmails ? "📧 Enviando..." : `⚠️ Cobrar pendentes/atrasados (${nPagos})`}
+                <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"11px 18px", background:D.gold, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:enviandoEmails?"default":"pointer", opacity:enviandoEmails?.7:1, flex:isMobile?"1 1 100%":"none", boxShadow:`0 2px 8px rgba(215,119,6,0.3)` }}>
+                  {enviandoEmails?"📧 Enviando...":`⚠️ Cobrar pendentes (${nPagos})`}
                 </button>
               )}
-              <button onClick={exportarPDF} style={{ padding:"12px 18px", background:"#fff", color:"#1E3A5F", border:"1.5px solid #1E3A5F", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", flex: isMobile?"1 1 100%":"none" }}>📄 Exportar PDF</button>
-              <button onClick={exportarPrestacaoContas} style={{ padding:"12px 18px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", flex: isMobile?"1 1 100%":"none" }}>📑 Prestação de Contas</button>
+              <button onClick={exportarPDF} style={{ padding:"11px 18px", background:D.bgCard, color:D.text, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", flex:isMobile?"1 1 100%":"none" }}>📄 Exportar PDF</button>
+              <button onClick={exportarPrestacaoContas} style={{ padding:"11px 18px", background:D.text, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", flex:isMobile?"1 1 100%":"none" }}>📑 Prestação de Contas</button>
             </div>
 
             {/* ── Dashboard Financeiro Anual ── */}
@@ -1342,7 +1402,7 @@ export default function App() {
                   </div>
 
                   {/* Gráfico de barras duplas */}
-                  <div style={{ background:"#fff", borderRadius:12, padding:18, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
                     <div style={{ fontSize:13, fontWeight:700, color:"#1E3A5F", marginBottom:6 }}>Arrecadação vs Despesas — mês a mês</div>
                     <div style={{ display:"flex", gap:12, marginBottom:12 }}>
                       <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:"#6B7A8D" }}><div style={{ width:10, height:10, background:"#2E6DA4", borderRadius:2 }}/> Arrecadado</div>
@@ -1369,7 +1429,7 @@ export default function App() {
                     <div style={{ marginTop:8, borderTop:"1px solid #F0F4F8", paddingTop:12, overflowX:"auto" }}>
                       <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
                         <thead>
-                          <tr style={{ background:"#F0F4F8" }}>
+                          <tr style={{ background:"#F8FAFC" }}>
                             {["Mês","Arrecadado","Saídas","Saldo"].map(h=>(
                               <th key={h} style={{ padding:"6px 8px", textAlign:"left", color:"#1E3A5F", fontWeight:700 }}>{h}</th>
                             ))}
@@ -1384,7 +1444,7 @@ export default function App() {
                               <td style={{ padding:"5px 8px", color: d.saldo>=0?"#2E6DA4":"#B03A2E", fontWeight:600 }}>R$ {d.saldo.toFixed(2).replace(".",",")}</td>
                             </tr>
                           ))}
-                          <tr style={{ borderTop:"2px solid #D0DAE6", background:"#F0F4F8" }}>
+                          <tr style={{ borderTop:"2px solid #D0DAE6", background:"#F8FAFC" }}>
                             <td style={{ padding:"6px 8px", fontWeight:700, color:"#1E3A5F" }}>Total</td>
                             <td style={{ padding:"6px 8px", fontWeight:700, color:"#2E7D32" }}>R$ {totalEntAno.toFixed(2).replace(".",",")}</td>
                             <td style={{ padding:"6px 8px", fontWeight:700, color:"#B03A2E" }}>R$ {totalSaiAno.toFixed(2).replace(".",",")}</td>
@@ -1406,10 +1466,10 @@ export default function App() {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Cobranças</h2>
-                <p style={{ color:"#6B7A8D", margin:"4px 0 0", fontSize:13 }}>Registre pagamentos e comprovantes</p>
+                <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Registre pagamentos e comprovantes</p>
               </div>
               <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
-                <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, color:"#1E3A5F", background:"#fff" }}>
+                <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard }}>
                   {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
                 </select>
                 {!readOnly && !isMobile && <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"9px 16px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>{enviandoEmails?"📧 Enviando...":"📧 Cobrar pendentes"}</button>}
@@ -1419,12 +1479,12 @@ export default function App() {
             {isMobile ? (
               <div>{cobMes.map((cob,i) => <CobCard key={i} cob={cob} />)}</div>
             ) : (
-              <div style={{ background:"#fff", borderRadius:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)", overflow:"hidden", marginTop:16 }}>
+              <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden", marginTop:16 }}>
                 <table style={{ width:"100%", borderCollapse:"collapse" }}>
                   <thead>
-                    <tr style={{ background:"#F0F4F8" }}>
+                    <tr style={{ background:"#F8FAFC" }}>
                       {["Unidade","Morador","E-mail","Status","Data Pgto","Ações"].map(h => (
-                        <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontSize:12, fontWeight:700, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5, borderBottom:"1px solid #E8EDF3" }}>{h}</th>
+                        <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, borderBottom:`1px solid ${D.border}` }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1433,20 +1493,20 @@ export default function App() {
                       const m = moradores.find(x => x.id === cob.moradorId);
                       if (!m) return null;
                       return (
-                        <tr key={i} style={{ borderBottom:"1px solid #F0F4F8" }}>
-                          <td style={{ padding:"13px 16px", fontWeight:600, color:"#1E3A5F", fontSize:13 }}>{m.unidade}</td>
-                          <td style={{ padding:"13px 16px", fontSize:13, color:"#2C3E50" }}>{m.nome}</td>
-                          <td style={{ padding:"13px 16px", fontSize:12, color:"#6B7A8D" }}>{m.email}</td>
+                        <tr key={i} style={{ borderBottom:`1px solid ${D.border}` }}>
+                          <td style={{ padding:"13px 16px", fontWeight:600, color:D.text, fontSize:13 }}>{m.unidade}</td>
+                          <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>{m.nome}</td>
+                          <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec }}>{m.email}</td>
                           <td style={{ padding:"13px 16px" }}><Badge status={cob.status} /></td>
-                          <td style={{ padding:"13px 16px", fontSize:12, color:"#6B7A8D" }}>{cob.dataPagamento || "—"}</td>
+                          <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec }}>{cob.dataPagamento || "—"}</td>
                           <td style={{ padding:"13px 16px" }}>
                             <div style={{ display:"flex", gap:8 }}>
                               {cob.status !== "pago" ? (
-                                !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ padding:"5px 12px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✓ Registrar Pgto</button>
+                                !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ padding:"5px 12px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✓ Registrar Pgto</button>
                               ) : (
                                 <>
-                                  {cob.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:cob.comprovante, nome:m.nome, arquivoNome:cob.arquivoNome } })} style={{ padding:"5px 12px", background:"#E3F2FD", color:"#1565C0", border:"1px solid #90CAF9", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>📄 Ver</button>}
-                                  {!readOnly && <button onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} style={{ padding:"5px 12px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>↩ Estornar</button>}
+                                  {cob.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:cob.comprovante, nome:m.nome, arquivoNome:cob.arquivoNome } })} style={{ padding:"5px 12px", background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>📄 Ver</button>}
+                                  {!readOnly && <button onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} style={{ padding:"5px 12px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>↩ Estornar</button>}
                                 </>
                               )}
                             </div>
@@ -1467,20 +1527,20 @@ export default function App() {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
               <div>
                 <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Moradores</h2>
-                <p style={{ color:"#6B7A8D", margin:"4px 0 0", fontSize:13 }}>{moradores.length} unidade{moradores.length!==1?"s":""} cadastrada{moradores.length!==1?"s":""}</p>
+                <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>{moradores.length} unidade{moradores.length!==1?"s":""} cadastrada{moradores.length!==1?"s":""}</p>
               </div>
-              {!readOnly && <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"10px 16px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>+ Novo</button>}
+              {!readOnly && <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"10px 16px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", boxShadow:`0 2px 8px rgba(13,148,136,0.3)` }}>+ Novo</button>}
             </div>
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
               {moradores.map(m => {
                 const cob = cobrancas.find(c => c.moradorId===m.id && c.mes===mesSel);
                 return (
-                  <div key={m.id} style={{ background:"#fff", borderRadius:12, padding:16, boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderLeft:`4px solid ${cob?.status==="pago"?"#2E7D32":"#B03A2E"}` }}>
+                  <div key={m.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${cob?.status==="pago"?D.success:cob?.status==="atrasado"?D.danger:D.warning}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
                       <div><div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{m.nome}</div><div style={{ fontSize:12, color:"#C9933A", fontWeight:600, marginTop:2 }}>{m.unidade}</div></div>
                       {cob && <Badge status={cob.status} />}
                     </div>
-                    <div style={{ fontSize:12, color:"#6B7A8D", lineHeight:1.8 }}>
+                    <div style={{ fontSize:12, color:D.textSec, lineHeight:1.8 }}>
                       <div>📧 {m.email}</div>
                       {m.telefone && <div>📱 {m.telefone}</div>}
                     </div>
@@ -1489,12 +1549,12 @@ export default function App() {
                         const link = `${window.location.origin}${window.location.pathname}?morador=${m.id}`;
                         navigator.clipboard.writeText(link);
                         showToast(`Link do ${m.unidade} copiado!`);
-                      }} style={{ padding:"6px 14px", background:"#E8F5E9", color:"#1B5E20", border:"1px solid #A5D6A7", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>🔗 Copiar link</button>
-                      <button onClick={() => setModal({ type:"historico", data:m })} style={{ padding:"6px 14px", background:"#F3E5F5", color:"#6A1B9A", border:"1px solid #CE93D8", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>📋 Histórico</button>
+                      }} style={{ padding:"6px 14px", background:"#F0FDFA", color:"#0F766E", border:"1px solid #99F6E4", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>🔗 Copiar link</button>
+                      <button onClick={() => setModal({ type:"historico", data:m })} style={{ padding:"6px 14px", background:"#F5F3FF", color:"#5B21B6", border:"1px solid #C4B5FD", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>📋 Histórico</button>
                       {!readOnly && (
                         <>
-                          <button onClick={() => { setEditMorador({ id:m.id, nome:m.nome, unidade:m.unidade, email:m.email, telefone:m.telefone||"" }); setModal({ type:"editarMorador" }); }} style={{ padding:"6px 14px", background:"#E3F2FD", color:"#1565C0", border:"1px solid #90CAF9", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✏️ Editar</button>
-                          <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>Remover</button>
+                          <button onClick={() => { setEditMorador({ id:m.id, nome:m.nome, unidade:m.unidade, email:m.email, telefone:m.telefone||"" }); setModal({ type:"editarMorador" }); }} style={{ padding:"6px 14px", background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✏️ Editar</button>
+                          <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"6px 14px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>Remover</button>
                         </>
                       )}
                     </div>
@@ -1511,9 +1571,9 @@ export default function App() {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Água &amp; Luz</h2>
-                <p style={{ color:"#6B7A8D", margin:"4px 0 0", fontSize:13 }}>Contas e despesas fixas</p>
+                <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Contas e despesas fixas</p>
               </div>
-              {!readOnly && <button onClick={() => setModal({ type:"novaDespesa" })} style={{ padding:"10px 16px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>+ Nova</button>}
+              {!readOnly && <button onClick={() => setModal({ type:"novaDespesa" })} style={{ padding:"10px 16px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", boxShadow:`0 2px 8px rgba(13,148,136,0.3)` }}>+ Nova</button>}
             </div>
 
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit,minmax(160px,1fr))", gap:12, marginBottom:16 }}>
@@ -1539,26 +1599,26 @@ export default function App() {
               <div style={{ background:"#fff", borderRadius:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)", overflow:"hidden" }}>
                 <table style={{ width:"100%", borderCollapse:"collapse" }}>
                   <thead>
-                    <tr style={{ background:"#F0F4F8" }}>
+                    <tr style={{ background:"#F8FAFC" }}>
                       {["Tipo","Descrição","Mês","Valor","Status","Data Pgto","Ações"].map(h => (
-                        <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontSize:12, fontWeight:700, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5, borderBottom:"1px solid #E8EDF3" }}>{h}</th>
+                        <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, borderBottom:`1px solid ${D.border}` }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {[...despesas].sort((a,b)=>b.mes.localeCompare(a.mes)).map(d => (
-                      <tr key={d.id} style={{ borderBottom:"1px solid #F0F4F8" }}>
+                      <tr key={d.id} style={{ borderBottom:`1px solid ${D.border}` }}>
                         <td style={{ padding:"13px 16px", fontSize:18 }}>{d.tipo==="agua"?"💧":d.tipo==="luz"?"⚡":"📦"}</td>
-                        <td style={{ padding:"13px 16px", fontSize:13, color:"#2C3E50" }}>{d.descricao||(d.tipo==="agua"?"Conta de água":d.tipo==="luz"?"Conta de luz":"Outra despesa")}</td>
+                        <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>{d.descricao||(d.tipo==="agua"?"Conta de água":d.tipo==="luz"?"Conta de luz":"Outra despesa")}</td>
                         <td style={{ padding:"13px 16px", fontSize:13, color:"#6B7A8D" }}>{mesLabel(d.mes)}</td>
                         <td style={{ padding:"13px 16px", fontSize:13, fontWeight:600, color:"#1E3A5F" }}>R$ {d.valor.toFixed(2).replace(".",",")}</td>
                         <td style={{ padding:"13px 16px" }}><Badge status={d.status} /></td>
-                        <td style={{ padding:"13px 16px", fontSize:12, color:"#6B7A8D" }}>{d.dataPagamento||"—"}</td>
+                        <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec }}>{d.dataPagamento||"—"}</td>
                         <td style={{ padding:"13px 16px" }}>
                           <div style={{ display:"flex", gap:8 }}>
-                            {d.status!=="pago" && !readOnly && <button onClick={() => marcarDespesaPaga(d.id)} style={{ padding:"5px 12px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✓ Marcar Paga</button>}
-                            {d.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} style={{ padding:"5px 12px", background:"#E3F2FD", color:"#1565C0", border:"1px solid #90CAF9", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>📄 Ver</button>}
-                            {!readOnly && <button onClick={() => { if(window.confirm("Remover?")) removerDespesa(d.id); }} style={{ padding:"5px 12px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>Remover</button>}
+                            {d.status!=="pago" && !readOnly && <button onClick={() => marcarDespesaPaga(d.id)} style={{ padding:"5px 12px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✓ Marcar Paga</button>}
+                            {d.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} style={{ padding:"5px 12px", background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>📄 Ver</button>}
+                            {!readOnly && <button onClick={() => { if(window.confirm("Remover?")) removerDespesa(d.id); }} style={{ padding:"5px 12px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>Remover</button>}
                           </div>
                         </td>
                       </tr>
@@ -1577,22 +1637,22 @@ export default function App() {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Serviços &amp; Manutenção</h2>
-                <p style={{ color:"#6B7A8D", margin:"4px 0 0", fontSize:13 }}>Consertos e melhorias do condomínio</p>
+                <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Consertos e melhorias do condomínio</p>
               </div>
-              {!readOnly && <button onClick={() => setModal({ type:"novoServico" })} style={{ padding:"10px 16px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>+ Novo</button>}
+              {!readOnly && <button onClick={() => setModal({ type:"novoServico" })} style={{ padding:"10px 16px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", boxShadow:`0 2px 8px rgba(13,148,136,0.3)` }}>+ Novo</button>}
             </div>
 
             <h3 style={{ fontSize:13, color:"#1E3A5F", fontWeight:700, margin:"20px 0 10px" }}>🟡 Pendentes ({servicos.filter(s=>s.status==="pendente").length})</h3>
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(280px,1fr))", gap:12, marginBottom:8 }}>
               {servicos.filter(s=>s.status==="pendente").map(s => (
-                <div key={s.id} style={{ background:"#fff", borderRadius:12, padding:16, boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderLeft:"4px solid #F57F17" }}>
+                <div key={s.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${D.warning}` }}>
                   <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14, marginBottom:4 }}>{s.titulo}</div>
                   {s.descricao && <div style={{ fontSize:13, color:"#6B7A8D", marginBottom:8 }}>{s.descricao}</div>}
                   <div style={{ fontSize:11, color:"#9aa6b5" }}>Aberto em {s.dataAbertura}</div>
                   {!readOnly && (
                     <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
-                      <button onClick={() => { setConcluirForm({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" }); setModal({ type:"concluirServico", data:s }); }} style={{ padding:"7px 14px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>✓ Concluir</button>
-                      <button onClick={() => { if(window.confirm(`Remover "${s.titulo}"?`)) removerServico(s.id); }} style={{ padding:"7px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Remover</button>
+                      <button onClick={() => { setConcluirForm({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" }); setModal({ type:"concluirServico", data:s }); }} style={{ padding:"7px 14px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>✓ Concluir</button>
+                      <button onClick={() => { if(window.confirm(`Remover "${s.titulo}"?`)) removerServico(s.id); }} style={{ padding:"7px 14px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Remover</button>
                     </div>
                   )}
                 </div>
@@ -1603,10 +1663,10 @@ export default function App() {
             <h3 style={{ fontSize:13, color:"#1E3A5F", fontWeight:700, margin:"24px 0 10px" }}>✅ Concluídos ({servicos.filter(s=>s.status==="concluido").length})</h3>
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
               {servicos.filter(s=>s.status==="concluido").map(s => (
-                <div key={s.id} style={{ background:"#fff", borderRadius:12, padding:16, boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderLeft:"4px solid #2E7D32" }}>
+                <div key={s.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${D.success}` }}>
                   <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14, marginBottom:4 }}>{s.titulo}</div>
                   {s.descricao && <div style={{ fontSize:13, color:"#6B7A8D", marginBottom:8 }}>{s.descricao}</div>}
-                  <div style={{ fontSize:12, color:"#6B7A8D", lineHeight:1.8, background:"#F0F4F8", borderRadius:8, padding:"10px 12px" }}>
+                  <div style={{ fontSize:12, color:D.textSec, lineHeight:1.8, background:"#F0F4F8", borderRadius:8, padding:"10px 12px" }}>
                     <div>📅 Início: <b style={{color:"#1E3A5F"}}>{s.dataInicio||"—"}</b> · Fim: <b style={{color:"#1E3A5F"}}>{s.dataFim||"—"}</b></div>
                     <div>🧱 Material: <b style={{color:"#1E3A5F"}}>R$ {(s.valorMaterial||0).toFixed(2).replace(".",",")}</b></div>
                     <div>👷 Mão de obra: <b style={{color:"#1E3A5F"}}>R$ {(s.valorMaoDeObra||0).toFixed(2).replace(".",",")}</b></div>
@@ -1615,8 +1675,8 @@ export default function App() {
                   </div>
                   {!readOnly && (
                     <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
-                      <button onClick={() => reabrirServico(s.id)} style={{ padding:"7px 14px", background:"#FFF8E1", color:"#F57F17", border:"1px solid #FFE082", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>↩ Reabrir</button>
-                      <button onClick={() => { if(window.confirm(`Remover "${s.titulo}"?`)) removerServico(s.id); }} style={{ padding:"7px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Remover</button>
+                      <button onClick={() => reabrirServico(s.id)} style={{ padding:"7px 14px", background:"#FFFBEB", color:"#92400E", border:"1px solid #FDE68A", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>↩ Reabrir</button>
+                      <button onClick={() => { if(window.confirm(`Remover "${s.titulo}"?`)) removerServico(s.id); }} style={{ padding:"7px 14px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Remover</button>
                     </div>
                   )}
                 </div>
@@ -1632,10 +1692,10 @@ export default function App() {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Controle de Acessos</h2>
-                <p style={{ color:"#6B7A8D", margin:"4px 0 0", fontSize:13 }}>Visitantes e prestadores de serviço</p>
+                <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Visitantes e prestadores de serviço</p>
               </div>
               {!readOnly && (
-                <button onClick={() => { setNovoAcesso({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" }); setModal({ type:"novoAcesso" }); }} style={{ padding:"10px 16px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
+                <button onClick={() => { setNovoAcesso({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" }); setModal({ type:"novoAcesso" }); }} style={{ padding:"10px 16px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", boxShadow:`0 2px 8px rgba(13,148,136,0.3)` }}>
                   + Registrar Entrada
                 </button>
               )}
@@ -1660,22 +1720,22 @@ export default function App() {
             {acessos.length === 0 ? (
               <div style={{ background:"#fff", borderRadius:12, padding:40, textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>🚪</div>
-                <div style={{ color:"#9aa6b5", fontSize:14 }}>Nenhum acesso registrado ainda.</div>
+                <div style={{ color:D.textMut, fontSize:14 }}>Nenhum acesso registrado ainda.</div>
               </div>
             ) : (
               <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
                 {acessos.map((a) => (
-                  <div key={a.id} style={{ background:"#fff", borderRadius:12, padding:16, boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderLeft:`4px solid ${a.horaSaida ? "#2E7D32" : "#F57F17"}` }}>
+                  <div key={a.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${a.horaSaida ? "#2E7D32" : "#F57F17"}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
                       <div>
                         <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{a.nome}</div>
-                        {a.empresa && <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>🏢 {a.empresa}</div>}
-                        <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>📋 {a.motivo}</div>
-                        {a.unidade && <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>🏠 {a.unidade}</div>}
+                        {a.empresa && <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>🏢 {a.empresa}</div>}
+                        <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>📋 {a.motivo}</div>
+                        {a.unidade && <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>🏠 {a.unidade}</div>}
                       </div>
                       <div style={{ textAlign:"right", flexShrink:0 }}>
                         <div style={{ fontSize:12, color:"#1E3A5F", fontWeight:600 }}>{a.dataEntrada}</div>
-                        <div style={{ fontSize:12, color:"#6B7A8D", marginTop:2 }}>Entrada: {a.horaEntrada}</div>
+                        <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>Entrada: {a.horaEntrada}</div>
                         {a.horaSaida
                           ? <div style={{ fontSize:12, color:"#2E7D32", marginTop:2, fontWeight:600 }}>Saída: {a.horaSaida}</div>
                           : <div style={{ fontSize:12, color:"#F57F17", marginTop:2, fontWeight:600 }}>No condomínio</div>
@@ -1685,11 +1745,11 @@ export default function App() {
                     {!readOnly && (
                       <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
                         {!a.horaSaida && (
-                          <button onClick={() => registrarSaida(a.id)} style={{ padding:"6px 14px", background:"#E8F5E9", color:"#2E7D32", border:"1px solid #A5D6A7", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                          <button onClick={() => registrarSaida(a.id)} style={{ padding:"6px 14px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}>
                             ✓ Registrar Saída
                           </button>
                         )}
-                        <button onClick={() => { if(window.confirm("Remover este registro?")) removerAcesso(a.id); }} style={{ padding:"6px 14px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                        <button onClick={() => { if(window.confirm("Remover este registro?")) removerAcesso(a.id); }} style={{ padding:"6px 14px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}>
                           Remover
                         </button>
                       </div>
@@ -1707,10 +1767,10 @@ export default function App() {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Histórico de Atividades</h2>
-                <p style={{ color:"#6B7A8D", margin:"4px 0 0", fontSize:13 }}>{logs.length} registro{logs.length!==1?"s":""} no sistema</p>
+                <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>{logs.length} registro{logs.length!==1?"s":""} no sistema</p>
               </div>
               {!readOnly && logs.length > 0 && (
-                <button onClick={async () => { if(window.confirm("Limpar todo o histórico?")) { const batch = writeBatch(db); logs.forEach(l => batch.delete(doc(db,"logs",l.id))); await batch.commit(); showToast("Histórico limpo."); }}} style={{ padding:"8px 16px", background:"#FFEBEE", color:"#B03A2E", border:"1px solid #EF9A9A", borderRadius:8, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                <button onClick={async () => { if(window.confirm("Limpar todo o histórico?")) { const batch = writeBatch(db); logs.forEach(l => batch.delete(doc(db,"logs",l.id))); await batch.commit(); showToast("Histórico limpo."); }}} style={{ padding:"8px 16px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:D.radiusSm, fontSize:12, fontWeight:600, cursor:"pointer" }}>
                   🗑️ Limpar histórico
                 </button>
               )}
@@ -1719,15 +1779,15 @@ export default function App() {
             {logs.length === 0 ? (
               <div style={{ background:"#fff", borderRadius:12, padding:40, textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
-                <div style={{ color:"#9aa6b5", fontSize:14 }}>Nenhuma atividade registrada ainda.<br/>As ações realizadas no sistema aparecerão aqui.</div>
+                <div style={{ color:D.textMut, fontSize:14 }}>Nenhuma atividade registrada ainda.<br/>As ações realizadas no sistema aparecerão aqui.</div>
               </div>
             ) : (
               <div style={{ background:"#fff", borderRadius:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)", overflow:"hidden" }}>
                 {logs.map((log, i) => (
-                  <div key={log.id} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"14px 18px", borderBottom: i < logs.length-1 ? "1px solid #F0F4F8" : "none", background: i%2===0 ? "#fff" : "#FAFBFC" }}>
+                  <div key={log.id} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"14px 18px", borderBottom: i < logs.length-1 ? "1px solid #F0F4F8" : "none", background: i%2===0 ? D.bgCard : "#F8FAFC" }}>
                     <div style={{ fontSize:22, flexShrink:0, marginTop:1 }}>{log.icone}</div>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:13, color:"#2C3E50", lineHeight:1.5 }}>{log.descricao}</div>
+                      <div style={{ fontSize:13, color:D.text, lineHeight:1.5 }}>{log.descricao}</div>
                       <div style={{ fontSize:11, color:"#9aa6b5", marginTop:3 }}>{log.dataHora}</div>
                     </div>
                   </div>
@@ -1740,19 +1800,19 @@ export default function App() {
         {/* ── Configurações ── */}
         {aba === "config" && (
           <div>
-            <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:"0 0 6px", fontSize:h2size }}>Configurações</h2>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-.5px" }}>Configurações</h2>
             <p style={{ color:"#6B7A8D", margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>
-            <div style={{ background:"#fff", borderRadius:12, padding: isMobile ? 20 : 28, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-              <h3 style={{ color:"#1E3A5F", margin:"0 0 16px", fontSize:15, fontWeight:700 }}>Taxa mensal</h3>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Valor (R$)</label>
-              <input type="number" value={taxa} onChange={e=>setTaxa(parseFloat(e.target.value)||0)} style={{ display:"block", width:"100%", padding:"12px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:16, color:"#1E3A5F", marginTop:8, boxSizing:"border-box" }} />
-              <button onClick={() => salvarTaxa(taxa)} style={{ marginTop:14, padding:"11px 24px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer" }}>Salvar</button>
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+              <h3 style={{ color:D.text, margin:"0 0 16px", fontSize:14, fontWeight:700 }}>Taxa mensal</h3>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Valor (R$)</label>
+              <input type="number" value={taxa} onChange={e=>setTaxa(parseFloat(e.target.value)||0)} style={{ display:"block", width:"100%", padding:"12px 14px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:16, color:D.text, marginTop:8, boxSizing:"border-box" }} />
+              <button onClick={() => salvarTaxa(taxa)} style={{ marginTop:14, padding:"11px 24px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(13,148,136,0.3)`, fontSize:14, fontWeight:600, cursor:"pointer" }}>Salvar</button>
 
               <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
 
               <h3 style={{ color:"#1E3A5F", margin:"0 0 6px", fontSize:15, fontWeight:700 }}>📅 Dia de vencimento</h3>
               <p style={{ color:"#6B7A8D", fontSize:12, margin:"0 0 14px" }}>O sistema enviará e-mails automaticamente 5 dias antes e no dia do vencimento.</p>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Dia do mês (1–28)</label>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Dia do mês (1–28)</label>
               <div style={{ display:"flex", gap:10, alignItems:"flex-end", marginTop:8 }}>
                 <input type="number" min={1} max={28} value={diaVencimento} onChange={e=>setDiaVencimento(parseInt(e.target.value)||10)} style={{ width:100, padding:"12px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:16, color:"#1E3A5F", boxSizing:"border-box" }} />
                 <button onClick={() => salvarDiaVencimento(diaVencimento)} style={{ padding:"12px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer" }}>Salvar</button>
@@ -1774,12 +1834,12 @@ export default function App() {
               <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
 
               <h3 style={{ color:"#1E3A5F", margin:"0 0 10px", fontSize:15, fontWeight:700 }}>Conta conectada</h3>
-              <div style={{ fontSize:13, color:"#6B7A8D", lineHeight:1.8, background:"#F0F4F8", borderRadius:8, padding:"12px 16px" }}>
+              <div style={{ fontSize:13, color:D.textSec, lineHeight:1.8, background:"#F8FAFC", borderRadius:D.radiusSm, padding:"12px 16px", border:`1px solid ${D.border}` }}>
                 <div>E-mail: <b style={{color:"#1E3A5F"}}>{user?.email}</b></div>
                 <div style={{ marginTop:6, fontSize:11, color:"#aaa" }}>Para trocar a senha, use o painel do Firebase (Authentication → Users).</div>
               </div>
               <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
-              <div style={{ fontSize:12, color:"#6B7A8D", lineHeight:1.8 }}>
+              <div style={{ fontSize:12, color:D.textSec, lineHeight:1.8 }}>
                 <div>🏢 Condomínio Vila Real 140</div>
                 <div>📦 Versão 2.0 · Firebase + React</div>
               </div>
@@ -1792,16 +1852,16 @@ export default function App() {
       {modal?.type === "pagar" && (
         <Modal title={`Registrar Pgto — ${modal.data.unidade}`} onClose={() => setModal(null)} isMobile={isMobile}>
           <p style={{ fontSize:13, color:"#6B7A8D", margin:"0 0 16px" }}>Morador: <b style={{color:"#1E3A5F"}}>{modal.data.nome}</b> · Taxa: <b style={{color:"#C9933A"}}>R$ {taxa.toFixed(2).replace(".",",")}</b></p>
-          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Observação</label>
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Observação</label>
           <input value={pagForm.obs} onChange={e=>setPagForm(p=>({...p,obs:e.target.value}))} placeholder="Ex: Pago via Pix" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:6, marginBottom:14, boxSizing:"border-box" }} />
-          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Comprovante</label>
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Comprovante</label>
           <div onClick={() => fileRef.current.click()} style={{ marginTop:6, border:"2px dashed #D0DAE6", borderRadius:8, padding:"18px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:"#6B7A8D", fontSize:13 }}>
             {pagForm.arquivoNome ? <span style={{color:"#2E6DA4",fontWeight:600}}>📎 {pagForm.arquivoNome}</span> : <><div style={{fontSize:22,marginBottom:4}}>📁</div>Toque para selecionar</>}
           </div>
           <input ref={fileRef} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f=e.target.files[0]; if(f) setPagForm(p=>({...p,arquivo:f,arquivoNome:f.name})); }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={() => registrarPagamento(modal.data.moradorId)} style={{ padding:"10px 20px", background:"#2E7D32", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Confirmar</button>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={() => registrarPagamento(modal.data.moradorId)} style={{ padding:"10px 20px", background:D.success, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(5,150,105,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Confirmar</button>
           </div>
         </Modal>
       )}
@@ -1824,8 +1884,8 @@ export default function App() {
         <Modal title="Confirmar Estorno" onClose={() => setModal(null)} isMobile={isMobile}>
           <p style={{ color:"#2C3E50", fontSize:14 }}>Estornar pagamento de <b>{modal.data.nome}</b>? O status voltará para Pendente.</p>
           <div style={{ display:"flex", gap:8, marginTop:18, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={() => estornarPagamento(modal.data.moradorId)} style={{ padding:"10px 20px", background:"#B03A2E", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>↩ Estornar</button>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={() => estornarPagamento(modal.data.moradorId)} style={{ padding:"10px 20px", background:D.danger, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer" }}>↩ Estornar</button>
           </div>
         </Modal>
       )}
@@ -1834,13 +1894,13 @@ export default function App() {
         <Modal title="Novo Morador" onClose={() => setModal(null)} isMobile={isMobile}>
           {[{label:"Nome *",key:"nome",placeholder:"Ex: João da Silva"},{label:"Unidade *",key:"unidade",placeholder:"Ex: Apto 103"},{label:"E-mail *",key:"email",placeholder:"joao@email.com",type:"email"},{label:"Telefone",key:"telefone",placeholder:"(85) 99999-0000"}].map(f => (
             <div key={f.key} style={{ marginBottom:14 }}>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>{f.label}</label>
-              <input type={f.type||"text"} value={novoMorador[f.key]} onChange={e=>setNovoMorador(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>{f.label}</label>
+              <input type={f.type||"text"} value={novoMorador[f.key]} onChange={e=>setNovoMorador(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
             </div>
           ))}
           <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={adicionarMorador} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Cadastrar</button>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={adicionarMorador} style={{ padding:"10px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(13,148,136,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Cadastrar</button>
           </div>
         </Modal>
       )}
@@ -1855,8 +1915,8 @@ export default function App() {
         return (
           <Modal title={`Histórico — ${m.nome}`} onClose={() => setModal(null)} isMobile={isMobile}>
             <div style={{ marginBottom:16, background:"#F0F4F8", borderRadius:10, padding:"12px 16px" }}>
-              <div style={{ fontSize:13, color:"#1E3A5F", fontWeight:600 }}>{m.unidade}</div>
-              <div style={{ fontSize:12, color:"#6B7A8D", marginTop:4, lineHeight:1.8 }}>
+              <div style={{ fontSize:13, color:D.text, fontWeight:600 }}>{m.unidade}</div>
+              <div style={{ fontSize:12, color:D.textSec, marginTop:4, lineHeight:1.8 }}>
                 📧 {m.email}{m.telefone ? ` · 📱 ${m.telefone}` : ""}
               </div>
               <div style={{ display:"flex", gap:16, marginTop:10, flexWrap:"wrap" }}>
@@ -1907,19 +1967,19 @@ export default function App() {
             { label:"Telefone",  key:"telefone", placeholder:"(85) 99999-0000"      },
           ].map(f => (
             <div key={f.key} style={{ marginBottom:14 }}>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>{f.label}</label>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>{f.label}</label>
               <input
                 type={f.type||"text"}
                 value={editMorador[f.key]}
                 onChange={e => setEditMorador(p => ({ ...p, [f.key]: e.target.value }))}
                 placeholder={f.placeholder}
-                style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }}
+                style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }}
               />
             </div>
           ))}
           <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={salvarEdicaoMorador} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Salvar</button>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={salvarEdicaoMorador} style={{ padding:"10px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(13,148,136,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Salvar</button>
           </div>
         </Modal>
       )}
@@ -1928,20 +1988,20 @@ export default function App() {
         <Modal title="Registrar Entrada" onClose={() => setModal(null)} isMobile={isMobile}>
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
             <div>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Nome *</label>
-              <input value={novoAcesso.nome} onChange={e=>setNovoAcesso(p=>({...p,nome:e.target.value}))} placeholder="Ex: João Silva" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Nome *</label>
+              <input value={novoAcesso.nome} onChange={e=>setNovoAcesso(p=>({...p,nome:e.target.value}))} placeholder="Ex: João Silva" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
             </div>
             <div>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Empresa / Vínculo</label>
-              <input value={novoAcesso.empresa} onChange={e=>setNovoAcesso(p=>({...p,empresa:e.target.value}))} placeholder="Ex: Hidráulica ABC, Familiar do morador..." style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Empresa / Vínculo</label>
+              <input value={novoAcesso.empresa} onChange={e=>setNovoAcesso(p=>({...p,empresa:e.target.value}))} placeholder="Ex: Hidráulica ABC, Familiar do morador..." style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
             </div>
             <div>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Motivo *</label>
-              <input value={novoAcesso.motivo} onChange={e=>setNovoAcesso(p=>({...p,motivo:e.target.value}))} placeholder="Ex: Conserto de encanamento, Visita ao morador..." style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Motivo *</label>
+              <input value={novoAcesso.motivo} onChange={e=>setNovoAcesso(p=>({...p,motivo:e.target.value}))} placeholder="Ex: Conserto de encanamento, Visita ao morador..." style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
             </div>
             <div>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Apartamento visitado</label>
-              <select value={novoAcesso.unidade} onChange={e=>setNovoAcesso(p=>({...p,unidade:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box", background:"#fff" }}>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Apartamento visitado</label>
+              <select value={novoAcesso.unidade} onChange={e=>setNovoAcesso(p=>({...p,unidade:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text, background:"#fff" }}>
                 <option value="">Área comum / Não especificado</option>
                 {[...moradores].sort((a,b)=>a.unidade.localeCompare(b.unidade)).map(m => (
                   <option key={m.id} value={m.unidade}>{m.unidade} — {m.nome}</option>
@@ -1950,64 +2010,64 @@ export default function App() {
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <div style={{ flex:1 }}>
-                <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Data de entrada</label>
-                <input type="date" value={novoAcesso.dataEntrada} onChange={e=>setNovoAcesso(p=>({...p,dataEntrada:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Data de entrada</label>
+                <input type="date" value={novoAcesso.dataEntrada} onChange={e=>setNovoAcesso(p=>({...p,dataEntrada:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
               </div>
               <div style={{ flex:1 }}>
-                <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Hora de entrada</label>
-                <input type="time" value={novoAcesso.horaEntrada} onChange={e=>setNovoAcesso(p=>({...p,horaEntrada:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Hora de entrada</label>
+                <input type="time" value={novoAcesso.horaEntrada} onChange={e=>setNovoAcesso(p=>({...p,horaEntrada:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
               </div>
             </div>
             <p style={{ fontSize:11, color:"#9aa6b5", margin:0 }}>Se data/hora ficarem em branco, serão preenchidas automaticamente com o momento atual.</p>
           </div>
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={registrarAcesso} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={registrarAcesso} style={{ padding:"10px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(13,148,136,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
           </div>
         </Modal>
       )}
 
       {modal?.type === "novaDespesa" && (
         <Modal title="Nova Despesa" onClose={() => setModal(null)} isMobile={isMobile}>
-          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Tipo</label>
-          <select value={novaDespesa.tipo} onChange={e=>setNovaDespesa(p=>({...p,tipo:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, marginBottom:14, boxSizing:"border-box", background:"#fff" }}>
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Tipo</label>
+          <select value={novaDespesa.tipo} onChange={e=>setNovaDespesa(p=>({...p,tipo:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, marginBottom:14, boxSizing:"border-box", background:"#fff", color:D.text }}>
             <option value="agua">💧 Água</option>
             <option value="luz">⚡ Luz</option>
             <option value="outro">📦 Outra despesa</option>
           </select>
-          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Descrição</label>
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Descrição</label>
           <input value={novaDespesa.descricao} onChange={e=>setNovaDespesa(p=>({...p,descricao:e.target.value}))} placeholder="Ex: Conta Enel Jun" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, marginBottom:14, boxSizing:"border-box" }} />
           <div style={{ display:"flex", gap:10 }}>
             <div style={{ flex:1 }}>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Valor *</label>
-              <input type="number" value={novaDespesa.valor} onChange={e=>setNovaDespesa(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Valor *</label>
+              <input type="number" value={novaDespesa.valor} onChange={e=>setNovaDespesa(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
             </div>
             <div style={{ flex:1 }}>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Mês *</label>
-              <input type="month" value={novaDespesa.mes} onChange={e=>setNovaDespesa(p=>({...p,mes:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Mês *</label>
+              <input type="month" value={novaDespesa.mes} onChange={e=>setNovaDespesa(p=>({...p,mes:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
             </div>
           </div>
-          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5, display:"block", marginTop:14 }}>Comprovante</label>
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginTop:14 }}>Comprovante</label>
           <div onClick={() => fileRefDespesa.current.click()} style={{ marginTop:6, border:"2px dashed #D0DAE6", borderRadius:8, padding:"16px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:"#6B7A8D", fontSize:13 }}>
             {novaDespesa.arquivoNome ? <span style={{color:"#2E6DA4",fontWeight:600}}>📎 {novaDespesa.arquivoNome}</span> : <>📁 Toque para selecionar</>}
           </div>
           <input ref={fileRefDespesa} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f=e.target.files[0]; if(f) setNovaDespesa(p=>({...p,arquivo:f,arquivoNome:f.name})); }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={adicionarDespesa} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={adicionarDespesa} style={{ padding:"10px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(13,148,136,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
           </div>
         </Modal>
       )}
 
       {modal?.type === "novoServico" && (
         <Modal title="Novo Serviço" onClose={() => setModal(null)} isMobile={isMobile}>
-          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Título *</label>
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Título *</label>
           <input value={novoServico.titulo} onChange={e=>setNovoServico(p=>({...p,titulo:e.target.value}))} placeholder="Ex: Consertar o portão" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, marginBottom:14, boxSizing:"border-box" }} />
-          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Descrição</label>
-          <textarea value={novoServico.descricao} onChange={e=>setNovoServico(p=>({...p,descricao:e.target.value}))} placeholder="Detalhes do serviço" rows={3} style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box", fontFamily:"inherit", resize:"vertical" }} />
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Descrição</label>
+          <textarea value={novoServico.descricao} onChange={e=>setNovoServico(p=>({...p,descricao:e.target.value}))} placeholder="Detalhes do serviço" rows={3} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text, fontFamily:"inherit", resize:"vertical" }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={adicionarServico} style={{ padding:"10px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={adicionarServico} style={{ padding:"10px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(13,148,136,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
           </div>
         </Modal>
       )}
@@ -2016,29 +2076,29 @@ export default function App() {
         <Modal title={`Concluir — ${modal.data.titulo}`} onClose={() => setModal(null)} isMobile={isMobile}>
           <div style={{ display:"flex", gap:10, marginBottom:14 }}>
             <div style={{ flex:1 }}>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Início</label>
-              <input type="date" value={concluirForm.dataInicio} onChange={e=>setConcluirForm(p=>({...p,dataInicio:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Início</label>
+              <input type="date" value={concluirForm.dataInicio} onChange={e=>setConcluirForm(p=>({...p,dataInicio:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
             </div>
             <div style={{ flex:1 }}>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Fim</label>
-              <input type="date" value={concluirForm.dataFim} onChange={e=>setConcluirForm(p=>({...p,dataFim:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Fim</label>
+              <input type="date" value={concluirForm.dataFim} onChange={e=>setConcluirForm(p=>({...p,dataFim:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
             </div>
           </div>
           <div style={{ display:"flex", gap:10, marginBottom:14 }}>
             <div style={{ flex:1 }}>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Material (R$)</label>
-              <input type="number" value={concluirForm.valorMaterial} onChange={e=>setConcluirForm(p=>({...p,valorMaterial:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Material (R$)</label>
+              <input type="number" value={concluirForm.valorMaterial} onChange={e=>setConcluirForm(p=>({...p,valorMaterial:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
             </div>
             <div style={{ flex:1 }}>
-              <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Mão de obra (R$)</label>
-              <input type="number" value={concluirForm.valorMaoDeObra} onChange={e=>setConcluirForm(p=>({...p,valorMaoDeObra:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box" }} />
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Mão de obra (R$)</label>
+              <input type="number" value={concluirForm.valorMaoDeObra} onChange={e=>setConcluirForm(p=>({...p,valorMaoDeObra:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
             </div>
           </div>
-          <label style={{ fontSize:12, fontWeight:600, color:"#1E3A5F", textTransform:"uppercase", letterSpacing:.5 }}>Observações</label>
-          <textarea value={concluirForm.obs} onChange={e=>setConcluirForm(p=>({...p,obs:e.target.value}))} rows={2} placeholder="Ex: Trocado motor do portão" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, boxSizing:"border-box", fontFamily:"inherit", resize:"vertical" }} />
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Observações</label>
+          <textarea value={concluirForm.obs} onChange={e=>setConcluirForm(p=>({...p,obs:e.target.value}))} rows={2} placeholder="Ex: Trocado motor do portão" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text, fontFamily:"inherit", resize:"vertical" }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F0F4F8", color:"#1E3A5F", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={() => concluirServico(modal.data.id)} style={{ padding:"10px 20px", background:"#2E7D32", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Confirmar</button>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={() => concluirServico(modal.data.id)} style={{ padding:"10px 20px", background:D.success, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(5,150,105,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Confirmar</button>
           </div>
         </Modal>
       )}

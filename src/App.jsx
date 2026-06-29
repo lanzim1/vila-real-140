@@ -189,8 +189,8 @@ const TopBar = ({ title, user, readOnly, nPendentes }) => {
 
 // ── Area Chart Animado ──
 const AreaChart = ({ dadosMes, mesesLabel }) => {
-  const [progress, setProgress] = React.useState(0);
-  React.useEffect(() => {
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
     setProgress(0);
     let p = 0;
     const id = setInterval(() => {
@@ -1187,8 +1187,8 @@ export default function App() {
   }
 
   // ── helpers de estilo responsivo ──
-  const pad    = "0"; // padding agora é por aba
   const h2size = isMobile ? 20 : 22;
+  const pad    = isMobile ? "16px 16px 100px" : "24px 28px 40px"; // mantido por compatibilidade
 
   // ── Cobranças: renderiza cards no mobile, tabela no desktop ──
   const CobCard = ({ cob }) => {
@@ -1303,7 +1303,7 @@ export default function App() {
       )}
 
       {/* ── Conteúdo ── */}
-      <main style={{ flex:1, padding:pad, overflow:"auto", background:D.bgApp }}>
+      <main style={{ flex:1, overflow:"auto", background:D.bgApp }}>
 
         {/* ── Dashboard ── */}
         {aba === "dashboard" && (

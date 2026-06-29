@@ -292,9 +292,13 @@ const Login = () => {
 // ── App Principal ──
 // ── Portal do Morador ──
 function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
-  const [morador, setMorador]   = useState(null);
+  const [morador, setMorador]     = useState(null);
   const [cobrancas, setCobrancas] = useState([]);
-  const [mesSel, setMesSel]     = useState(mesAtual());
+  const [reservasMor, setReservasMor] = useState([]);
+  const [mesSel, setMesSel]       = useState(mesAtual());
+  const [formReserva, setFormReserva] = useState({ area:"Churrasqueira", data:"", horario:"", observacao:"" });
+  const [enviandoReserva, setEnviandoReserva] = useState(false);
+  const [msgReserva, setMsgReserva] = useState("");
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -306,8 +310,34 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
       query(collection(db, "cobrancas"), where("moradorId","==",moradorId)),
       s => setCobrancas(s.docs.map(d => d.data()).sort((a,b) => b.mes.localeCompare(a.mes)))
     );
-    return () => { u1(); u2(); };
+    const u3 = onSnapshot(
+      query(collection(db, "reservas"), where("moradorId","==",moradorId)),
+      s => setReservasMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
+    );
+    return () => { u1(); u2(); u3(); };
   }, [moradorId]);
+
+  const fazerReserva = async () => {
+    if (!formReserva.data || !formReserva.horario) { setMsgReserva("Preencha a data e o horário."); return; }
+    setEnviandoReserva(true);
+    try {
+      await addDoc(collection(db, "reservas"), {
+        moradorId, nome: morador.nome, unidade: morador.unidade,
+        area: formReserva.area, data: formReserva.data, horario: formReserva.horario,
+        observacao: formReserva.observacao || "",
+        status: "pendente",
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
+        timestamp: Date.now(),
+        criadoPor: "morador",
+      });
+      setFormReserva({ area:"Churrasqueira", data:"", horario:"", observacao:"" });
+      setMsgReserva("✅ Reserva solicitada! Aguarde aprovação do síndico.");
+    } catch(e) {
+      setMsgReserva("Erro ao solicitar reserva. Tente novamente.");
+    } finally {
+      setEnviandoReserva(false);
+    }
+  };
 
   if (!morador) return (
     <div style={{ minHeight:"100vh", background:"#1E3A5F", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontFamily:D.fontBody }}>
@@ -393,6 +423,67 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
           </div>
         </div>
 
+        {/* Reservas */}
+        <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginTop:20 }}>
+          <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:16, letterSpacing:"-0.02em" }}>📅 Reservar Churrasqueira</div>
+
+          {/* Formulário */}
+          <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:16, padding:16, background:D.muted, borderRadius:D.radiusSm }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", display:"block", marginBottom:5 }}>Área</label>
+              <select value={formReserva.area} onChange={e=>setFormReserva(p=>({...p,area:e.target.value}))} style={{ display:"block", width:"100%", padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, background:"#fff", fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }}>
+                <option value="Churrasqueira">🔥 Churrasqueira</option>
+                <option value="Salão de Festas">🎉 Salão de Festas</option>
+                <option value="Espaço Gourmet">🍽️ Espaço Gourmet</option>
+              </select>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", display:"block", marginBottom:5 }}>Data *</label>
+                <input type="date" value={formReserva.data} onChange={e=>setFormReserva(p=>({...p,data:e.target.value}))} min={new Date().toISOString().split("T")[0]} style={{ display:"block", width:"100%", padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", display:"block", marginBottom:5 }}>Horário *</label>
+                <input value={formReserva.horario} onChange={e=>setFormReserva(p=>({...p,horario:e.target.value}))} placeholder="Ex: 14h às 22h" style={{ display:"block", width:"100%", padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", display:"block", marginBottom:5 }}>Observação</label>
+              <input value={formReserva.observacao} onChange={e=>setFormReserva(p=>({...p,observacao:e.target.value}))} placeholder="Nº de pessoas, ocasião..." style={{ display:"block", width:"100%", padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
+            </div>
+            {msgReserva && <div style={{ fontSize:12, color: msgReserva.startsWith("✅") ? D.success : D.danger, fontFamily:D.fontBody, fontWeight:500 }}>{msgReserva}</div>}
+            <button onClick={fazerReserva} disabled={enviandoReserva} style={{ padding:"10px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: enviandoReserva?"default":"pointer", fontFamily:D.fontBody, opacity: enviandoReserva?.7:1 }}>
+              {enviandoReserva ? "Enviando..." : "📅 Solicitar Reserva"}
+            </button>
+          </div>
+
+          {/* Minhas reservas */}
+          {reservasMor.length > 0 && (
+            <div>
+              <div style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", marginBottom:10 }}>Minhas reservas</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {reservasMor.map((r,i) => {
+                  const cor = r.status==="aprovada"?D.success:r.status==="rejeitada"?D.danger:D.warning;
+                  const bg  = r.status==="aprovada"?D.successBg:r.status==="rejeitada"?D.dangerBg:D.warningBg;
+                  return (
+                    <div key={i} style={{ background:bg, borderRadius:D.radiusSm, padding:"12px 14px", borderLeft:`3px solid ${cor}` }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                        <div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>🔥 {r.area}</div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>{r.data} · {r.horario}</div>
+                        </div>
+                        <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:cor, textTransform:"capitalize" }}>
+                          {r.status==="aprovada"?"✅ Aprovada":r.status==="rejeitada"?"❌ Rejeitada":"⏳ Pendente"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div style={{ textAlign:"center", marginTop:24, fontSize:11, color:D.textMut, fontFamily:D.fontBody }}>
           Vila Real 140 · Portal do Morador · Acesso somente leitura
         </div>
@@ -427,6 +518,8 @@ export default function App() {
   const [logs, setLogs]         = useState([]);
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
+  const [reservas, setReservas] = useState([]);
+  const [novaReserva, setNovaReserva] = useState({ area:"Churrasqueira", data:"", horario:"", observacao:"" });
   const fileRef        = useRef();
   const fileRefDespesa = useRef();
 
@@ -469,7 +562,10 @@ export default function App() {
     const u8 = onSnapshot(collection(db, "acessos"),
       s => setAcessos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
     );
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); };
+    const u9 = onSnapshot(collection(db, "reservas"),
+      s => setReservas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
+    );
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); };
   }, [user]);
 
   // ── Popular na primeira vez ──
@@ -790,6 +886,45 @@ export default function App() {
   const removerAcesso = async (id) => {
     await deleteDoc(doc(db, "acessos", id));
     showToast("Registro removido.", "error");
+  };
+
+  // ── Reservas ──
+  const solicitarReserva = async (moradorId, morador, form) => {
+    if (!form.data || !form.horario) { showToast("Preencha a data e o horário.", "error"); return false; }
+    // Verificar conflito de data
+    const conflito = reservas.find(r => r.area === form.area && r.data === form.data && r.status === "aprovada");
+    if (conflito) { showToast(`Já existe reserva aprovada para ${form.area} nessa data.`, "error"); return false; }
+    await addDoc(collection(db, "reservas"), {
+      moradorId, nome: morador.nome, unidade: morador.unidade,
+      area: form.area, data: form.data, horario: form.horario,
+      observacao: form.observacao || "",
+      status: "pendente",
+      criadoEm: new Date().toLocaleDateString("pt-BR"),
+      timestamp: Date.now(),
+      criadoPor: readOnly ? "morador" : "sindico",
+    });
+    registrarLog("📅", `Reserva solicitada: ${morador.nome} (${morador.unidade}) — ${form.area} em ${form.data}`);
+    showToast("Reserva solicitada! Aguarde aprovação do síndico.");
+    return true;
+  };
+
+  const aprovarReserva = async (id) => {
+    const r = reservas.find(x => x.id === id);
+    await setDoc(doc(db, "reservas", id), { status:"aprovada", aprovadaEm: new Date().toLocaleDateString("pt-BR") }, { merge:true });
+    registrarLog("✅", `Reserva aprovada: ${r?.nome} (${r?.unidade}) — ${r?.area} em ${r?.data}`);
+    showToast("Reserva aprovada!");
+  };
+
+  const rejeitarReserva = async (id) => {
+    const r = reservas.find(x => x.id === id);
+    await setDoc(doc(db, "reservas", id), { status:"rejeitada" }, { merge:true });
+    registrarLog("❌", `Reserva rejeitada: ${r?.nome} (${r?.unidade}) — ${r?.area} em ${r?.data}`);
+    showToast("Reserva rejeitada.", "error");
+  };
+
+  const removerReserva = async (id) => {
+    await deleteDoc(doc(db, "reservas", id));
+    showToast("Reserva removida.", "error");
   };
 
   const enviarLembretes = () => {
@@ -1145,6 +1280,7 @@ export default function App() {
     { id:"moradores", icon:"👥", label:"Moradores"  },
     { id:"despesas",  icon:"💧", label:"Água/Luz"   },
     { id:"servicos",  icon:"🔧", label:"Serviços"   },
+    { id:"reservas",  icon:"📅", label:"Reservas"   },
     { id:"acessos",   icon:"🚪", label:"Acessos"    },
     { id:"historico", icon:"📋", label:"Histórico"  },
     ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config." }] : []),
@@ -1722,6 +1858,129 @@ export default function App() {
           </div>
         )}
 
+        {/* ── Reservas ── */}
+        {aba === "reservas" && (
+          <div>
+            <TopBar title="Reservas" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
+
+              {/* Cards de resumo */}
+              <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(3,1fr)", gap:12, marginBottom:20 }}>
+                {[
+                  { label:"Aguardando aprovação", valor: reservas.filter(r=>r.status==="pendente").length,  icon:"⏳", cor:D.warning,  bg:D.warningBg  },
+                  { label:"Aprovadas",             valor: reservas.filter(r=>r.status==="aprovada").length,  icon:"✅", cor:D.success,  bg:D.successBg  },
+                  { label:"Rejeitadas",            valor: reservas.filter(r=>r.status==="rejeitada").length, icon:"❌", cor:D.danger,   bg:D.dangerBg   },
+                ].map((c,i) => (
+                  <div key={i} style={{ background:c.bg, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                    <div style={{ fontSize:20, marginBottom:6 }}>{c.icon}</div>
+                    <div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:c.cor, letterSpacing:"-0.02em" }}>{c.valor}</div>
+                    <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:3 }}>{c.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Botão nova reserva (síndico) */}
+              {!readOnly && (
+                <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:16 }}>
+                  <button onClick={() => { setNovaReserva({ area:"Churrasqueira", data:"", horario:"", observacao:"", moradorId:"", moradorNome:"" }); setModal({ type:"novaReservaSindico" }); }} style={{ padding:"9px 18px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
+                    + Nova Reserva
+                  </button>
+                </div>
+              )}
+
+              {/* Pendentes — precisam de aprovação */}
+              {reservas.filter(r=>r.status==="pendente").length > 0 && (
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>⏳ Aguardando aprovação</div>
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
+                    <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                      <thead>
+                        <tr style={{ background:D.muted }}>
+                          {["Área","Morador","Data","Horário","Observação","Ações"].map(h => (
+                            <th key={h} style={{ padding:"10px 18px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reservas.filter(r=>r.status==="pendente").map((r,i) => (
+                          <tr key={r.id} style={{ borderBottom:`1px solid ${D.border}` }}>
+                            <td style={{ padding:"13px 18px" }}>
+                              <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>🔥 {r.area}</div>
+                              <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:2 }}>Solicitado em {r.criadoEm}</div>
+                            </td>
+                            <td style={{ padding:"13px 18px" }}>
+                              <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.nome}</div>
+                              <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textSec }}>{r.unidade}</div>
+                            </td>
+                            <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.data}</td>
+                            <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.horario}</td>
+                            <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{r.observacao||"—"}</td>
+                            <td style={{ padding:"13px 18px" }}>
+                              {!readOnly && (
+                                <div style={{ display:"flex", gap:8 }}>
+                                  <button onClick={() => aprovarReserva(r.id)} style={{ padding:"6px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>✓ Aprovar</button>
+                                  <button onClick={() => rejeitarReserva(r.id)} style={{ padding:"6px 14px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>✗ Rejeitar</button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Histórico de reservas */}
+              <div>
+                <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>📋 Histórico de Reservas</div>
+                {reservas.filter(r=>r.status!=="pendente").length === 0 ? (
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:32, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                    <div style={{ fontSize:36, marginBottom:10 }}>📅</div>
+                    <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhuma reserva aprovada ou rejeitada ainda.</div>
+                  </div>
+                ) : (
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
+                    <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                      <thead>
+                        <tr style={{ background:D.muted }}>
+                          {["Área","Morador","Data","Horário","Status","Ações"].map(h => (
+                            <th key={h} style={{ padding:"10px 18px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reservas.filter(r=>r.status!=="pendente").map((r,i) => (
+                          <tr key={r.id} style={{ borderBottom:`1px solid ${D.border}` }}>
+                            <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>🔥 {r.area}</td>
+                            <td style={{ padding:"13px 18px" }}>
+                              <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.nome}</div>
+                              <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textSec }}>{r.unidade}</div>
+                            </td>
+                            <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.data}</td>
+                            <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.horario}</td>
+                            <td style={{ padding:"13px 18px" }}>
+                              <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px 3px 8px", borderRadius:20, fontSize:12, fontWeight:600, background: r.status==="aprovada"?D.successBg:D.dangerBg, color: r.status==="aprovada"?D.success:D.danger }}>
+                                <span style={{ width:6, height:6, borderRadius:"50%", background: r.status==="aprovada"?D.success:D.danger }} />
+                                {r.status==="aprovada"?"Aprovada":"Rejeitada"}
+                              </span>
+                            </td>
+                            <td style={{ padding:"13px 18px" }}>
+                              {!readOnly && (
+                                <button onClick={() => { if(window.confirm("Remover esta reserva?")) removerReserva(r.id); }} style={{ padding:"5px 12px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Remover</button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Acessos ── */}
         {aba === "acessos" && (
           <div>
@@ -2025,6 +2284,59 @@ export default function App() {
           <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
             <button onClick={salvarEdicaoMorador} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Salvar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "novaReservaSindico" && (
+        <Modal title="Nova Reserva" onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Morador *</label>
+              <select value={novaReserva.moradorId||""} onChange={e => { const m=moradores.find(x=>x.id===e.target.value); setNovaReserva(p=>({...p,moradorId:e.target.value,moradorNome:m?.nome||"",moradorUnidade:m?.unidade||""})); }} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", background:"#fff", fontFamily:D.fontBody, color:D.text }}>
+                <option value="">Selecione o morador</option>
+                {[...moradores].sort((a,b)=>a.unidade.localeCompare(b.unidade)).map(m => (
+                  <option key={m.id} value={m.id}>{m.unidade} — {m.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Área *</label>
+              <select value={novaReserva.area} onChange={e=>setNovaReserva(p=>({...p,area:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", background:"#fff", fontFamily:D.fontBody, color:D.text }}>
+                <option value="Churrasqueira">🔥 Churrasqueira</option>
+                <option value="Salão de Festas">🎉 Salão de Festas</option>
+                <option value="Espaço Gourmet">🍽️ Espaço Gourmet</option>
+              </select>
+            </div>
+            <div style={{ display:"flex", gap:12 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Data *</label>
+                <input type="date" value={novaReserva.data} onChange={e=>setNovaReserva(p=>({...p,data:e.target.value}))} min={new Date().toISOString().split("T")[0]} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Horário *</label>
+                <input value={novaReserva.horario} onChange={e=>setNovaReserva(p=>({...p,horario:e.target.value}))} placeholder="Ex: 14h às 22h" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Observação</label>
+              <textarea value={novaReserva.observacao} onChange={e=>setNovaReserva(p=>({...p,observacao:e.target.value}))} rows={2} placeholder="Número de pessoas, ocasião..." style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text, resize:"vertical" }} />
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+            <button onClick={async () => {
+              if (!novaReserva.moradorId) { showToast("Selecione um morador.", "error"); return; }
+              const m = moradores.find(x=>x.id===novaReserva.moradorId);
+              const ok = await solicitarReserva(novaReserva.moradorId, m, novaReserva);
+              if (ok) {
+                // síndico aprova automaticamente
+                const snap = await getDocs(collection(db, "reservas"));
+                const ultima = snap.docs.sort((a,b)=>b.data().timestamp-a.data().timestamp)[0];
+                if (ultima) await aprovarReserva(ultima.id);
+                setModal(null);
+              }
+            }} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>✓ Reservar e Aprovar</button>
           </div>
         </Modal>
       )}

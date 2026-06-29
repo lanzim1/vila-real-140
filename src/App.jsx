@@ -154,6 +154,107 @@ const Badge = ({ status }) => {
   );
 };
 
+
+// ── Top Bar ──
+const TopBar = ({ title, user, readOnly, nPendentes }) => {
+  const hoje = new Date().toLocaleDateString("pt-BR", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+  const initials = (user?.email || "SC").slice(0,2).toUpperCase();
+  return (
+    <div style={{ background:D.bgCard, borderBottom:`1px solid ${D.border}`, padding:"14px 28px", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0, gap:16, flexWrap:"wrap" }}>
+      <div>
+        <h1 style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:600, color:D.text, margin:0, letterSpacing:"-0.02em" }}>{title}</h1>
+        <p style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, margin:"2px 0 0", textTransform:"capitalize" }}>{hoje}</p>
+      </div>
+      <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, background:D.muted, border:`1px solid ${D.border}`, borderRadius:D.radius, padding:"8px 14px" }}>
+          <span style={{ color:D.textMut, fontSize:13 }}>🔍</span>
+          <span style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Buscar morador, unidade...</span>
+        </div>
+        <div style={{ position:"relative", width:38, height:38, borderRadius:D.radius, border:`1px solid ${D.border}`, display:"flex", alignItems:"center", justifyContent:"center", background:D.bgCard, cursor:"pointer", flexShrink:0 }}>
+          <span style={{ fontSize:16 }}>🔔</span>
+          {nPendentes > 0 && <div style={{ position:"absolute", top:7, right:7, width:8, height:8, borderRadius:"50%", background:D.danger, border:`2px solid ${D.bgCard}` }} />}
+        </div>
+        {!readOnly && (
+          <button style={{ display:"flex", alignItems:"center", gap:6, padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radius, fontFamily:D.fontBody, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", boxShadow:`0 2px 8px rgba(30,58,114,0.3)` }}>
+            + Novo lançamento
+          </button>
+        )}
+        <div style={{ width:36, height:36, borderRadius:"50%", background:D.accent, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontFamily:D.fontDisplay, fontSize:13, fontWeight:700, flexShrink:0 }}>
+          {initials}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Area Chart Animado ──
+const AreaChart = ({ dadosMes, mesesLabel }) => {
+  const [progress, setProgress] = React.useState(0);
+  React.useEffect(() => {
+    setProgress(0);
+    let p = 0;
+    const id = setInterval(() => {
+      p += 0.035;
+      if (p >= 1) { clearInterval(id); p = 1; }
+      setProgress(p);
+    }, 16);
+    return () => clearInterval(id);
+  }, [dadosMes.length]);
+
+  const W = 600, H = 200;
+  const PAD = { top:20, right:20, bottom:36, left:10 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+  const maxVal = Math.max(...dadosMes.map(d => Math.max(d.entrada, d.saida)), 1);
+  const toX = (i) => PAD.left + (i / Math.max(dadosMes.length-1,1)) * cW;
+  const toY = (v) => PAD.top + cH - (v / maxVal) * cH;
+
+  const smoothPath = (pts) => {
+    if (!pts.length) return "";
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 1; i < pts.length; i++) {
+      const cpx = (pts[i-1].x + pts[i].x) / 2;
+      d += ` C ${cpx} ${pts[i-1].y} ${cpx} ${pts[i].y} ${pts[i].x} ${pts[i].y}`;
+    }
+    return d;
+  };
+
+  const ptsR = dadosMes.map((d,i) => ({ x:toX(i), y:toY(d.entrada) }));
+  const ptsD = dadosMes.map((d,i) => ({ x:toX(i), y:toY(d.saida) }));
+  const bottom = `L ${toX(dadosMes.length-1)} ${toY(0)} L ${toX(0)} ${toY(0)} Z`;
+  const clipW = cW * progress;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%", height:"auto", display:"block" }}>
+      <defs>
+        <linearGradient id="gR" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={D.accent} stopOpacity="0.25"/>
+          <stop offset="100%" stopColor={D.accent} stopOpacity="0"/>
+        </linearGradient>
+        <linearGradient id="gD" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.2"/>
+          <stop offset="100%" stopColor="#F59E0B" stopOpacity="0"/>
+        </linearGradient>
+        <clipPath id="anim">
+          <rect x={PAD.left} y={0} width={clipW} height={H} />
+        </clipPath>
+      </defs>
+      {[0.25, 0.5, 0.75, 1].map((t,i) => (
+        <line key={i} x1={PAD.left} y1={PAD.top + cH*(1-t)} x2={PAD.left+cW} y2={PAD.top + cH*(1-t)} stroke={D.border} strokeWidth="1"/>
+      ))}
+      <g clipPath="url(#anim)">
+        <path d={smoothPath(ptsR)+bottom} fill="url(#gR)" />
+        <path d={smoothPath(ptsD)+bottom} fill="url(#gD)" />
+        <path d={smoothPath(ptsR)} fill="none" stroke={D.accent} strokeWidth="2.5" strokeLinecap="round"/>
+        <path d={smoothPath(ptsD)} fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round"/>
+      </g>
+      {dadosMes.map((d,i) => (
+        <text key={i} x={toX(i)} y={H-8} textAnchor="middle" style={{ fontFamily:D.fontBody, fontSize:11, fill:D.textSec }}>{mesesLabel[i]}</text>
+      ))}
+    </svg>
+  );
+};
+
 // ── Login ──
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -1086,8 +1187,8 @@ export default function App() {
   }
 
   // ── helpers de estilo responsivo ──
-  const pad    = isMobile ? "16px 16px 100px" : "32px 32px 40px";
-  const h2size = isMobile ? 22 : 26;
+  const pad    = "0"; // padding agora é por aba
+  const h2size = isMobile ? 20 : 22;
 
   // ── Cobranças: renderiza cards no mobile, tabela no desktop ──
   const CobCard = ({ cob }) => {
@@ -1207,296 +1308,156 @@ export default function App() {
         {/* ── Dashboard ── */}
         {aba === "dashboard" && (
           <div>
-            <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Dashboard</h2>
-            <p style={{ color:"#6B7A8D", margin:"0 0 18px", fontSize:13 }}>Visão geral · {mesLabel(mesSel)}</p>
+            <TopBar title="Visão Geral" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile ? "20px 16px 100px" : "24px 28px 40px" }}>
 
-            {/* Saldo de caixa — Hero */}
-            <div style={{ background: saldoCaixa>=0 ? `linear-gradient(135deg, ${D.primary} 0%, #162E5C 100%)` : `linear-gradient(135deg, ${D.danger} 0%, #B91C1C 100%)`, borderRadius:18, padding: isMobile?"20px 22px":"28px 32px", marginBottom:20, boxShadow: saldoCaixa>=0 ? `0 8px 32px rgba(30,58,114,0.35)` : `0 8px 32px rgba(224,58,34,0.35)`, position:"relative", overflow:"hidden" }}>
-              <div style={{ position:"absolute", top:-20, right:-20, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,.06)", pointerEvents:"none" }} />
-              <div style={{ position:"absolute", bottom:-30, right:20, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,.04)", pointerEvents:"none" }} />
-              <div style={{ color:"rgba(255,255,255,.7)", fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:1.2, marginBottom:8 }}>Saldo de Caixa · Geral</div>
-              <div style={{ color:"#fff", fontSize: isMobile?30:38, fontWeight:800, letterSpacing:"-0.02em", lineHeight:1, marginBottom:10 }}>R$ {saldoCaixa.toFixed(2).replace(".",",")}</div>
-              <div style={{ display:"flex", gap: isMobile?12:24, flexWrap:"wrap" }}>
-                {[["Entradas", totalEntradas],["Despesas", totalSaidasDespesas],["Serviços", totalSaidasServicos]].map(([l,v])=>(
-                  <div key={l}>
-                    <div style={{ color:"rgba(255,255,255,.5)", fontSize:10, fontWeight:600, textTransform:"uppercase", letterSpacing:.8 }}>{l}</div>
-                    <div style={{ color:"rgba(255,255,255,.9)", fontSize:13, fontWeight:600 }}>R$ {v.toFixed(2).replace(".",",")}</div>
+              {/* Stat Cards */}
+              <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(4,1fr)", gap:16, marginBottom:24 }}>
+                {[
+                  {
+                    icon:"💰", iconBg:"#DCFDF0", iconColor:D.success,
+                    label:"Receita do mês", valor:`R$ ${totalArrecadado.toFixed(2).replace(".",",")}`,
+                    change: moradores.length ? `↑ ${Math.round((pagos/moradores.length)*100)}% adimpl.` : "—",
+                    changeColor: D.success,
+                  },
+                  {
+                    icon:"⚠️", iconBg:"#FEF3C7", iconColor:D.warning,
+                    label:"Inadimplência", valor: moradores.length ? `${Math.round((nPagos/moradores.length)*100)}%` : "0%",
+                    change: nPagos > 0 ? `↓ ${nPagos} unid.` : "✓ Em dia",
+                    changeColor: nPagos > 0 ? D.danger : D.success,
+                  },
+                  {
+                    icon:"👥", iconBg:D.secondary, iconColor:D.accent,
+                    label:"Unidades ativas", valor:`${pagos} / ${moradores.length}`,
+                    change:`${atrasados} atrasada${atrasados!==1?"s":""}`,
+                    changeColor: atrasados > 0 ? D.danger : D.success,
+                  },
+                  {
+                    icon:"💼", iconBg: saldoCaixa>=0 ? "#DCFDF0" : "#FEE8E4", iconColor: saldoCaixa>=0 ? D.success : D.danger,
+                    label:"Saldo de caixa", valor:`R$ ${saldoCaixa.toFixed(2).replace(".",",")}`,
+                    change: saldoCaixa>=0 ? "↑ Positivo" : "↓ Negativo",
+                    changeColor: saldoCaixa>=0 ? D.success : D.danger,
+                  },
+                ].map((c,i) => (
+                  <div key={i} style={{ background:D.bgCard, borderRadius:D.radius, padding:"20px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
+                      <div style={{ width:40, height:40, borderRadius:10, background:c.iconBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>
+                        {c.icon}
+                      </div>
+                      <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:c.changeColor }}>{c.change}</span>
+                    </div>
+                    <div style={{ fontFamily:D.fontDisplay, fontSize: isMobile?20:24, fontWeight:700, color:D.text, letterSpacing:"-0.02em", marginBottom:4 }}>{c.valor}</div>
+                    <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{c.label}</div>
                   </div>
                 ))}
               </div>
-            </div>
 
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:20, flexWrap:"wrap" }}>
-              <label style={{ fontSize:13, color:D.text, fontWeight:600, fontFamily:D.fontBody }}>Mês:</label>
-              <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, flex:1, minWidth:120 }}>
-                {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
-              </select>
-            </div>
+              {/* Linha: Gráfico + Atividade Recente */}
+              <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"2fr 1fr", gap:16, marginBottom:24 }}>
 
-            <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(auto-fit,minmax(140px,1fr))", gap:12, marginBottom:20 }}>
-              {[
-                { label:"Unidades",   valor: moradores.length,                                           icon:"🏠", cor:D.primary, bg:D.muted },
-                { label:"Pagamentos", valor: pagos,                                                      icon:"✅", cor:D.success, bg:"#F0FDF4" },
-                { label:"Pendentes",  valor: pendentes,                                                  icon:"⏳", cor:D.warning, bg:D.warningBg },
-                { label:"Atrasados",  valor: atrasados,                                                  icon:"🚨", cor:D.danger,  bg:D.dangerBg },
-                { label:"Arrecadado", valor:`R$ ${totalArrecadado.toFixed(2).replace(".",",")}`,         icon:"💵", cor:D.success, bg:D.successBg },
-                { label:"A Receber",  valor:`R$ ${totalPendente.toFixed(2).replace(".",",")}`,           icon:"📋", cor:D.accent,  bg:D.secondary },
-              ].map((c,i) => (
-                <div key={i} style={{ background:c.bg, borderRadius:D.radius, padding:"16px 16px 14px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                  <div style={{ fontSize:18, marginBottom:8 }}>{c.icon}</div>
-                  <div style={{ fontSize: isMobile?17:20, fontWeight:800, color:c.cor, letterSpacing:"-0.02em" }}>{c.valor}</div>
-                  <div style={{ fontSize:11, color:D.textSec, marginTop:4, fontWeight:500, fontFamily:D.fontBody }}>{c.label}</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"18px 20px", boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-                <div>
-                  <span style={{ fontSize:13, fontWeight:600, color:D.text, fontFamily:D.fontDisplay }}>Adimplência — {mesLabel(mesSel)}</span>
-                  <span style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginLeft:8 }}>{pagos} de {moradores.length} pagaram</span>
-                </div>
-                <span style={{ fontSize:18, fontWeight:700, color:D.success, fontFamily:D.fontDisplay }}>{moradores.length?Math.round((pagos/moradores.length)*100):0}%</span>
-              </div>
-              <div style={{ height:10, background:D.border, borderRadius:10, overflow:"hidden" }}>
-                <div style={{ height:"100%", width:`${moradores.length?(pagos/moradores.length)*100:0}%`, background:`linear-gradient(90deg, ${D.accent}, ${D.success})`, borderRadius:10, transition:"width .6s ease" }} />
-              </div>
-            </div>
-
-            {/* ── Gráficos ── */}
-            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16, marginBottom:20 }}>
-
-              {/* Gráfico de barras — arrecadação por mês */}
-              {(() => {
-                const ultimos6 = mesesDisponiveis().slice(0,6).reverse();
-                const maxVal   = Math.max(...ultimos6.map(m => cobrancas.filter(c=>c.mes===m&&c.status==="pago").length * taxa), 1);
-                return (
-                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:"#1E3A5F", marginBottom:16 }}>💵 Arrecadação por mês</div>
-                    <div style={{ display:"flex", alignItems:"flex-end", gap: isMobile ? 6 : 10, height:110, paddingBottom:24, position:"relative" }}>
-                      {ultimos6.map((m,i) => {
-                        const val  = cobrancas.filter(c=>c.mes===m&&c.status==="pago").length * taxa;
-                        const pct  = Math.round((val/maxVal)*100);
-                        const ativo = m === mesSel;
-                        return (
-                          <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
-                            <div style={{ fontSize:10, color:"#1E3A5F", fontWeight:600 }}>
-                              {val > 0 ? `${(val/1000).toFixed(1)}k` : ""}
-                            </div>
-                            <div style={{ width:"100%", height:`${Math.max(pct,4)}%`, background: ativo ? "#C9933A" : "#2E6DA4", borderRadius:"4px 4px 0 0", transition:"height .5s ease", minHeight:4 }} />
-                            <div style={{ position:"absolute", bottom:0, fontSize:9, color: ativo ? "#C9933A" : "#6B7A8D", fontWeight: ativo ? 700 : 400, whiteSpace:"nowrap" }}>
-                              {mesLabel(m).split("/")[0]}
-                            </div>
+                {/* Fluxo Financeiro */}
+                {(() => {
+                  const anoAtual = new Date().getFullYear();
+                  const mesesAno = Array.from({length:6}, (_,i) => {
+                    const d = new Date(); d.setMonth(d.getMonth()-5+i);
+                    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+                  });
+                  const labels6 = mesesAno.map(m => {
+                    const [,mo] = m.split("-");
+                    return ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][parseInt(mo)-1];
+                  });
+                  const dados6 = mesesAno.map(m => {
+                    const entrada = cobrancas.filter(c=>c.mes===m&&c.status==="pago").length * taxa;
+                    const saida   = despesas.filter(d=>d.mes===m&&d.status==="pago").reduce((s,d)=>s+d.valor,0)
+                                  + servicos.filter(s=>{
+                                      if(!s.dataFim) return false;
+                                      const p=s.dataFim.split("/");
+                                      return p.length===3&&`${p[2]}-${p[1]}`===m;
+                                    }).reduce((s,sv)=>(sv.valorMaterial||0)+(sv.valorMaoDeObra||0)+s, 0);
+                    return { entrada, saida };
+                  });
+                  return (
+                    <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
+                        <div>
+                          <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>Fluxo Financeiro</div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>Receitas × Despesas (em R$)</div>
+                        </div>
+                        <div style={{ display:"flex", gap:14, alignItems:"center" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:5, fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>
+                            <div style={{ width:8, height:8, borderRadius:"50%", background:D.accent }} />Receita
                           </div>
-                        );
-                      })}
-                    </div>
-                    <div style={{ fontSize:11, color:D.textMut, fontFamily:D.fontBody, textAlign:"center", marginTop:4 }}>Últimos {ultimos6.length} meses · Dourado = mês atual</div>
-                  </div>
-                );
-              })()}
-
-              {/* Gráfico de pizza — adimplência do mês */}
-              {(() => {
-                const total   = cobMes.length || 1;
-                const pPagos  = pagos / total;
-                const pPend   = pendentes / total;
-                const pAtraso = atrasados / total;
-                const toAngle = (p) => p * 360;
-                const polarToXY = (cx, cy, r, angleDeg) => {
-                  const rad = (angleDeg - 90) * Math.PI / 180;
-                  return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
-                };
-                const slice = (startDeg, endDeg, color) => {
-                  if (endDeg - startDeg < 0.5) return null;
-                  const cx=80, cy=80, r=65;
-                  const [x1,y1] = polarToXY(cx,cy,r,startDeg);
-                  const [x2,y2] = polarToXY(cx,cy,r,endDeg);
-                  const large   = (endDeg-startDeg) > 180 ? 1 : 0;
-                  return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${color}" />`;
-                };
-                let a = 0;
-                const s1 = slice(a, a+toAngle(pPagos),  "#2E7D32"); a+=toAngle(pPagos);
-                const s2 = slice(a, a+toAngle(pPend),   "#F57F17"); a+=toAngle(pPend);
-                const s3 = slice(a, a+toAngle(pAtraso), "#B03A2E"); a+=toAngle(pAtraso);
-                const svg = `<svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">${s1||""}${s2||""}${s3||""}<circle cx="80" cy="80" r="35" fill="white"/><text x="80" y="76" text-anchor="middle" font-size="14" font-weight="bold" fill="#1E3A5F">${moradores.length?Math.round((pagos/moradores.length)*100):0}%</text><text x="80" y="92" text-anchor="middle" font-size="9" fill="#6B7A8D">adimplente</text></svg>`;
-                return (
-                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:"#1E3A5F", marginBottom:12 }}>🥧 Situação — {mesLabel(mesSel)}</div>
-                    <div style={{ display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
-                      <div style={{ width:130, flexShrink:0 }} dangerouslySetInnerHTML={{ __html: svg }} />
-                      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                        {[
-                          { cor:"#2E7D32", label:"Pagos",     qtd: pagos     },
-                          { cor:"#F57F17", label:"Pendentes", qtd: pendentes  },
-                          { cor:"#B03A2E", label:"Atrasados", qtd: atrasados  },
-                        ].map((item,i) => (
-                          <div key={i} style={{ display:"flex", alignItems:"center", gap:8, fontSize:13 }}>
-                            <div style={{ width:12, height:12, borderRadius:3, background:item.cor, flexShrink:0 }} />
-                            <span style={{ color:"#1E3A5F", fontWeight:600 }}>{item.qtd}</span>
-                            <span style={{ color:"#6B7A8D" }}>{item.label}</span>
+                          <div style={{ display:"flex", alignItems:"center", gap:5, fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>
+                            <div style={{ width:8, height:8, borderRadius:"50%", background:"#F59E0B" }} />Despesa
                           </div>
-                        ))}
-                        <div style={{ fontSize:11, color:D.textMut, fontFamily:D.fontBody, marginTop:4 }}>
-                          Total: {cobMes.length} unidades
                         </div>
                       </div>
+                      <AreaChart dadosMes={dados6} mesesLabel={labels6} />
                     </div>
-                  </div>
-                );
-              })()}
-            </div>
+                  );
+                })()}
 
-            {/* Observações do mês */}
-            <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#1E3A5F", marginBottom:10 }}>📝 Observações — {mesLabel(mesSel)}</div>
-              {readOnly ? (
-                <div style={{ fontSize:13, color: obsSalva ? "#2C3E50" : "#9aa6b5", lineHeight:1.7, minHeight:40 }}>
-                  {obsSalva || "Nenhuma observação registrada para este mês."}
-                </div>
-              ) : (
-                <>
-                  <textarea
-                    value={obsMes}
-                    onChange={e => setObsMes(e.target.value)}
-                    placeholder="Ex: Taxa extra por pintura da fachada. Reunião de condomínio dia 15..."
-                    rows={3}
-                    style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${obsMes !== obsSalva ? D.gold : D.border}`, borderRadius:D.radiusSm, fontSize:13, boxSizing:"border-box", fontFamily:"inherit", resize:"vertical", color:"#2C3E50", lineHeight:1.6, outline:"none" }}
-                  />
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:8 }}>
-                    <span style={{ fontSize:11, color: obsMes !== obsSalva ? D.gold : D.textMut }}>
-                      {obsMes !== obsSalva ? "Alterações não salvas" : obsSalva ? "Salvo" : ""}
-                    </span>
-                    <button onClick={salvarObsMes} disabled={obsMes === obsSalva} style={{ padding:"7px 18px", background: obsMes !== obsSalva ? D.primary : D.border, color: obsMes !== obsSalva ? "#fff" : D.textMut, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: obsMes !== obsSalva ? "pointer" : "default" }}>
-                      Salvar
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-              {!readOnly && (
-                <button onClick={() => dispararEmails("lembrete")} disabled={enviandoEmails} style={{ padding:"11px 18px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:enviandoEmails?"default":"pointer", opacity:enviandoEmails?.7:1, flex:isMobile?"1 1 100%":"none", boxShadow:`0 2px 8px rgba(30,58,114,0.3)`, fontFamily:D.fontBody }}>
-                  {enviandoEmails?"📧 Enviando...":`📧 Lembrete a todos (${moradores.length})`}
-                </button>
-              )}
-              {!readOnly && (
-                <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"11px 18px", background:D.warning, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:enviandoEmails?"default":"pointer", opacity:enviandoEmails?.7:1, flex:isMobile?"1 1 100%":"none", fontFamily:D.fontBody }}>
-                  {enviandoEmails?"📧 Enviando...":`⚠️ Cobrar pendentes (${nPagos})`}
-                </button>
-              )}
-              <button onClick={exportarPDF} style={{ padding:"11px 18px", background:D.bgCard, color:D.text, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", flex:isMobile?"1 1 100%":"none", fontFamily:D.fontBody }}>📄 Exportar PDF</button>
-              <button onClick={exportarPrestacaoContas} style={{ padding:"11px 18px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", flex:isMobile?"1 1 100%":"none", fontFamily:D.fontBody }}>📑 Prestação de Contas</button>
-            </div>
-
-            {/* ── Dashboard Financeiro Anual ── */}
-            {(() => {
-              const anoAtual = new Date().getFullYear();
-              const mesesAno = Array.from({ length:12 }, (_,i) => `${anoAtual}-${String(i+1).padStart(2,"0")}`);
-              const mesesLabel = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-
-              const dadosMes = mesesAno.map((m, i) => {
-                const cobM    = cobrancas.filter(c => c.mes === m);
-                const pagosM  = cobM.filter(c => c.status === "pago").length;
-                const entrada = pagosM * taxa;
-                const despM   = despesas.filter(d => d.mes === m && d.status === "pago").reduce((s,d)=>s+d.valor,0);
-                const servM   = servicos.filter(s => {
-                  if (!s.dataFim) return false;
-                  const p = s.dataFim.split("/");
-                  return p.length === 3 && `${p[2]}-${p[1]}` === m;
-                }).reduce((s,sv)=>(sv.valorMaterial||0)+(sv.valorMaoDeObra||0)+s, 0);
-                return { mes: mesesLabel[i], entrada, saida: despM + servM, saldo: entrada - despM - servM };
-              });
-
-              const totalEntAno  = dadosMes.reduce((s,d)=>s+d.entrada,0);
-              const totalSaiAno  = dadosMes.reduce((s,d)=>s+d.saida,0);
-              const saldoAno     = totalEntAno - totalSaiAno;
-              const maxVal       = Math.max(...dadosMes.map(d=>Math.max(d.entrada,d.saida)), 1);
-
-              return (
-                <div style={{ marginTop:20 }}>
-                  <h3 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:"0 0 16px", fontSize:16 }}>
-                    📅 Visão Financeira Anual — {anoAtual}
-                  </h3>
-
-                  {/* Cards anuais */}
-                  <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(3,1fr)", gap:12, marginBottom:20 }}>
-                    {[
-                      { label:"Total arrecadado", valor:`R$ ${totalEntAno.toFixed(2).replace(".",",")}`, icon:"💵", cor:"#2E7D32" },
-                      { label:"Total de saídas",  valor:`R$ ${totalSaiAno.toFixed(2).replace(".",",")}`, icon:"📤", cor:"#B03A2E" },
-                      { label:"Saldo do ano",     valor:`R$ ${saldoAno.toFixed(2).replace(".",",")}`,   icon: saldoAno>=0?"📈":"📉", cor: saldoAno>=0?"#2E6DA4":"#B03A2E" },
-                    ].map((c,i)=>(
-                      <div key={i} style={{ background:"#fff", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderTop:`3px solid ${c.cor}` }}>
-                        <div style={{ fontSize:20, marginBottom:4 }}>{c.icon}</div>
-                        <div style={{ fontSize: isMobile?14:17, fontWeight:700, color:c.cor, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>{c.valor}</div>
-                        <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{c.label}</div>
+                {/* Atividade Recente */}
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em", marginBottom:18 }}>Atividade recente</div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                    {logs.slice(0,6).map((log,i) => (
+                      <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
+                        <div style={{ width:34, height:34, borderRadius:9, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, flexShrink:0 }}>{log.icone}</div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:500, color:D.text, lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{log.descricao}</div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:2 }}>{log.dataHora}</div>
+                        </div>
                       </div>
                     ))}
-                  </div>
-
-                  {/* Gráfico de barras duplas */}
-                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:"#1E3A5F", marginBottom:6 }}>Arrecadação vs Despesas — mês a mês</div>
-                    <div style={{ display:"flex", gap:12, marginBottom:12 }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:"#6B7A8D" }}><div style={{ width:10, height:10, background:"#2E6DA4", borderRadius:2 }}/> Arrecadado</div>
-                      <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:"#6B7A8D" }}><div style={{ width:10, height:10, background:"#EF9A9A", borderRadius:2 }}/> Saídas</div>
-                    </div>
-                    <div style={{ display:"flex", alignItems:"flex-end", gap: isMobile?2:6, height:130, paddingBottom:28, position:"relative" }}>
-                      {dadosMes.map((d,i) => {
-                        const hEnt = maxVal > 0 ? Math.max((d.entrada/maxVal)*100, d.entrada>0?4:0) : 0;
-                        const hSai = maxVal > 0 ? Math.max((d.saida/maxVal)*100, d.saida>0?4:0) : 0;
-                        const atual = mesesAno[i] === mesSel;
-                        return (
-                          <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
-                            <div style={{ width:"100%", display:"flex", gap:1, alignItems:"flex-end", height:100 }}>
-                              <div style={{ flex:1, height:`${hEnt}%`, background: atual?"#C9933A":"#2E6DA4", borderRadius:"3px 3px 0 0", minHeight: d.entrada>0?3:0, transition:"height .5s" }} title={`Arrecadado: R$ ${d.entrada.toFixed(0)}`} />
-                              <div style={{ flex:1, height:`${hSai}%`, background:"#EF9A9A", borderRadius:"3px 3px 0 0", minHeight: d.saida>0?3:0, transition:"height .5s" }} title={`Saídas: R$ ${d.saida.toFixed(0)}`} />
-                            </div>
-                            <div style={{ position:"absolute", bottom:0, fontSize: isMobile?8:9, color: atual?"#C9933A":"#6B7A8D", fontWeight: atual?700:400 }}>{d.mes}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Tabela resumo anual */}
-                    <div style={{ marginTop:8, borderTop:"1px solid #F0F4F8", paddingTop:12, overflowX:"auto" }}>
-                      <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
-                        <thead>
-                          <tr style={{ background:"#F8FAFC" }}>
-                            {["Mês","Arrecadado","Saídas","Saldo"].map(h=>(
-                              <th key={h} style={{ padding:"6px 8px", textAlign:"left", color:"#1E3A5F", fontWeight:700 }}>{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dadosMes.map((d,i) => (
-                            <tr key={i} style={{ borderBottom:"1px solid #F8FAFC", background: mesesAno[i]===mesSel?D.muted:"transparent" }}>
-                              <td style={{ padding:"5px 8px", fontWeight: mesesAno[i]===mesSel?700:400, color:"#1E3A5F" }}>{d.mes}</td>
-                              <td style={{ padding:"5px 8px", color:"#2E7D32" }}>R$ {d.entrada.toFixed(2).replace(".",",")}</td>
-                              <td style={{ padding:"5px 8px", color:"#B03A2E" }}>R$ {d.saida.toFixed(2).replace(".",",")}</td>
-                              <td style={{ padding:"5px 8px", color: d.saldo>=0?"#2E6DA4":"#B03A2E", fontWeight:600 }}>R$ {d.saldo.toFixed(2).replace(".",",")}</td>
-                            </tr>
-                          ))}
-                          <tr style={{ borderTop:"2px solid #D0DAE6", background:"#F8FAFC" }}>
-                            <td style={{ padding:"6px 8px", fontWeight:700, color:"#1E3A5F" }}>Total</td>
-                            <td style={{ padding:"6px 8px", fontWeight:700, color:"#2E7D32" }}>R$ {totalEntAno.toFixed(2).replace(".",",")}</td>
-                            <td style={{ padding:"6px 8px", fontWeight:700, color:"#B03A2E" }}>R$ {totalSaiAno.toFixed(2).replace(".",",")}</td>
-                            <td style={{ padding:"6px 8px", fontWeight:700, color: saldoAno>=0?"#2E6DA4":"#B03A2E" }}>R$ {saldoAno.toFixed(2).replace(".",",")}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    {logs.length === 0 && (
+                      <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut, textAlign:"center", padding:"20px 0" }}>Nenhuma atividade ainda.</div>
+                    )}
                   </div>
                 </div>
-              );
-            })()}
+              </div>
+
+              {/* Cobranças Recentes */}
+              <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
+                <div style={{ padding:"18px 24px 14px", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:`1px solid ${D.border}` }}>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>Cobranças recentes</div>
+                  <button onClick={() => setAba("cobrancas")} style={{ fontFamily:D.fontBody, fontSize:13, color:D.accent, background:"none", border:"none", cursor:"pointer", fontWeight:500 }}>Ver todas →</button>
+                </div>
+                <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                  <thead>
+                    <tr style={{ background:D.muted }}>
+                      {["Unidade","Morador","Valor","Status"].map(h => (
+                        <th key={h} style={{ padding:"10px 24px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cobMes.slice(0,5).map((cob,i) => {
+                      const m = moradores.find(x=>x.id===cob.moradorId);
+                      if (!m) return null;
+                      return (
+                        <tr key={i} style={{ borderBottom:`1px solid ${D.border}` }}>
+                          <td style={{ padding:"14px 24px", fontFamily:D.fontDisplay, fontSize:13, fontWeight:600, color:D.text }}>{m.unidade}</td>
+                          <td style={{ padding:"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{m.nome}</td>
+                          <td style={{ padding:"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>R$ {taxa.toFixed(2).replace(".",",")}</td>
+                          <td style={{ padding:"14px 24px" }}><Badge status={cob.status} /></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
           </div>
         )}
+
 
         {/* ── Cobranças ── */}
         {aba === "cobrancas" && (
           <div>
+            <TopBar title="Cobranças" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Cobranças</h2>
@@ -1553,55 +1514,111 @@ export default function App() {
               </div>
             )}
           </div>
+          </div>
         )}
 
         {/* ── Moradores ── */}
         {aba === "moradores" && (
           <div>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
-              <div>
-                <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Moradores</h2>
-                <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>{moradores.length} unidade{moradores.length!==1?"s":""} cadastrada{moradores.length!==1?"s":""}</p>
+            <TopBar title="Moradores" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
+
+              {/* Cabeçalho + ações */}
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
+                <div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{moradores.length} unidade{moradores.length!==1?"s":""} cadastrada{moradores.length!==1?"s":""}</div>
+                </div>
+                <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+                  <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, fontFamily:D.fontBody }}>
+                    {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
+                  </select>
+                  {!readOnly && (
+                    <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
+                      + Adicionar morador
+                    </button>
+                  )}
+                </div>
               </div>
-              {!readOnly && <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>+ Novo</button>}
-            </div>
-            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
-              {moradores.map(m => {
-                const cob = cobrancas.find(c => c.moradorId===m.id && c.mes===mesSel);
-                return (
-                  <div key={m.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${cob?.status==="pago"?D.success:cob?.status==="atrasado"?D.danger:D.warning}` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
-                      <div><div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{m.nome}</div><div style={{ fontSize:11, color:D.accent, fontWeight:600, marginTop:2, fontFamily:D.fontBody, textTransform:"uppercase", letterSpacing:".5px" }}>{m.unidade}</div></div>
-                      {cob && <Badge status={cob.status} />}
-                    </div>
-                    <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, lineHeight:1.8, fontFamily:D.fontBody }}>
-                      <div>📧 {m.email}</div>
-                      {m.telefone && <div>📱 {m.telefone}</div>}
-                    </div>
-                    <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
-                      <button onClick={() => {
-                        const link = `${window.location.origin}${window.location.pathname}?morador=${m.id}`;
-                        navigator.clipboard.writeText(link);
-                        showToast(`Link do ${m.unidade} copiado!`);
-                      }} style={{ padding:"6px 14px", background:"#F0FDFA", color:"#0F766E", border:"1px solid #99F6E4", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>🔗 Copiar link</button>
-                      <button onClick={() => setModal({ type:"historico", data:m })} style={{ padding:"6px 14px", background:"#F5F3FF", color:"#5B21B6", border:"1px solid #C4B5FD", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>📋 Histórico</button>
-                      {!readOnly && (
-                        <>
-                          <button onClick={() => { setEditMorador({ id:m.id, nome:m.nome, unidade:m.unidade, email:m.email, telefone:m.telefone||"" }); setModal({ type:"editarMorador" }); }} style={{ padding:"6px 14px", background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✏️ Editar</button>
-                          <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"6px 14px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>Remover</button>
-                        </>
-                      )}
-                    </div>
+
+              {/* Tabela */}
+              <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
+                {isMobile ? (
+                  /* Mobile: cards */
+                  <div style={{ padding:12, display:"flex", flexDirection:"column", gap:10 }}>
+                    {moradores.sort((a,b)=>a.unidade.localeCompare(b.unidade)).map(m => {
+                      const cob = cobrancas.find(c=>c.moradorId===m.id&&c.mes===mesSel);
+                      return (
+                        <div key={m.id} style={{ background:D.muted, borderRadius:D.radiusSm, padding:14, borderLeft:`3px solid ${cob?.status==="pago"?D.success:cob?.status==="atrasado"?D.danger:D.warning}` }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                            <div>
+                              <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>{m.unidade}</div>
+                              <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>{m.nome}</div>
+                            </div>
+                            {cob && <Badge status={cob.status} />}
+                          </div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.email}</div>
+                          <div style={{ display:"flex", gap:8, marginTop:10, flexWrap:"wrap" }}>
+                            <button onClick={() => { setModal({ type:"historico", data:m }); }} style={{ padding:"5px 12px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>📋 Histórico</button>
+                            <button onClick={() => { const link=`${window.location.origin}${window.location.pathname}?morador=${m.id}`; navigator.clipboard.writeText(link); showToast(`Link do ${m.unidade} copiado!`); }} style={{ padding:"5px 12px", background:"#F0FDFA", color:D.success, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🔗 Link</button>
+                            {!readOnly && <>
+                              <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,email:m.email,telefone:m.telefone||""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 12px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
+                              <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"5px 12px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
+                            </>}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                ) : (
+                  /* Desktop: tabela */
+                  <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                    <thead>
+                      <tr style={{ background:D.muted }}>
+                        {["Unidade","Morador","Contato","Status","Ações"].map(h => (
+                          <th key={h} style={{ padding:"12px 20px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {moradores.sort((a,b)=>a.unidade.localeCompare(b.unidade)).map((m,i) => {
+                        const cob = cobrancas.find(c=>c.moradorId===m.id&&c.mes===mesSel);
+                        return (
+                          <tr key={m.id} style={{ borderBottom:`1px solid ${D.border}` }}>
+                            <td style={{ padding:"14px 20px" }}>
+                              <div style={{ fontFamily:D.fontDisplay, fontSize:13, fontWeight:600, color:D.text }}>{m.unidade}</div>
+                              {m.proprietario && <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:2 }}>Prop: {m.proprietario}</div>}
+                            </td>
+                            <td style={{ padding:"14px 20px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{m.nome}</td>
+                            <td style={{ padding:"14px 20px" }}>
+                              <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.email||"—"}</div>
+                              {m.telefone && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:2 }}>{m.telefone}</div>}
+                            </td>
+                            <td style={{ padding:"14px 20px" }}>{cob ? <Badge status={cob.status} /> : <span style={{ color:D.textMut, fontSize:12 }}>—</span>}</td>
+                            <td style={{ padding:"14px 20px" }}>
+                              <div style={{ display:"flex", gap:6 }}>
+                                <button onClick={() => setModal({ type:"historico", data:m })} style={{ padding:"5px 10px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>📋</button>
+                                <button onClick={() => { const link=`${window.location.origin}${window.location.pathname}?morador=${m.id}`; navigator.clipboard.writeText(link); showToast(`Link do ${m.unidade} copiado!`); }} style={{ padding:"5px 10px", background:"#F0FDFA", color:D.success, border:`1px solid #BBF7D0`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🔗</button>
+                                {!readOnly && <>
+                                  <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,email:m.email,telefone:m.telefone||""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 10px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
+                                  <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"5px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
+                                </>}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {/* ── Despesas ── */}
         {aba === "despesas" && (
           <div>
+            <TopBar title="Água & Luz" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Água &amp; Luz</h2>
@@ -1663,11 +1680,14 @@ export default function App() {
               </div>
             )}
           </div>
+          </div>
         )}
 
         {/* ── Serviços ── */}
         {aba === "servicos" && (
           <div>
+            <TopBar title="Serviços & Manutenção" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Serviços &amp; Manutenção</h2>
@@ -1718,11 +1738,14 @@ export default function App() {
               {servicos.filter(s=>s.status==="concluido").length===0 && <div style={{ color:"#9aa6b5", fontSize:13, padding:"4px 0" }}>Nenhum serviço concluído ainda.</div>}
             </div>
           </div>
+          </div>
         )}
 
         {/* ── Acessos ── */}
         {aba === "acessos" && (
           <div>
+            <TopBar title="Controle de Acessos" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Controle de Acessos</h2>
@@ -1793,11 +1816,14 @@ export default function App() {
               </div>
             )}
           </div>
+          </div>
         )}
 
         {/* ── Histórico ── */}
         {aba === "historico" && (
           <div>
+            <TopBar title="Histórico de Atividades" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Histórico de Atividades</h2>
@@ -1829,11 +1855,14 @@ export default function App() {
               </div>
             )}
           </div>
+          </div>
         )}
 
         {/* ── Configurações ── */}
         {aba === "config" && (
           <div>
+            <TopBar title="Configurações" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
             <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Configurações</h2>
             <p style={{ color:"#6B7A8D", margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>
             <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
@@ -1878,6 +1907,7 @@ export default function App() {
                 <div>📦 Versão 2.0 · Firebase + React</div>
               </div>
             </div>
+          </div>
           </div>
         )}
       </main>

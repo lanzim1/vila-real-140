@@ -158,30 +158,11 @@ const Badge = ({ status }) => {
 // ── Top Bar ──
 const TopBar = ({ title, user, readOnly, nPendentes }) => {
   const hoje = new Date().toLocaleDateString("pt-BR", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
-  const initials = (user?.email || "SC").slice(0,2).toUpperCase();
   return (
-    <div style={{ background:D.bgCard, borderBottom:`1px solid ${D.border}`, padding:"14px 28px", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0, gap:16, flexWrap:"wrap" }}>
+    <div style={{ background:D.bgCard, borderBottom:`1px solid ${D.border}`, padding:"14px 28px", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
       <div>
         <h1 style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:600, color:D.text, margin:0, letterSpacing:"-0.02em" }}>{title}</h1>
         <p style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, margin:"2px 0 0", textTransform:"capitalize" }}>{hoje}</p>
-      </div>
-      <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8, background:D.muted, border:`1px solid ${D.border}`, borderRadius:D.radius, padding:"8px 14px" }}>
-          <span style={{ color:D.textMut, fontSize:13 }}>🔍</span>
-          <span style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Buscar morador, unidade...</span>
-        </div>
-        <div style={{ position:"relative", width:38, height:38, borderRadius:D.radius, border:`1px solid ${D.border}`, display:"flex", alignItems:"center", justifyContent:"center", background:D.bgCard, cursor:"pointer", flexShrink:0 }}>
-          <span style={{ fontSize:16 }}>🔔</span>
-          {nPendentes > 0 && <div style={{ position:"absolute", top:7, right:7, width:8, height:8, borderRadius:"50%", background:D.danger, border:`2px solid ${D.bgCard}` }} />}
-        </div>
-        {!readOnly && (
-          <button style={{ display:"flex", alignItems:"center", gap:6, padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radius, fontFamily:D.fontBody, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", boxShadow:`0 2px 8px rgba(30,58,114,0.3)` }}>
-            + Novo lançamento
-          </button>
-        )}
-        <div style={{ width:36, height:36, borderRadius:"50%", background:D.accent, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontFamily:D.fontDisplay, fontSize:13, fontWeight:700, flexShrink:0 }}>
-          {initials}
-        </div>
       </div>
     </div>
   );

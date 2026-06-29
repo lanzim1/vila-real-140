@@ -1274,6 +1274,22 @@ export default function App() {
     showToast("Prestacao de contas gerada!");
   };
 
+  const [maisAberto, setMaisAberto] = useState(false);
+
+  const navPrincipal = [
+    { id:"dashboard", icon:"📊", label:"Dashboard" },
+    { id:"cobrancas", icon:"💰", label:"Cobranças"  },
+    { id:"moradores", icon:"👥", label:"Moradores"  },
+    { id:"despesas",  icon:"💧", label:"Água/Luz"   },
+    { id:"servicos",  icon:"🔧", label:"Serviços"   },
+  ];
+  const navSecundario = [
+    { id:"reservas",  icon:"📅", label:"Reservas"   },
+    { id:"acessos",   icon:"🚪", label:"Acessos"    },
+    { id:"historico", icon:"📋", label:"Histórico"  },
+    ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config."  }] : []),
+  ];
+
   const navItems = [
     { id:"dashboard", icon:"📊", label:"Dashboard" },
     { id:"cobrancas", icon:"💰", label:"Cobranças"  },
@@ -1398,25 +1414,47 @@ export default function App() {
 
       {/* ── Barra de navegação inferior (mobile) ── */}
       {isMobile && (
-        <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:D.sidebar, display:"flex", zIndex:500, boxShadow:`0 -1px 0 ${D.sidebarBdr}, 0 -4px 16px rgba(28,45,94,.4)`, paddingBottom:"env(safe-area-inset-bottom,0)" }}>
-          {navItems.map(n => (
-            <button key={n.id} onClick={() => setAba(n.id)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color: aba===n.id ? D.accent : "rgba(226,232,245,0.4)", borderTop: aba===n.id ? `2px solid ${D.accent}` : "2px solid transparent", fontFamily:D.fontBody }}>
-              <span style={{ fontSize:18 }}>{n.icon}</span>
-              <span style={{ fontSize:9.5, fontWeight: aba===n.id ? 600 : 400 }}>{n.label}</span>
-            </button>
-          ))}
-          {readOnly ? (
-            <button onClick={async () => { await signOut(auth); window.location.href = window.location.origin+window.location.pathname; }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color:"rgba(252,211,77,.8)", borderTop:"2px solid transparent" }}>
-              <span style={{ fontSize:19 }}>👁️</span>
-              <span style={{ fontSize:9.5 }}>Sair</span>
-            </button>
-          ) : (
-            <button onClick={() => signOut(auth)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color:"rgba(252,165,165,.8)", borderTop:"2px solid transparent" }}>
-              <span style={{ fontSize:19 }}>🚪</span>
-              <span style={{ fontSize:9.5 }}>Sair</span>
-            </button>
+        <>
+          {/* Painel "Mais" */}
+          {maisAberto && (
+            <div style={{ position:"fixed", inset:0, zIndex:498 }} onClick={() => setMaisAberto(false)}>
+              <div style={{ position:"absolute", bottom:68, left:0, right:0, background:D.sidebar, borderTop:`1px solid ${D.sidebarBdr}`, padding:"8px 12px 12px", boxShadow:"0 -8px 24px rgba(0,0,0,.3)" }} onClick={e=>e.stopPropagation()}>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:4, marginBottom:8 }}>
+                  {navSecundario.map(n => (
+                    <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", padding:"10px 4px", display:"flex", flexDirection:"column", alignItems:"center", gap:4, color: aba===n.id ? "#fff" : "rgba(226,232,245,0.75)", borderRadius:10, fontFamily:D.fontBody }}>
+                      <span style={{ fontSize:20 }}>{n.icon}</span>
+                      <span style={{ fontSize:10, fontWeight: aba===n.id?600:400 }}>{n.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div style={{ borderTop:`1px solid ${D.sidebarBdr}`, paddingTop:8 }}>
+                  {readOnly ? (
+                    <button onClick={async () => { await signOut(auth); window.location.href = window.location.origin+window.location.pathname; }} style={{ width:"100%", padding:"10px", background:"rgba(252,211,77,.1)", border:`1px solid rgba(252,211,77,.2)`, borderRadius:10, color:"#FCD34D", fontFamily:D.fontBody, fontSize:13, fontWeight:500, cursor:"pointer" }}>
+                      👁️ Modo Visualização — Sair
+                    </button>
+                  ) : (
+                    <button onClick={() => signOut(auth)} style={{ width:"100%", padding:"10px", background:"rgba(224,58,34,.12)", border:`1px solid rgba(224,58,34,.2)`, borderRadius:10, color:"#FCA5A5", fontFamily:D.fontBody, fontSize:13, fontWeight:500, cursor:"pointer" }}>
+                      🚪 Sair do sistema
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
-        </nav>
+          {/* Barra principal */}
+          <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:D.sidebar, display:"flex", zIndex:499, boxShadow:`0 -1px 0 ${D.sidebarBdr}, 0 -4px 16px rgba(28,45,94,.4)`, paddingBottom:"env(safe-area-inset-bottom,0)", height:64 }}>
+            {navPrincipal.map(n => (
+              <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color: aba===n.id ? D.accent : "rgba(226,232,245,0.75)", borderTop: aba===n.id ? `2px solid ${D.accent}` : "2px solid transparent", fontFamily:D.fontBody }}>
+                <span style={{ fontSize:19 }}>{n.icon}</span>
+                <span style={{ fontSize:9.5, fontWeight: aba===n.id?600:400 }}>{n.label}</span>
+              </button>
+            ))}
+            <button onClick={() => setMaisAberto(v=>!v)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color: maisAberto || navSecundario.some(n=>n.id===aba) ? D.accent : "rgba(226,232,245,0.75)", borderTop: maisAberto || navSecundario.some(n=>n.id===aba) ? `2px solid ${D.accent}` : "2px solid transparent", fontFamily:D.fontBody }}>
+              <span style={{ fontSize:19 }}>⋯</span>
+              <span style={{ fontSize:9.5, fontWeight: maisAberto?600:400 }}>Mais</span>
+            </button>
+          </nav>
+        </>
       )}
 
       {/* ── Conteúdo ── */}
@@ -1426,10 +1464,10 @@ export default function App() {
         {aba === "dashboard" && (
           <div>
             <TopBar title="Visão Geral" user={user} readOnly={readOnly} nPendentes={nPagos} />
-            <div style={{ padding: isMobile ? "20px 16px 100px" : "24px 28px 40px" }}>
+            <div style={{ padding: isMobile ? "16px 14px 80px" : "24px 28px 40px" }}>
 
               {/* Stat Cards */}
-              <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(4,1fr)", gap:16, marginBottom:24 }}>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(4,1fr)", gap:isMobile?10:16, marginBottom:20 }}>
                 {[
                   {
                     icon:"💰", iconBg:"#DCFDF0", iconColor:D.success,
@@ -1456,21 +1494,21 @@ export default function App() {
                     changeColor: saldoCaixa>=0 ? D.success : D.danger,
                   },
                 ].map((c,i) => (
-                  <div key={i} style={{ background:D.bgCard, borderRadius:D.radius, padding:"20px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
-                      <div style={{ width:40, height:40, borderRadius:10, background:c.iconBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>
+                  <div key={i} style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"14px 12px":"20px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom: isMobile?8:14 }}>
+                      <div style={{ width:isMobile?32:40, height:isMobile?32:40, borderRadius:isMobile?8:10, background:c.iconBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:isMobile?15:18, flexShrink:0 }}>
                         {c.icon}
                       </div>
-                      <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:c.changeColor }}>{c.change}</span>
+                      <span style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:600, color:c.changeColor, textAlign:"right", lineHeight:1.3 }}>{c.change}</span>
                     </div>
-                    <div style={{ fontFamily:D.fontDisplay, fontSize: isMobile?20:24, fontWeight:700, color:D.text, letterSpacing:"-0.02em", marginBottom:4 }}>{c.valor}</div>
-                    <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{c.label}</div>
+                    <div style={{ fontFamily:D.fontDisplay, fontSize: isMobile?16:24, fontWeight:700, color:D.text, letterSpacing:"-0.02em", marginBottom:3, lineHeight:1.1 }}>{c.valor}</div>
+                    <div style={{ fontFamily:D.fontBody, fontSize: isMobile?11:13, color:D.textSec }}>{c.label}</div>
                   </div>
                 ))}
               </div>
 
               {/* Linha: Gráfico + Atividade Recente */}
-              <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"2fr 1fr", gap:16, marginBottom:24 }}>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"2fr 1fr", gap:isMobile?12:16, marginBottom:isMobile?12:24 }}>
 
                 {/* Fluxo Financeiro */}
                 {(() => {
@@ -1574,7 +1612,7 @@ export default function App() {
         {aba === "cobrancas" && (
           <div>
             <TopBar title="Cobranças" user={user} readOnly={readOnly} nPendentes={nPagos} />
-            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Cobranças</h2>
@@ -1638,7 +1676,7 @@ export default function App() {
         {aba === "moradores" && (
           <div>
             <TopBar title="Moradores" user={user} readOnly={readOnly} nPendentes={nPagos} />
-            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ações */}
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
@@ -1735,7 +1773,7 @@ export default function App() {
         {aba === "despesas" && (
           <div>
             <TopBar title="Água & Luz" user={user} readOnly={readOnly} nPendentes={nPagos} />
-            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Água &amp; Luz</h2>
@@ -1804,7 +1842,7 @@ export default function App() {
         {aba === "servicos" && (
           <div>
             <TopBar title="Serviços & Manutenção" user={user} readOnly={readOnly} nPendentes={nPagos} />
-            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Serviços &amp; Manutenção</h2>
@@ -1862,7 +1900,7 @@ export default function App() {
         {aba === "reservas" && (
           <div>
             <TopBar title="Reservas" user={user} readOnly={readOnly} nPendentes={nPagos} />
-            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cards de resumo */}
               <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(3,1fr)", gap:12, marginBottom:20 }}>
@@ -1985,7 +2023,7 @@ export default function App() {
         {aba === "acessos" && (
           <div>
             <TopBar title="Controle de Acessos" user={user} readOnly={readOnly} nPendentes={nPagos} />
-            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Controle de Acessos</h2>
@@ -2063,7 +2101,7 @@ export default function App() {
         {aba === "historico" && (
           <div>
             <TopBar title="Histórico de Atividades" user={user} readOnly={readOnly} nPendentes={nPagos} />
-            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Histórico de Atividades</h2>
@@ -2102,7 +2140,7 @@ export default function App() {
         {aba === "config" && (
           <div>
             <TopBar title="Configurações" user={user} readOnly={readOnly} nPendentes={nPagos} />
-            <div style={{ padding: isMobile?"16px 16px 100px":"24px 28px 40px" }}>
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Configurações</h2>
             <p style={{ color:"#6B7A8D", margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>
             <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>

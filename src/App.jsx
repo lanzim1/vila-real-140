@@ -1238,8 +1238,8 @@ export default function App() {
           {/* Nav */}
           <nav style={{ flex:1, padding:"8px 10px" }}>
             {navItems.map(n => (
-              <button key={n.id} onClick={() => setAba(n.id)} style={{ display:"flex", alignItems:"center", gap:9, width:"100%", padding:"9px 11px", background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", color: aba===n.id ? "#fff" : "rgba(226,232,245,0.5)", fontFamily:D.fontBody, fontSize:13, fontWeight: aba===n.id ? 600 : 500, textAlign:"left", borderRadius:8, marginBottom:1, outline:"none", borderLeft: aba===n.id ? `2px solid ${D.sidebarActBdr}` : "2px solid transparent" }}>
-                <span style={{ fontSize:15, minWidth:18, textAlign:"center", opacity: aba===n.id?1:.65 }}>{n.icon}</span>{n.label}
+              <button key={n.id} onClick={() => setAba(n.id)} style={{ display:"flex", alignItems:"center", gap:9, width:"100%", padding:"9px 11px", background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", color: aba===n.id ? "#fff" : "rgba(226,232,245,0.85)", fontFamily:D.fontBody, fontSize:13, fontWeight: aba===n.id ? 600 : 500, textAlign:"left", borderRadius:8, marginBottom:1, outline:"none", borderLeft: aba===n.id ? `2px solid ${D.sidebarActBdr}` : "2px solid transparent" }}>
+                <span style={{ fontSize:15, minWidth:18, textAlign:"center", opacity: aba===n.id?1:.8 }}>{n.icon}</span>{n.label}
               </button>
             ))}
           </nav>

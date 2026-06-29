@@ -55,27 +55,61 @@ function useIsMobile() {
   return isMobile;
 }
 
-// ── Design System ──
+// ── Design System — baseado em Residencial Aurora (condo-care-reborn) ──
+// OKLCH convertido para HEX; Space Grotesk + DM Sans
 const D = {
-  sidebar:    "#0F172A",
-  sidebarHov: "rgba(255,255,255,0.07)",
-  sidebarAct: "rgba(13,148,136,0.18)",
-  primary:    "#0D9488",
-  primaryDk:  "#0F766E",
-  gold:       "#D97706",
-  success:    "#059669",
-  danger:     "#DC2626",
-  warning:    "#F59E0B",
-  bgApp:      "#F1F5F9",
-  bgCard:     "#FFFFFF",
-  text:       "#0F172A",
-  textSec:    "#64748B",
-  textMut:    "#94A3B8",
-  border:     "#E2E8F0",
-  shadow:     "0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06)",
-  shadowMd:   "0 4px 12px rgba(0,0,0,.1), 0 16px 40px rgba(0,0,0,.08)",
-  radius:     14,
-  radiusSm:   8,
+  // Backgrounds
+  bgApp:       "#F4F6FB",   // --background oklch(0.985 0.004 250)
+  bgCard:      "#FFFFFF",   // --card
+
+  // Text
+  text:        "#1A2744",   // --foreground oklch(0.22 0.05 260)
+  textSec:     "#6B7A9E",   // --muted-foreground oklch(0.52 0.04 256)
+  textMut:     "#9AA5C0",
+
+  // Brand
+  primary:     "#1E3A72",   // --primary oklch(0.32 0.09 258) — botões primários
+  primaryFg:   "#F8F9FC",   // --primary-foreground
+  accent:      "#4B72C4",   // --accent oklch(0.6 0.11 250) — ativo, gráficos
+  secondary:   "#E8EDF7",   // --secondary
+  muted:       "#EEF1F8",   // --muted
+
+  // Semantic
+  success:     "#22A26B",   // --success oklch(0.62 0.14 155)
+  successBg:   "#DCFDF0",
+  warning:     "#B87200",   // --warning-foreground oklch(0.28 0.06 70)
+  warningBg:   "#FEF3C7",   // --warning oklch(0.78 0.15 75) bg
+  danger:      "#E03A22",   // --destructive oklch(0.58 0.21 25)
+  dangerBg:    "#FEE8E4",
+
+  // UI
+  border:      "#DDE3EF",   // --border oklch(0.9 0.015 252)
+  ring:        "#4B72C4",   // --ring
+
+  // Sidebar (oklch values conforme design system)
+  sidebar:     "#1C2D5E",   // --sidebar oklch(0.27 0.07 260)
+  sidebarHov:  "#253875",   // --sidebar-accent oklch(0.33 0.07 260)
+  sidebarAct:  "rgba(75,114,196,0.2)",
+  sidebarActBdr:"#4B72C4",  // --sidebar-primary
+  sidebarFg:   "#E2E8F5",   // --sidebar-foreground
+  sidebarBdr:  "#2E4380",   // --sidebar-border
+
+  // Deprecated (mantidos para compatibilidade de código legado)
+  gold:        "#B87200",
+  primaryDk:   "#162E5C",
+
+  // Shadows
+  shadow:    "0 1px 3px rgba(30,42,100,.06), 0 2px 8px rgba(30,42,100,.05)",
+  shadowMd:  "0 4px 16px rgba(30,42,100,.1), 0 8px 32px rgba(30,42,100,.07)",
+
+  // Radius (--radius: 0.75rem = 12px)
+  radius:    12,
+  radiusSm:  8,
+  radiusXl:  16,
+
+  // Fontes
+  fontDisplay: "'Space Grotesk', sans-serif",
+  fontBody:    "'DM Sans', sans-serif",
 };
 
 // ── Toast ──
@@ -138,16 +172,16 @@ const Login = () => {
   };
 
   return (
-    <div style={{ minHeight:"100vh", background:D.sidebar, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Inter',sans-serif", padding:16, position:"relative", overflow:"hidden" }}>
+    <div style={{ minHeight:"100vh", background:D.sidebar, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontBody, padding:16, position:"relative", overflow:"hidden" }}>
       {/* Padrão decorativo */}
       <div style={{ position:"absolute", inset:0, backgroundImage:`radial-gradient(circle at 20% 20%, rgba(13,148,136,0.15) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(13,148,136,0.1) 0%, transparent 50%)`, pointerEvents:"none" }} />
       <div style={{ background:"#fff", borderRadius:20, padding:"40px 36px", width:"100%", maxWidth:420, boxShadow:"0 32px 80px rgba(0,0,0,0.4)", position:"relative" }}>
         {/* Logo */}
         <div style={{ textAlign:"center", marginBottom:32 }}>
           <div style={{ width:64, height:64, borderRadius:16, background:`linear-gradient(135deg, ${D.primary}, ${D.primaryDk})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", boxShadow:`0 8px 24px rgba(13,148,136,0.35)` }}>
-            <span style={{ color:"#fff", fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:700 }}>VR</span>
+            <span style={{ color:"#fff", fontFamily:D.fontDisplay, fontSize:22, fontWeight:700 }}>VR</span>
           </div>
-          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, color:D.text, margin:0, fontWeight:700, letterSpacing:"-.5px" }}>Vila Real 140</h1>
+          <h1 style={{ fontFamily:D.fontDisplay, fontSize:24, color:D.text, margin:0, fontWeight:700, letterSpacing:"-0.02em" }}>Vila Real 140</h1>
           <p style={{ color:D.textSec, fontSize:13, margin:"6px 0 0", letterSpacing:".2px" }}>Sistema de Gestão Condominial</p>
         </div>
         <div style={{ marginBottom:16 }}>
@@ -194,7 +228,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   }, [moradorId]);
 
   if (!morador) return (
-    <div style={{ minHeight:"100vh", background:"#1E3A5F", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontFamily:"'Inter',sans-serif" }}>
+    <div style={{ minHeight:"100vh", background:"#1E3A5F", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontFamily:D.fontBody }}>
       Carregando...
     </div>
   );
@@ -205,11 +239,11 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const statusCor = cobMes?.status === "pago" ? "#2E7D32" : cobMes?.status === "atrasado" ? "#B03A2E" : "#F57F17";
 
   return (
-    <div style={{ minHeight:"100vh", background:"#F0F4F8", fontFamily:"'Inter',sans-serif" }}>
+    <div style={{ minHeight:"100vh", background:"#F0F4F8", fontFamily:D.fontBody }}>
       {/* Cabeçalho */}
-      <div style={{ background:"linear-gradient(135deg,#0F172A,#0F766E)", padding: isMobile ? "24px 20px" : "32px 40px", color:"#fff" }}>
+      <div style={{ background:`linear-gradient(135deg, ${D.sidebar}, ${D.primary})`, padding: isMobile ? "24px 20px" : "32px 40px", color:"#fff" }}>
         <div style={{ fontSize:13, opacity:.7, marginBottom:6 }}>🏢 Condomínio Vila Real 140</div>
-        <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize: isMobile?22:28, margin:"0 0 4px", fontWeight:700, letterSpacing:"-.5px" }}>{morador.nome}</h1>
+        <h1 style={{ fontFamily:D.fontDisplay, fontSize: isMobile?22:28, margin:"0 0 4px", fontWeight:700, letterSpacing:"-0.02em" }}>{morador.nome}</h1>
         <div style={{ fontSize:14, opacity:.85 }}>{morador.unidade}{morador.proprietario ? ` · Prop: ${morador.proprietario}` : ""}</div>
         {morador.email && <div style={{ fontSize:12, opacity:.7, marginTop:4 }}>📧 {morador.email}</div>}
       </div>
@@ -225,12 +259,12 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
             </select>
           </div>
           {cobMes ? (
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:"#F8FAFC", borderRadius:10, padding:16, borderLeft:`4px solid ${statusCor}` }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:D.muted, borderRadius:D.radius, padding:16, borderLeft:`4px solid ${statusCor}` }}>
               <div>
                 <div style={{ fontSize:22, fontWeight:800, color:statusCor, textTransform:"capitalize" }}>{cobMes.status}</div>
                 <div style={{ fontSize:13, color:"#6B7A8D", marginTop:4 }}>Taxa: R$ {taxa.toFixed(2).replace(".",",")}</div>
-                {cobMes.dataPagamento && <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>Pago em {cobMes.dataPagamento}</div>}
-                {cobMes.obs && <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>📝 {cobMes.obs}</div>}
+                {cobMes.dataPagamento && <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>Pago em {cobMes.dataPagamento}</div>}
+                {cobMes.obs && <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>📝 {cobMes.obs}</div>}
               </div>
               <div style={{ fontSize:40, opacity:.3 }}>{cobMes.status==="pago"?"✅":cobMes.status==="atrasado"?"🚨":"⏳"}</div>
             </div>
@@ -259,9 +293,9 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
           <div style={{ fontSize:14, fontWeight:700, color:"#1E3A5F", marginBottom:14 }}>📋 Histórico de pagamentos</div>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             {cobrancas.map((c,i) => {
-              const cor = c.status==="pago"?"#2E7D32":c.status==="atrasado"?"#B03A2E":"#F57F17";
+              const cor = c.status==="pago"?D.success:c.status==="atrasado"?D.danger:D.warning;
               return (
-                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background: c.status==="pago"?"#E8F5E9":c.status==="atrasado"?"#FFEBEE":"#FFF8E1", borderRadius:10, borderLeft:`4px solid ${cor}` }}>
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background: c.status==="pago"?D.successBg:c.status==="atrasado"?D.dangerBg:D.warningBg, borderRadius:D.radiusSm, borderLeft:`4px solid ${cor}` }}>
                   <div>
                     <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:13 }}>{mesLabel(c.mes)}</div>
                     {c.dataPagamento && <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>Pago em {c.dataPagamento}</div>}
@@ -277,7 +311,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
           </div>
         </div>
 
-        <div style={{ textAlign:"center", marginTop:24, fontSize:11, color:"#9aa6b5" }}>
+        <div style={{ textAlign:"center", marginTop:24, fontSize:11, color:D.textMut, fontFamily:D.fontBody }}>
           Vila Real 140 · Portal do Morador · Acesso somente leitura
         </div>
       </div>
@@ -1035,11 +1069,11 @@ export default function App() {
   ];
 
   if (!authChecked) return (
-    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#1E3A5F", color:"#fff", fontFamily:"'Inter',sans-serif" }}>Carregando...</div>
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#1E3A5F", color:"#fff", fontFamily:D.fontBody }}>Carregando...</div>
   );
 
   if (modoVisitante && !user) return (
-    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#1E3A5F", color:"#fff", fontFamily:"'Inter',sans-serif", textAlign:"center", padding:24 }}>
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#1E3A5F", color:"#fff", fontFamily:D.fontBody, textAlign:"center", padding:24 }}>
       <div><div style={{ fontSize:36, marginBottom:10 }}>🔒</div>Link de visualização indisponível.<br/>Contate o síndico.</div>
     </div>
   );
@@ -1060,11 +1094,11 @@ export default function App() {
     const m = moradores.find(x => x.id === cob.moradorId);
     if (!m) return null;
     return (
-      <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${cob.status==="pago"?D.success:cob.status==="atrasado"?D.danger:D.warning}`, marginBottom:10 }}>
+      <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${cob.status==="pago"?D.success:cob.status==="atrasado"?D.danger:D.warning}`, marginBottom:10 }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
           <div>
             <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{m.unidade} — {m.nome}</div>
-            <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>{m.email}</div>
+            <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>{m.email}</div>
           </div>
           <Badge status={cob.status} />
         </div>
@@ -1084,11 +1118,11 @@ export default function App() {
   };
 
   const DespCard = ({ d }) => (
-    <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${d.status==="pago"?D.success:D.danger}`, marginBottom:10 }}>
+    <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${d.status==="pago"?D.success:D.danger}`, marginBottom:10 }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
         <div>
           <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{d.tipo==="agua"?"💧":d.tipo==="luz"?"⚡":"📦"} {d.descricao || (d.tipo==="agua"?"Conta de água":d.tipo==="luz"?"Conta de luz":"Outra despesa")}</div>
-          <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>{mesLabel(d.mes)} · R$ {d.valor.toFixed(2).replace(".",",")}</div>
+          <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>{mesLabel(d.mes)} · R$ {d.valor.toFixed(2).replace(".",",")}</div>
         </div>
         <Badge status={d.status} />
       </div>
@@ -1102,43 +1136,43 @@ export default function App() {
   );
 
   return (
-    <div style={{ display:"flex", flexDirection: isMobile ? "column" : "row", minHeight:"100vh", fontFamily:"'Inter',sans-serif", background:"#F8FAFC" }}>
+    <div style={{ display:"flex", flexDirection: isMobile ? "column" : "row", minHeight:"100vh", fontFamily:D.fontBody, background:"#F8FAFC" }}>
 
       {/* ── Sidebar (desktop) ── */}
       {!isMobile && (
-        <aside style={{ width:240, background:D.sidebar, display:"flex", flexDirection:"column", flexShrink:0 }}>
+        <aside style={{ width:240, background:D.sidebar, display:"flex", flexDirection:"column", flexShrink:0, borderRight:`1px solid ${D.sidebarBdr}` }}>
           {/* Logo */}
-          <div style={{ padding:"28px 20px 24px", borderBottom:"1px solid rgba(255,255,255,0.07)" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <div style={{ width:40, height:40, borderRadius:10, background:`linear-gradient(135deg, ${D.primary}, ${D.primaryDk})`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                <span style={{ color:"#fff", fontFamily:"'Playfair Display',serif", fontSize:14, fontWeight:700 }}>VR</span>
+          <div style={{ padding:"22px 18px 18px", borderBottom:`1px solid ${D.sidebarBdr}` }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ width:36, height:36, borderRadius:9, background:D.accent, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:`0 2px 8px rgba(75,114,196,0.4)` }}>
+                <span style={{ color:"#fff", fontFamily:D.fontDisplay, fontSize:13, fontWeight:700 }}>VR</span>
               </div>
               <div>
-                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, color:"#fff", fontWeight:700, lineHeight:1.2 }}>Vila Real 140</div>
-                <div style={{ fontSize:11, color:"rgba(255,255,255,.4)", marginTop:2, letterSpacing:".3px" }}>Gestão Condominial</div>
+                <div style={{ fontFamily:D.fontDisplay, fontSize:14, color:D.sidebarFg, fontWeight:600, letterSpacing:"-0.02em", lineHeight:1.2 }}>Vila Real 140</div>
+                <div style={{ fontFamily:D.fontBody, fontSize:11, color:"rgba(226,232,245,0.4)", marginTop:1 }}>Gestão Condominial</div>
               </div>
             </div>
           </div>
           {/* Nav */}
-          <nav style={{ flex:1, padding:"12px 10px" }}>
+          <nav style={{ flex:1, padding:"8px 10px" }}>
             {navItems.map(n => (
-              <button key={n.id} onClick={() => setAba(n.id)} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", padding:"10px 12px", background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", color: aba===n.id ? "#fff" : "rgba(255,255,255,.55)", fontSize:13.5, fontWeight: aba===n.id ? 600 : 400, textAlign:"left", borderRadius:10, marginBottom:2, transition:"all .15s", outline:"none", borderLeft: aba===n.id ? `3px solid ${D.primary}` : "3px solid transparent" }}>
-                <span style={{ fontSize:17, minWidth:20, textAlign:"center" }}>{n.icon}</span>{n.label}
+              <button key={n.id} onClick={() => setAba(n.id)} style={{ display:"flex", alignItems:"center", gap:9, width:"100%", padding:"9px 11px", background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", color: aba===n.id ? "#fff" : "rgba(226,232,245,0.5)", fontFamily:D.fontBody, fontSize:13, fontWeight: aba===n.id ? 600 : 500, textAlign:"left", borderRadius:8, marginBottom:1, outline:"none", borderLeft: aba===n.id ? `2px solid ${D.sidebarActBdr}` : "2px solid transparent" }}>
+                <span style={{ fontSize:15, minWidth:18, textAlign:"center", opacity: aba===n.id?1:.65 }}>{n.icon}</span>{n.label}
               </button>
             ))}
           </nav>
           {/* Bottom */}
-          <div style={{ padding:"16px 10px" }}>
-            <div style={{ background:"rgba(255,255,255,.05)", borderRadius:10, padding:"10px 12px", marginBottom:10 }}>
-              <div style={{ fontSize:10, color:"rgba(255,255,255,.35)", textTransform:"uppercase", letterSpacing:1, marginBottom:3 }}>Conta</div>
-              <div style={{ fontSize:12, color:"rgba(255,255,255,.6)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{user?.email}</div>
+          <div style={{ padding:"10px 10px 18px", borderTop:`1px solid ${D.sidebarBdr}` }}>
+            <div style={{ background:"rgba(255,255,255,.05)", borderRadius:8, padding:"8px 11px", marginBottom:8 }}>
+              <div style={{ fontFamily:D.fontBody, fontSize:10, color:"rgba(226,232,245,0.35)", textTransform:"uppercase", letterSpacing:".8px", marginBottom:2 }}>Conta ativa</div>
+              <div style={{ fontFamily:D.fontBody, fontSize:11, color:"rgba(226,232,245,0.6)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{user?.email}</div>
             </div>
             {readOnly ? (
-              <button onClick={async () => { await signOut(auth); window.location.href = window.location.origin + window.location.pathname; }} style={{ width:"100%", padding:"9px 12px", background:"rgba(215,119,6,.15)", border:`1px solid rgba(215,119,6,.3)`, borderRadius:10, color:"#FCD34D", fontSize:12, fontWeight:600, textAlign:"center", cursor:"pointer" }}>
+              <button onClick={async () => { await signOut(auth); window.location.href = window.location.origin + window.location.pathname; }} style={{ width:"100%", padding:"8px 11px", background:"rgba(184,114,0,.15)", border:`1px solid rgba(184,114,0,.3)`, borderRadius:8, color:"#FCD34D", fontFamily:D.fontBody, fontSize:11.5, fontWeight:500, textAlign:"center", cursor:"pointer" }}>
                 👁️ Modo Visualização — Sair
               </button>
             ) : (
-              <button onClick={() => signOut(auth)} style={{ width:"100%", padding:"9px 12px", background:"rgba(220,38,38,.15)", border:`1px solid rgba(220,38,38,.25)`, borderRadius:10, color:"#FCA5A5", cursor:"pointer", fontSize:13, fontWeight:600 }}>Sair</button>
+              <button onClick={() => signOut(auth)} style={{ width:"100%", padding:"8px 11px", background:"rgba(224,58,34,.12)", border:`1px solid rgba(224,58,34,.22)`, borderRadius:8, color:"#FCA5A5", cursor:"pointer", fontFamily:D.fontBody, fontSize:12, fontWeight:500 }}>Sair</button>
             )}
           </div>
         </aside>
@@ -1146,11 +1180,11 @@ export default function App() {
 
       {/* ── Barra de navegação inferior (mobile) ── */}
       {isMobile && (
-        <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:D.sidebar, display:"flex", zIndex:500, boxShadow:"0 -1px 0 rgba(255,255,255,.06), 0 -8px 24px rgba(0,0,0,.3)", paddingBottom:"env(safe-area-inset-bottom,0)" }}>
+        <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:D.sidebar, display:"flex", zIndex:500, boxShadow:`0 -1px 0 ${D.sidebarBdr}, 0 -4px 16px rgba(28,45,94,.4)`, paddingBottom:"env(safe-area-inset-bottom,0)" }}>
           {navItems.map(n => (
-            <button key={n.id} onClick={() => setAba(n.id)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color: aba===n.id ? D.primary : "rgba(255,255,255,.4)", borderTop: aba===n.id ? `2px solid ${D.primary}` : "2px solid transparent", transition:"color .15s" }}>
-              <span style={{ fontSize:19 }}>{n.icon}</span>
-              <span style={{ fontSize:9.5, fontWeight: aba===n.id ? 700 : 400, letterSpacing:".2px" }}>{n.label}</span>
+            <button key={n.id} onClick={() => setAba(n.id)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color: aba===n.id ? D.accent : "rgba(226,232,245,0.4)", borderTop: aba===n.id ? `2px solid ${D.accent}` : "2px solid transparent", fontFamily:D.fontBody }}>
+              <span style={{ fontSize:18 }}>{n.icon}</span>
+              <span style={{ fontSize:9.5, fontWeight: aba===n.id ? 600 : 400 }}>{n.label}</span>
             </button>
           ))}
           {readOnly ? (
@@ -1173,15 +1207,15 @@ export default function App() {
         {/* ── Dashboard ── */}
         {aba === "dashboard" && (
           <div>
-            <h2 style={{ fontFamily:"'Playfair Display',serif", color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-.5px" }}>Dashboard</h2>
+            <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Dashboard</h2>
             <p style={{ color:"#6B7A8D", margin:"0 0 18px", fontSize:13 }}>Visão geral · {mesLabel(mesSel)}</p>
 
             {/* Saldo de caixa — Hero */}
-            <div style={{ background: saldoCaixa>=0 ? `linear-gradient(135deg, ${D.primary} 0%, ${D.primaryDk} 100%)` : `linear-gradient(135deg, #DC2626 0%, #991B1B 100%)`, borderRadius:18, padding: isMobile?"20px 22px":"28px 32px", marginBottom:20, boxShadow: saldoCaixa>=0 ? `0 8px 32px rgba(13,148,136,0.35)` : `0 8px 32px rgba(220,38,38,0.35)`, position:"relative", overflow:"hidden" }}>
+            <div style={{ background: saldoCaixa>=0 ? `linear-gradient(135deg, ${D.primary} 0%, #162E5C 100%)` : `linear-gradient(135deg, ${D.danger} 0%, #B91C1C 100%)`, borderRadius:18, padding: isMobile?"20px 22px":"28px 32px", marginBottom:20, boxShadow: saldoCaixa>=0 ? `0 8px 32px rgba(30,58,114,0.35)` : `0 8px 32px rgba(224,58,34,0.35)`, position:"relative", overflow:"hidden" }}>
               <div style={{ position:"absolute", top:-20, right:-20, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,.06)", pointerEvents:"none" }} />
               <div style={{ position:"absolute", bottom:-30, right:20, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,.04)", pointerEvents:"none" }} />
               <div style={{ color:"rgba(255,255,255,.7)", fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:1.2, marginBottom:8 }}>Saldo de Caixa · Geral</div>
-              <div style={{ color:"#fff", fontSize: isMobile?30:38, fontWeight:800, letterSpacing:-1, lineHeight:1, marginBottom:10 }}>R$ {saldoCaixa.toFixed(2).replace(".",",")}</div>
+              <div style={{ color:"#fff", fontSize: isMobile?30:38, fontWeight:800, letterSpacing:"-0.02em", lineHeight:1, marginBottom:10 }}>R$ {saldoCaixa.toFixed(2).replace(".",",")}</div>
               <div style={{ display:"flex", gap: isMobile?12:24, flexWrap:"wrap" }}>
                 {[["Entradas", totalEntradas],["Despesas", totalSaidasDespesas],["Serviços", totalSaidasServicos]].map(([l,v])=>(
                   <div key={l}>
@@ -1193,7 +1227,7 @@ export default function App() {
             </div>
 
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:20, flexWrap:"wrap" }}>
-              <label style={{ fontSize:13, color:D.text, fontWeight:600 }}>Mês:</label>
+              <label style={{ fontSize:13, color:D.text, fontWeight:600, fontFamily:D.fontBody }}>Mês:</label>
               <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, flex:1, minWidth:120 }}>
                 {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
               </select>
@@ -1201,17 +1235,17 @@ export default function App() {
 
             <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(auto-fit,minmax(140px,1fr))", gap:12, marginBottom:20 }}>
               {[
-                { label:"Unidades",   valor: moradores.length,                                           icon:"🏠", cor:D.text,    bg:"#F8FAFC" },
+                { label:"Unidades",   valor: moradores.length,                                           icon:"🏠", cor:D.primary, bg:D.muted },
                 { label:"Pagamentos", valor: pagos,                                                      icon:"✅", cor:D.success, bg:"#F0FDF4" },
-                { label:"Pendentes",  valor: pendentes,                                                  icon:"⏳", cor:D.warning, bg:"#FFFBEB" },
-                { label:"Atrasados",  valor: atrasados,                                                  icon:"🚨", cor:D.danger,  bg:"#FEF2F2" },
-                { label:"Arrecadado", valor:`R$ ${totalArrecadado.toFixed(2).replace(".",",")}`,         icon:"💵", cor:D.gold,    bg:"#FFFBEB" },
-                { label:"A Receber",  valor:`R$ ${totalPendente.toFixed(2).replace(".",",")}`,           icon:"📋", cor:D.primary, bg:"#F0FDFA" },
+                { label:"Pendentes",  valor: pendentes,                                                  icon:"⏳", cor:D.warning, bg:D.warningBg },
+                { label:"Atrasados",  valor: atrasados,                                                  icon:"🚨", cor:D.danger,  bg:D.dangerBg },
+                { label:"Arrecadado", valor:`R$ ${totalArrecadado.toFixed(2).replace(".",",")}`,         icon:"💵", cor:D.success, bg:D.successBg },
+                { label:"A Receber",  valor:`R$ ${totalPendente.toFixed(2).replace(".",",")}`,           icon:"📋", cor:D.accent,  bg:D.secondary },
               ].map((c,i) => (
                 <div key={i} style={{ background:c.bg, borderRadius:D.radius, padding:"16px 16px 14px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
                   <div style={{ fontSize:18, marginBottom:8 }}>{c.icon}</div>
-                  <div style={{ fontSize: isMobile?17:20, fontWeight:800, color:c.cor, letterSpacing:"-.5px" }}>{c.valor}</div>
-                  <div style={{ fontSize:11, color:D.textSec, marginTop:4, fontWeight:500 }}>{c.label}</div>
+                  <div style={{ fontSize: isMobile?17:20, fontWeight:800, color:c.cor, letterSpacing:"-0.02em" }}>{c.valor}</div>
+                  <div style={{ fontSize:11, color:D.textSec, marginTop:4, fontWeight:500, fontFamily:D.fontBody }}>{c.label}</div>
                 </div>
               ))}
             </div>
@@ -1219,13 +1253,13 @@ export default function App() {
             <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"18px 20px", boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                 <div>
-                  <span style={{ fontSize:13, fontWeight:700, color:D.text }}>Adimplência — {mesLabel(mesSel)}</span>
-                  <span style={{ fontSize:12, color:D.textSec, marginLeft:8 }}>{pagos} de {moradores.length} pagaram</span>
+                  <span style={{ fontSize:13, fontWeight:600, color:D.text, fontFamily:D.fontDisplay }}>Adimplência — {mesLabel(mesSel)}</span>
+                  <span style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginLeft:8 }}>{pagos} de {moradores.length} pagaram</span>
                 </div>
-                <span style={{ fontSize:18, fontWeight:800, color:D.success }}>{moradores.length?Math.round((pagos/moradores.length)*100):0}%</span>
+                <span style={{ fontSize:18, fontWeight:700, color:D.success, fontFamily:D.fontDisplay }}>{moradores.length?Math.round((pagos/moradores.length)*100):0}%</span>
               </div>
               <div style={{ height:10, background:D.border, borderRadius:10, overflow:"hidden" }}>
-                <div style={{ height:"100%", width:`${moradores.length?(pagos/moradores.length)*100:0}%`, background:`linear-gradient(90deg, ${D.primary}, ${D.success})`, borderRadius:10, transition:"width .6s ease" }} />
+                <div style={{ height:"100%", width:`${moradores.length?(pagos/moradores.length)*100:0}%`, background:`linear-gradient(90deg, ${D.accent}, ${D.success})`, borderRadius:10, transition:"width .6s ease" }} />
               </div>
             </div>
 
@@ -1257,7 +1291,7 @@ export default function App() {
                         );
                       })}
                     </div>
-                    <div style={{ fontSize:11, color:"#9aa6b5", textAlign:"center", marginTop:4 }}>Últimos {ultimos6.length} meses · Dourado = mês atual</div>
+                    <div style={{ fontSize:11, color:D.textMut, fontFamily:D.fontBody, textAlign:"center", marginTop:4 }}>Últimos {ultimos6.length} meses · Dourado = mês atual</div>
                   </div>
                 );
               })()}
@@ -1303,7 +1337,7 @@ export default function App() {
                             <span style={{ color:"#6B7A8D" }}>{item.label}</span>
                           </div>
                         ))}
-                        <div style={{ fontSize:11, color:"#9aa6b5", marginTop:4 }}>
+                        <div style={{ fontSize:11, color:D.textMut, fontFamily:D.fontBody, marginTop:4 }}>
                           Total: {cobMes.length} unidades
                         </div>
                       </div>
@@ -1343,17 +1377,17 @@ export default function App() {
 
             <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
               {!readOnly && (
-                <button onClick={() => dispararEmails("lembrete")} disabled={enviandoEmails} style={{ padding:"11px 18px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:enviandoEmails?"default":"pointer", opacity:enviandoEmails?.7:1, flex:isMobile?"1 1 100%":"none", boxShadow:`0 2px 8px rgba(13,148,136,0.3)` }}>
+                <button onClick={() => dispararEmails("lembrete")} disabled={enviandoEmails} style={{ padding:"11px 18px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:enviandoEmails?"default":"pointer", opacity:enviandoEmails?.7:1, flex:isMobile?"1 1 100%":"none", boxShadow:`0 2px 8px rgba(30,58,114,0.3)`, fontFamily:D.fontBody }}>
                   {enviandoEmails?"📧 Enviando...":`📧 Lembrete a todos (${moradores.length})`}
                 </button>
               )}
               {!readOnly && (
-                <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"11px 18px", background:D.gold, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:enviandoEmails?"default":"pointer", opacity:enviandoEmails?.7:1, flex:isMobile?"1 1 100%":"none", boxShadow:`0 2px 8px rgba(215,119,6,0.3)` }}>
+                <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"11px 18px", background:D.warning, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:enviandoEmails?"default":"pointer", opacity:enviandoEmails?.7:1, flex:isMobile?"1 1 100%":"none", fontFamily:D.fontBody }}>
                   {enviandoEmails?"📧 Enviando...":`⚠️ Cobrar pendentes (${nPagos})`}
                 </button>
               )}
-              <button onClick={exportarPDF} style={{ padding:"11px 18px", background:D.bgCard, color:D.text, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", flex:isMobile?"1 1 100%":"none" }}>📄 Exportar PDF</button>
-              <button onClick={exportarPrestacaoContas} style={{ padding:"11px 18px", background:D.text, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", flex:isMobile?"1 1 100%":"none" }}>📑 Prestação de Contas</button>
+              <button onClick={exportarPDF} style={{ padding:"11px 18px", background:D.bgCard, color:D.text, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", flex:isMobile?"1 1 100%":"none", fontFamily:D.fontBody }}>📄 Exportar PDF</button>
+              <button onClick={exportarPrestacaoContas} style={{ padding:"11px 18px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", flex:isMobile?"1 1 100%":"none", fontFamily:D.fontBody }}>📑 Prestação de Contas</button>
             </div>
 
             {/* ── Dashboard Financeiro Anual ── */}
@@ -1382,7 +1416,7 @@ export default function App() {
 
               return (
                 <div style={{ marginTop:20 }}>
-                  <h3 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:"0 0 16px", fontSize:16 }}>
+                  <h3 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:"0 0 16px", fontSize:16 }}>
                     📅 Visão Financeira Anual — {anoAtual}
                   </h3>
 
@@ -1395,7 +1429,7 @@ export default function App() {
                     ].map((c,i)=>(
                       <div key={i} style={{ background:"#fff", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderTop:`3px solid ${c.cor}` }}>
                         <div style={{ fontSize:20, marginBottom:4 }}>{c.icon}</div>
-                        <div style={{ fontSize: isMobile?14:17, fontWeight:800, color:c.cor }}>{c.valor}</div>
+                        <div style={{ fontSize: isMobile?14:17, fontWeight:700, color:c.cor, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>{c.valor}</div>
                         <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{c.label}</div>
                       </div>
                     ))}
@@ -1437,7 +1471,7 @@ export default function App() {
                         </thead>
                         <tbody>
                           {dadosMes.map((d,i) => (
-                            <tr key={i} style={{ borderBottom:"1px solid #F8FAFC", background: mesesAno[i]===mesSel?"#FFF8E1":"transparent" }}>
+                            <tr key={i} style={{ borderBottom:"1px solid #F8FAFC", background: mesesAno[i]===mesSel?D.muted:"transparent" }}>
                               <td style={{ padding:"5px 8px", fontWeight: mesesAno[i]===mesSel?700:400, color:"#1E3A5F" }}>{d.mes}</td>
                               <td style={{ padding:"5px 8px", color:"#2E7D32" }}>R$ {d.entrada.toFixed(2).replace(".",",")}</td>
                               <td style={{ padding:"5px 8px", color:"#B03A2E" }}>R$ {d.saida.toFixed(2).replace(".",",")}</td>
@@ -1465,7 +1499,7 @@ export default function App() {
           <div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12, flexWrap:"wrap", gap:10 }}>
               <div>
-                <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Cobranças</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Cobranças</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Registre pagamentos e comprovantes</p>
               </div>
               <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
@@ -1496,9 +1530,9 @@ export default function App() {
                         <tr key={i} style={{ borderBottom:`1px solid ${D.border}` }}>
                           <td style={{ padding:"13px 16px", fontWeight:600, color:D.text, fontSize:13 }}>{m.unidade}</td>
                           <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>{m.nome}</td>
-                          <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec }}>{m.email}</td>
+                          <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec, fontFamily:D.fontBody }}>{m.email}</td>
                           <td style={{ padding:"13px 16px" }}><Badge status={cob.status} /></td>
-                          <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec }}>{cob.dataPagamento || "—"}</td>
+                          <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec, fontFamily:D.fontBody }}>{cob.dataPagamento || "—"}</td>
                           <td style={{ padding:"13px 16px" }}>
                             <div style={{ display:"flex", gap:8 }}>
                               {cob.status !== "pago" ? (
@@ -1526,21 +1560,21 @@ export default function App() {
           <div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
               <div>
-                <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Moradores</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Moradores</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>{moradores.length} unidade{moradores.length!==1?"s":""} cadastrada{moradores.length!==1?"s":""}</p>
               </div>
-              {!readOnly && <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"10px 16px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", boxShadow:`0 2px 8px rgba(13,148,136,0.3)` }}>+ Novo</button>}
+              {!readOnly && <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>+ Novo</button>}
             </div>
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
               {moradores.map(m => {
                 const cob = cobrancas.find(c => c.moradorId===m.id && c.mes===mesSel);
                 return (
-                  <div key={m.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${cob?.status==="pago"?D.success:cob?.status==="atrasado"?D.danger:D.warning}` }}>
+                  <div key={m.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${cob?.status==="pago"?D.success:cob?.status==="atrasado"?D.danger:D.warning}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
-                      <div><div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{m.nome}</div><div style={{ fontSize:12, color:"#C9933A", fontWeight:600, marginTop:2 }}>{m.unidade}</div></div>
+                      <div><div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{m.nome}</div><div style={{ fontSize:11, color:D.accent, fontWeight:600, marginTop:2, fontFamily:D.fontBody, textTransform:"uppercase", letterSpacing:".5px" }}>{m.unidade}</div></div>
                       {cob && <Badge status={cob.status} />}
                     </div>
-                    <div style={{ fontSize:12, color:D.textSec, lineHeight:1.8 }}>
+                    <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, lineHeight:1.8, fontFamily:D.fontBody }}>
                       <div>📧 {m.email}</div>
                       {m.telefone && <div>📱 {m.telefone}</div>}
                     </div>
@@ -1570,10 +1604,10 @@ export default function App() {
           <div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
-                <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Água &amp; Luz</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Água &amp; Luz</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Contas e despesas fixas</p>
               </div>
-              {!readOnly && <button onClick={() => setModal({ type:"novaDespesa" })} style={{ padding:"10px 16px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", boxShadow:`0 2px 8px rgba(13,148,136,0.3)` }}>+ Nova</button>}
+              {!readOnly && <button onClick={() => setModal({ type:"novaDespesa" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>+ Nova</button>}
             </div>
 
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit,minmax(160px,1fr))", gap:12, marginBottom:16 }}>
@@ -1613,7 +1647,7 @@ export default function App() {
                         <td style={{ padding:"13px 16px", fontSize:13, color:"#6B7A8D" }}>{mesLabel(d.mes)}</td>
                         <td style={{ padding:"13px 16px", fontSize:13, fontWeight:600, color:"#1E3A5F" }}>R$ {d.valor.toFixed(2).replace(".",",")}</td>
                         <td style={{ padding:"13px 16px" }}><Badge status={d.status} /></td>
-                        <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec }}>{d.dataPagamento||"—"}</td>
+                        <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec, fontFamily:D.fontBody }}>{d.dataPagamento||"—"}</td>
                         <td style={{ padding:"13px 16px" }}>
                           <div style={{ display:"flex", gap:8 }}>
                             {d.status!=="pago" && !readOnly && <button onClick={() => marcarDespesaPaga(d.id)} style={{ padding:"5px 12px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✓ Marcar Paga</button>}
@@ -1636,19 +1670,19 @@ export default function App() {
           <div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
-                <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Serviços &amp; Manutenção</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Serviços &amp; Manutenção</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Consertos e melhorias do condomínio</p>
               </div>
-              {!readOnly && <button onClick={() => setModal({ type:"novoServico" })} style={{ padding:"10px 16px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", boxShadow:`0 2px 8px rgba(13,148,136,0.3)` }}>+ Novo</button>}
+              {!readOnly && <button onClick={() => setModal({ type:"novoServico" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>+ Novo</button>}
             </div>
 
-            <h3 style={{ fontSize:13, color:"#1E3A5F", fontWeight:700, margin:"20px 0 10px" }}>🟡 Pendentes ({servicos.filter(s=>s.status==="pendente").length})</h3>
+            <h3 style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, fontWeight:700, margin:"20px 0 10px", textTransform:"uppercase", letterSpacing:".8px", fontFamily:D.fontBody }}>🟡 Pendentes ({servicos.filter(s=>s.status==="pendente").length})</h3>
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(280px,1fr))", gap:12, marginBottom:8 }}>
               {servicos.filter(s=>s.status==="pendente").map(s => (
-                <div key={s.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${D.warning}` }}>
+                <div key={s.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.warning}` }}>
                   <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14, marginBottom:4 }}>{s.titulo}</div>
                   {s.descricao && <div style={{ fontSize:13, color:"#6B7A8D", marginBottom:8 }}>{s.descricao}</div>}
-                  <div style={{ fontSize:11, color:"#9aa6b5" }}>Aberto em {s.dataAbertura}</div>
+                  <div style={{ fontSize:11, color:D.textMut, fontFamily:D.fontBody }}>Aberto em {s.dataAbertura}</div>
                   {!readOnly && (
                     <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
                       <button onClick={() => { setConcluirForm({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" }); setModal({ type:"concluirServico", data:s }); }} style={{ padding:"7px 14px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>✓ Concluir</button>
@@ -1660,17 +1694,17 @@ export default function App() {
               {servicos.filter(s=>s.status==="pendente").length===0 && <div style={{ color:"#9aa6b5", fontSize:13, padding:"4px 0" }}>Nenhum serviço pendente. 🎉</div>}
             </div>
 
-            <h3 style={{ fontSize:13, color:"#1E3A5F", fontWeight:700, margin:"24px 0 10px" }}>✅ Concluídos ({servicos.filter(s=>s.status==="concluido").length})</h3>
+            <h3 style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, fontWeight:700, margin:"24px 0 10px", textTransform:"uppercase", letterSpacing:".8px", fontFamily:D.fontBody }}>✅ Concluídos ({servicos.filter(s=>s.status==="concluido").length})</h3>
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
               {servicos.filter(s=>s.status==="concluido").map(s => (
-                <div key={s.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${D.success}` }}>
+                <div key={s.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.success}` }}>
                   <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14, marginBottom:4 }}>{s.titulo}</div>
                   {s.descricao && <div style={{ fontSize:13, color:"#6B7A8D", marginBottom:8 }}>{s.descricao}</div>}
-                  <div style={{ fontSize:12, color:D.textSec, lineHeight:1.8, background:"#F0F4F8", borderRadius:8, padding:"10px 12px" }}>
+                  <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, lineHeight:1.8, fontFamily:D.fontBody, background:"#F0F4F8", borderRadius:8, padding:"10px 12px" }}>
                     <div>📅 Início: <b style={{color:"#1E3A5F"}}>{s.dataInicio||"—"}</b> · Fim: <b style={{color:"#1E3A5F"}}>{s.dataFim||"—"}</b></div>
                     <div>🧱 Material: <b style={{color:"#1E3A5F"}}>R$ {(s.valorMaterial||0).toFixed(2).replace(".",",")}</b></div>
                     <div>👷 Mão de obra: <b style={{color:"#1E3A5F"}}>R$ {(s.valorMaoDeObra||0).toFixed(2).replace(".",",")}</b></div>
-                    <div>💰 Total: <b style={{color:"#C9933A"}}>R$ {((s.valorMaterial||0)+(s.valorMaoDeObra||0)).toFixed(2).replace(".",",")}</b></div>
+                    <div>💰 Total: <b style={{color:D.warning}}>R$ {((s.valorMaterial||0)+(s.valorMaoDeObra||0)).toFixed(2).replace(".",",")}</b></div>
                     {s.obsConclusao && <div style={{marginTop:4}}>📝 {s.obsConclusao}</div>}
                   </div>
                   {!readOnly && (
@@ -1691,11 +1725,11 @@ export default function App() {
           <div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
-                <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Controle de Acessos</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Controle de Acessos</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Visitantes e prestadores de serviço</p>
               </div>
               {!readOnly && (
-                <button onClick={() => { setNovoAcesso({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" }); setModal({ type:"novoAcesso" }); }} style={{ padding:"10px 16px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", boxShadow:`0 2px 8px rgba(13,148,136,0.3)` }}>
+                <button onClick={() => { setNovoAcesso({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" }); setModal({ type:"novoAcesso" }); }} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
                   + Registrar Entrada
                 </button>
               )}
@@ -1720,22 +1754,22 @@ export default function App() {
             {acessos.length === 0 ? (
               <div style={{ background:"#fff", borderRadius:12, padding:40, textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>🚪</div>
-                <div style={{ color:D.textMut, fontSize:14 }}>Nenhum acesso registrado ainda.</div>
+                <div style={{ color:D.textMut, fontSize:14, fontFamily:D.fontBody }}>Nenhum acesso registrado ainda.</div>
               </div>
             ) : (
               <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
                 {acessos.map((a) => (
-                  <div key={a.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${a.horaSaida ? "#2E7D32" : "#F57F17"}` }}>
+                  <div key={a.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${a.horaSaida ? "#2E7D32" : "#F57F17"}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
                       <div>
                         <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{a.nome}</div>
-                        {a.empresa && <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>🏢 {a.empresa}</div>}
-                        <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>📋 {a.motivo}</div>
-                        {a.unidade && <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>🏠 {a.unidade}</div>}
+                        {a.empresa && <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>🏢 {a.empresa}</div>}
+                        <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>📋 {a.motivo}</div>
+                        {a.unidade && <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>🏠 {a.unidade}</div>}
                       </div>
                       <div style={{ textAlign:"right", flexShrink:0 }}>
                         <div style={{ fontSize:12, color:"#1E3A5F", fontWeight:600 }}>{a.dataEntrada}</div>
-                        <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>Entrada: {a.horaEntrada}</div>
+                        <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>Entrada: {a.horaEntrada}</div>
                         {a.horaSaida
                           ? <div style={{ fontSize:12, color:"#2E7D32", marginTop:2, fontWeight:600 }}>Saída: {a.horaSaida}</div>
                           : <div style={{ fontSize:12, color:"#F57F17", marginTop:2, fontWeight:600 }}>No condomínio</div>
@@ -1766,7 +1800,7 @@ export default function App() {
           <div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
-                <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1E3A5F", margin:0, fontSize:h2size }}>Histórico de Atividades</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Histórico de Atividades</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>{logs.length} registro{logs.length!==1?"s":""} no sistema</p>
               </div>
               {!readOnly && logs.length > 0 && (
@@ -1779,7 +1813,7 @@ export default function App() {
             {logs.length === 0 ? (
               <div style={{ background:"#fff", borderRadius:12, padding:40, textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
-                <div style={{ color:D.textMut, fontSize:14 }}>Nenhuma atividade registrada ainda.<br/>As ações realizadas no sistema aparecerão aqui.</div>
+                <div style={{ color:D.textMut, fontSize:14, fontFamily:D.fontBody }}>Nenhuma atividade registrada ainda.<br/>As ações realizadas no sistema aparecerão aqui.</div>
               </div>
             ) : (
               <div style={{ background:"#fff", borderRadius:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)", overflow:"hidden" }}>
@@ -1787,8 +1821,8 @@ export default function App() {
                   <div key={log.id} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"14px 18px", borderBottom: i < logs.length-1 ? "1px solid #F0F4F8" : "none", background: i%2===0 ? D.bgCard : "#F8FAFC" }}>
                     <div style={{ fontSize:22, flexShrink:0, marginTop:1 }}>{log.icone}</div>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:13, color:D.text, lineHeight:1.5 }}>{log.descricao}</div>
-                      <div style={{ fontSize:11, color:"#9aa6b5", marginTop:3 }}>{log.dataHora}</div>
+                      <div style={{ fontSize:13, color:D.text, lineHeight:1.5, fontFamily:D.fontBody }}>{log.descricao}</div>
+                      <div style={{ fontSize:11, color:D.textMut, fontFamily:D.fontBody, marginTop:3 }}>{log.dataHora}</div>
                     </div>
                   </div>
                 ))}
@@ -1800,13 +1834,13 @@ export default function App() {
         {/* ── Configurações ── */}
         {aba === "config" && (
           <div>
-            <h2 style={{ fontFamily:"'Playfair Display',serif", color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-.5px" }}>Configurações</h2>
+            <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Configurações</h2>
             <p style={{ color:"#6B7A8D", margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>
             <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-              <h3 style={{ color:D.text, margin:"0 0 16px", fontSize:14, fontWeight:700 }}>Taxa mensal</h3>
+              <h3 style={{ color:D.text, margin:"0 0 16px", fontSize:14, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Taxa mensal</h3>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Valor (R$)</label>
-              <input type="number" value={taxa} onChange={e=>setTaxa(parseFloat(e.target.value)||0)} style={{ display:"block", width:"100%", padding:"12px 14px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:16, color:D.text, marginTop:8, boxSizing:"border-box" }} />
-              <button onClick={() => salvarTaxa(taxa)} style={{ marginTop:14, padding:"11px 24px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(13,148,136,0.3)`, fontSize:14, fontWeight:600, cursor:"pointer" }}>Salvar</button>
+              <input type="number" value={taxa} onChange={e=>setTaxa(parseFloat(e.target.value)||0)} style={{ display:"block", width:"100%", padding:"12px 14px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:16, color:D.text, marginTop:8, boxSizing:"border-box", fontFamily:D.fontBody }} />
+              <button onClick={() => salvarTaxa(taxa)} style={{ marginTop:14, padding:"11px 24px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontWeight:600, fontSize:14, fontWeight:600, cursor:"pointer" }}>Salvar</button>
 
               <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
 
@@ -1839,7 +1873,7 @@ export default function App() {
                 <div style={{ marginTop:6, fontSize:11, color:"#aaa" }}>Para trocar a senha, use o painel do Firebase (Authentication → Users).</div>
               </div>
               <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
-              <div style={{ fontSize:12, color:D.textSec, lineHeight:1.8 }}>
+              <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, lineHeight:1.8, fontFamily:D.fontBody }}>
                 <div>🏢 Condomínio Vila Real 140</div>
                 <div>📦 Versão 2.0 · Firebase + React</div>
               </div>
@@ -1851,7 +1885,7 @@ export default function App() {
       {/* ── Modais ── */}
       {modal?.type === "pagar" && (
         <Modal title={`Registrar Pgto — ${modal.data.unidade}`} onClose={() => setModal(null)} isMobile={isMobile}>
-          <p style={{ fontSize:13, color:"#6B7A8D", margin:"0 0 16px" }}>Morador: <b style={{color:"#1E3A5F"}}>{modal.data.nome}</b> · Taxa: <b style={{color:"#C9933A"}}>R$ {taxa.toFixed(2).replace(".",",")}</b></p>
+          <p style={{ fontSize:13, color:"#6B7A8D", margin:"0 0 16px" }}>Morador: <b style={{color:"#1E3A5F"}}>{modal.data.nome}</b> · Taxa: <b style={{color:D.warning}}>R$ {taxa.toFixed(2).replace(".",",")}</b></p>
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Observação</label>
           <input value={pagForm.obs} onChange={e=>setPagForm(p=>({...p,obs:e.target.value}))} placeholder="Ex: Pago via Pix" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:6, marginBottom:14, boxSizing:"border-box" }} />
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Comprovante</label>
@@ -1861,7 +1895,7 @@ export default function App() {
           <input ref={fileRef} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f=e.target.files[0]; if(f) setPagForm(p=>({...p,arquivo:f,arquivoNome:f.name})); }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={() => registrarPagamento(modal.data.moradorId)} style={{ padding:"10px 20px", background:D.success, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(5,150,105,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Confirmar</button>
+            <button onClick={() => registrarPagamento(modal.data.moradorId)} style={{ padding:"10px 20px", background:D.success, color:"#fff", border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Confirmar</button>
           </div>
         </Modal>
       )}
@@ -1900,7 +1934,7 @@ export default function App() {
           ))}
           <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={adicionarMorador} style={{ padding:"10px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(13,148,136,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Cadastrar</button>
+            <button onClick={adicionarMorador} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Cadastrar</button>
           </div>
         </Modal>
       )}
@@ -1914,9 +1948,9 @@ export default function App() {
         const totalAtraso = cobMorador.filter(c=>c.status==="atrasado").length;
         return (
           <Modal title={`Histórico — ${m.nome}`} onClose={() => setModal(null)} isMobile={isMobile}>
-            <div style={{ marginBottom:16, background:"#F0F4F8", borderRadius:10, padding:"12px 16px" }}>
-              <div style={{ fontSize:13, color:D.text, fontWeight:600 }}>{m.unidade}</div>
-              <div style={{ fontSize:12, color:D.textSec, marginTop:4, lineHeight:1.8 }}>
+            <div style={{ marginBottom:16, background:D.muted, borderRadius:D.radius, padding:"12px 16px", border:`1px solid ${D.border}` }}>
+              <div style={{ fontSize:13, color:D.text, fontWeight:600, fontFamily:D.fontBody }}>{m.unidade}</div>
+              <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:4, lineHeight:1.8 }}>
                 📧 {m.email}{m.telefone ? ` · 📱 ${m.telefone}` : ""}
               </div>
               <div style={{ display:"flex", gap:16, marginTop:10, flexWrap:"wrap" }}>
@@ -1945,7 +1979,7 @@ export default function App() {
                       <span style={{ fontSize:11, fontWeight:600, color:corBorda, textTransform:"capitalize" }}>{c.status}</span>
                       <span style={{ fontSize:12, color:"#1E3A5F", fontWeight:600 }}>R$ {taxa.toFixed(2).replace(".",",")}</span>
                       {c.status === "pago" && (
-                        <button onClick={() => gerarReciboPDF(m, c.dataPagamento, c.obs)} style={{ fontSize:11, padding:"3px 8px", background:"#F3E5F5", color:"#6A1B9A", border:"1px solid #CE93D8", borderRadius:6, cursor:"pointer", fontWeight:600, marginTop:2 }}>
+                        <button onClick={() => gerarReciboPDF(m, c.dataPagamento, c.obs)} style={{ fontSize:11, padding:"3px 8px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, cursor:"pointer", fontWeight:600, marginTop:2 }}>
                           📄 Recibo
                         </button>
                       )}
@@ -1979,7 +2013,7 @@ export default function App() {
           ))}
           <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={salvarEdicaoMorador} style={{ padding:"10px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(13,148,136,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Salvar</button>
+            <button onClick={salvarEdicaoMorador} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Salvar</button>
           </div>
         </Modal>
       )}
@@ -2018,11 +2052,11 @@ export default function App() {
                 <input type="time" value={novoAcesso.horaEntrada} onChange={e=>setNovoAcesso(p=>({...p,horaEntrada:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
               </div>
             </div>
-            <p style={{ fontSize:11, color:"#9aa6b5", margin:0 }}>Se data/hora ficarem em branco, serão preenchidas automaticamente com o momento atual.</p>
+            <p style={{ fontSize:11, color:D.textMut, fontFamily:D.fontBody, margin:0 }}>Se data/hora ficarem em branco, serão preenchidas automaticamente com o momento atual.</p>
           </div>
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={registrarAcesso} style={{ padding:"10px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(13,148,136,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
+            <button onClick={registrarAcesso} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
           </div>
         </Modal>
       )}
@@ -2054,7 +2088,7 @@ export default function App() {
           <input ref={fileRefDespesa} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f=e.target.files[0]; if(f) setNovaDespesa(p=>({...p,arquivo:f,arquivoNome:f.name})); }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={adicionarDespesa} style={{ padding:"10px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(13,148,136,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
+            <button onClick={adicionarDespesa} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
           </div>
         </Modal>
       )}
@@ -2067,7 +2101,7 @@ export default function App() {
           <textarea value={novoServico.descricao} onChange={e=>setNovoServico(p=>({...p,descricao:e.target.value}))} placeholder="Detalhes do serviço" rows={3} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text, fontFamily:"inherit", resize:"vertical" }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={adicionarServico} style={{ padding:"10px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(13,148,136,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
+            <button onClick={adicionarServico} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
           </div>
         </Modal>
       )}
@@ -2098,7 +2132,7 @@ export default function App() {
           <textarea value={concluirForm.obs} onChange={e=>setConcluirForm(p=>({...p,obs:e.target.value}))} rows={2} placeholder="Ex: Trocado motor do portão" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text, fontFamily:"inherit", resize:"vertical" }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
-            <button onClick={() => concluirServico(modal.data.id)} style={{ padding:"10px 20px", background:D.success, color:"#fff", border:"none", borderRadius:D.radiusSm, boxShadow:`0 2px 8px rgba(5,150,105,0.35)`, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Confirmar</button>
+            <button onClick={() => concluirServico(modal.data.id)} style={{ padding:"10px 20px", background:D.success, color:"#fff", border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Confirmar</button>
           </div>
         </Modal>
       )}

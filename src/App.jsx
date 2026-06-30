@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { auth, db } from "./firebase";
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "firebase/auth";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import emailjs from "@emailjs/browser";
@@ -251,15 +251,38 @@ const AreaChart = ({ dadosMes, mesesLabel }) => {
   );
 };
 
-// ── Login ──
+// ── Determina o plano pela faixa de tamanho ──
+const planoPorTamanho = (numApt) => {
+  const n = parseInt(numApt) || 0;
+  if (n <= 20) return "basico";
+  if (n <= 50) return "padrao";
+  return "avancado";
+};
+
+// ── Gera um id de condomínio a partir do nome ──
+const gerarCondId = (nome) => {
+  const base = nome.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 20);
+  return `${base}${Date.now().toString().slice(-5)}`;
+};
+
+// ── Login / Cadastro ──
 const Login = () => {
+  const [modo, setModo]   = useState("login"); // "login" | "cadastro"
   const [email, setEmail] = useState("");
   const [pass, setPass]   = useState("");
   const [verPass, setVerPass] = useState(false);
   const [err, setErr]     = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handle = async () => {
+  // Campos do cadastro
+  const [nomeSindico, setNomeSindico] = useState("");
+  const [nomeCond, setNomeCond]       = useState("");
+  const [numApt, setNumApt]           = useState("");
+
+  const handleLogin = async () => {
     setErr("");
     if (!email || !pass) { setErr("Preencha e-mail e senha."); return; }
     setLoading(true);
@@ -268,37 +291,130 @@ const Login = () => {
     finally { setLoading(false); }
   };
 
+  const handleCadastro = async () => {
+    setErr("");
+    if (!nomeSindico || !email || !pass || !nomeCond || !numApt) {
+      setErr("Preencha todos os campos."); return;
+    }
+    if (pass.length < 6) { setErr("A senha deve ter no mínimo 6 caracteres."); return; }
+    setLoading(true);
+    try {
+      // 1. Cria a conta (faz login automático)
+      const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
+      const uid = cred.user.uid;
+      const condId = gerarCondId(nomeCond);
+      const plano = planoPorTamanho(numApt);
+
+      // 2. Cria o condomínio
+      await setDoc(doc(db, "condominios", condId), {
+        nome: nomeCond.trim(),
+        plano,
+        numApartamentos: parseInt(numApt) || 0,
+        taxa: 180,
+        diaVencimento: 10,
+        sindicoEmail: email.trim(),
+        sindicoNome: nomeSindico.trim(),
+        sindicoUid: uid,
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
+        ativo: true,
+        // Teste grátis de 14 dias
+        trialAte: new Date(Date.now() + 14*24*60*60*1000).toLocaleDateString("pt-BR"),
+        statusAssinatura: "trial",
+      });
+
+      // 3. Vincula usuário → condomínio
+      await setDoc(doc(db, "usuarios", uid), {
+        email: email.trim(),
+        nome: nomeSindico.trim(),
+        condominioId: condId,
+        papel: "sindico",
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
+      });
+      // O onAuthStateChanged já vai detectar o login e carregar o condomínio
+    } catch (e) {
+      if (e.code === "auth/email-already-in-use") setErr("Este e-mail já está cadastrado. Faça login.");
+      else if (e.code === "auth/invalid-email") setErr("E-mail inválido.");
+      else if (e.code === "auth/weak-password") setErr("Senha muito fraca (mínimo 6 caracteres).");
+      else setErr("Erro ao criar conta. Tente novamente.");
+      setLoading(false);
+    }
+  };
+
+  const inputStyle = { width:"100%", padding:"12px 14px", border:`1.5px solid ${D.border}`, borderRadius:10, fontSize:15, color:D.text, outline:"none", boxSizing:"border-box", transition:"border .2s", fontFamily:D.fontBody };
+  const labelStyle = { display:"block", fontSize:11, fontWeight:700, color:D.textSec, marginBottom:7, textTransform:"uppercase", letterSpacing:1 };
+
   return (
     <div style={{ minHeight:"100vh", background:D.sidebar, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontBody, padding:16, position:"relative", overflow:"hidden" }}>
-      {/* Padrão decorativo */}
-      <div style={{ position:"absolute", inset:0, backgroundImage:`radial-gradient(circle at 20% 20%, rgba(13,148,136,0.15) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(13,148,136,0.1) 0%, transparent 50%)`, pointerEvents:"none" }} />
-      <div style={{ background:"#fff", borderRadius:20, padding:"40px 36px", width:"100%", maxWidth:420, boxShadow:"0 32px 80px rgba(0,0,0,0.4)", position:"relative" }}>
+      <div style={{ position:"absolute", inset:0, backgroundImage:`radial-gradient(circle at 20% 20%, rgba(75,114,196,0.18) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(75,114,196,0.12) 0%, transparent 50%)`, pointerEvents:"none" }} />
+      <div style={{ background:"#fff", borderRadius:20, padding:"40px 36px", width:"100%", maxWidth:430, boxShadow:"0 32px 80px rgba(0,0,0,0.4)", position:"relative", maxHeight:"94vh", overflowY:"auto" }}>
         {/* Logo */}
-        <div style={{ textAlign:"center", marginBottom:32 }}>
-          <div style={{ width:64, height:64, borderRadius:16, background:`linear-gradient(135deg, ${D.primary}, ${D.primaryDk})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", boxShadow:`0 8px 24px rgba(13,148,136,0.35)` }}>
-            <span style={{ color:"#fff", fontFamily:D.fontDisplay, fontSize:22, fontWeight:700 }}>VR</span>
+        <div style={{ textAlign:"center", marginBottom:28 }}>
+          <div style={{ width:60, height:60, borderRadius:16, background:`linear-gradient(135deg, ${D.accent}, ${D.primary})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", boxShadow:`0 8px 24px rgba(30,58,114,0.35)` }}>
+            <span style={{ color:"#fff", fontFamily:D.fontDisplay, fontSize:20, fontWeight:700 }}>🏢</span>
           </div>
-          <h1 style={{ fontFamily:D.fontDisplay, fontSize:24, color:D.text, margin:0, fontWeight:700, letterSpacing:"-0.02em" }}>Vila Real 140</h1>
-          <p style={{ color:D.textSec, fontSize:13, margin:"6px 0 0", letterSpacing:".2px" }}>Sistema de Gestão Condominial</p>
+          <h1 style={{ fontFamily:D.fontDisplay, fontSize:23, color:D.text, margin:0, fontWeight:700, letterSpacing:"-0.02em" }}>
+            {modo === "login" ? "Bem-vindo de volta" : "Criar conta grátis"}
+          </h1>
+          <p style={{ color:D.textSec, fontSize:13, margin:"6px 0 0" }}>
+            {modo === "login" ? "Acesse o painel de gestão do seu condomínio" : "14 dias grátis · sem cartão de crédito"}
+          </p>
         </div>
-        <div style={{ marginBottom:16 }}>
-          <label style={{ display:"block", fontSize:11, fontWeight:700, color:D.textSec, marginBottom:7, textTransform:"uppercase", letterSpacing:1 }}>E-mail</label>
-          <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="seu@email.com" style={{ width:"100%", padding:"12px 14px", border:`1.5px solid ${D.border}`, borderRadius:10, fontSize:15, color:D.text, outline:"none", boxSizing:"border-box", transition:"border .2s" }} onFocus={e=>e.target.style.borderColor=D.primary} onBlur={e=>e.target.style.borderColor=D.border} />
+
+        {modo === "cadastro" && (
+          <>
+            <div style={{ marginBottom:14 }}>
+              <label style={labelStyle}>Seu nome</label>
+              <input value={nomeSindico} onChange={e=>setNomeSindico(e.target.value)} placeholder="Ex: João Silva" style={inputStyle} onFocus={e=>e.target.style.borderColor=D.accent} onBlur={e=>e.target.style.borderColor=D.border} />
+            </div>
+            <div style={{ marginBottom:14 }}>
+              <label style={labelStyle}>Nome do condomínio</label>
+              <input value={nomeCond} onChange={e=>setNomeCond(e.target.value)} placeholder="Ex: Residencial das Flores" style={inputStyle} onFocus={e=>e.target.style.borderColor=D.accent} onBlur={e=>e.target.style.borderColor=D.border} />
+            </div>
+            <div style={{ marginBottom:14 }}>
+              <label style={labelStyle}>Número de apartamentos</label>
+              <input type="number" value={numApt} onChange={e=>setNumApt(e.target.value)} placeholder="Ex: 24" style={inputStyle} onFocus={e=>e.target.style.borderColor=D.accent} onBlur={e=>e.target.style.borderColor=D.border} />
+              {numApt && (
+                <p style={{ fontSize:11, color:D.accent, margin:"6px 0 0", fontWeight:600 }}>
+                  Plano sugerido: {PLANOS[planoPorTamanho(numApt)].nome} (R$ {PLANOS[planoPorTamanho(numApt)].preco}/mês após o teste)
+                </p>
+              )}
+            </div>
+          </>
+        )}
+
+        <div style={{ marginBottom:14 }}>
+          <label style={labelStyle}>E-mail</label>
+          <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&(modo==="login"?handleLogin():handleCadastro())} placeholder="seu@email.com" style={inputStyle} onFocus={e=>e.target.style.borderColor=D.accent} onBlur={e=>e.target.style.borderColor=D.border} />
         </div>
-        <div style={{ marginBottom:24 }}>
-          <label style={{ display:"block", fontSize:11, fontWeight:700, color:D.textSec, marginBottom:7, textTransform:"uppercase", letterSpacing:1 }}>Senha</label>
+        <div style={{ marginBottom:20 }}>
+          <label style={labelStyle}>Senha</label>
           <div style={{ position:"relative" }}>
-            <input type={verPass?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="••••••••" style={{ width:"100%", padding:"12px 44px 12px 14px", border:`1.5px solid ${D.border}`, borderRadius:10, fontSize:15, color:D.text, outline:"none", boxSizing:"border-box", transition:"border .2s" }} onFocus={e=>e.target.style.borderColor=D.primary} onBlur={e=>e.target.style.borderColor=D.border} />
+            <input type={verPass?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&(modo==="login"?handleLogin():handleCadastro())} placeholder={modo==="cadastro"?"Mínimo 6 caracteres":"••••••••"} style={{ ...inputStyle, paddingRight:44 }} onFocus={e=>e.target.style.borderColor=D.accent} onBlur={e=>e.target.style.borderColor=D.border} />
             <button type="button" onClick={()=>setVerPass(v=>!v)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", fontSize:17, padding:4, lineHeight:1, color:D.textMut }}>
               {verPass?"🙈":"👁️"}
             </button>
           </div>
         </div>
-        {err && <div style={{ background:"#FEE2E2", color:"#991B1B", fontSize:13, padding:"10px 14px", borderRadius:8, marginBottom:16, textAlign:"center" }}>{err}</div>}
-        <button onClick={handle} disabled={loading} style={{ width:"100%", padding:"14px", background:`linear-gradient(135deg, ${D.primary}, ${D.primaryDk})`, color:"#fff", border:"none", borderRadius:10, fontSize:15, fontWeight:700, cursor: loading?"default":"pointer", opacity: loading?.75:1, letterSpacing:".3px", boxShadow:`0 4px 16px rgba(13,148,136,0.35)` }}>
-          {loading?"Verificando...":"Entrar"}
+
+        {err && <div style={{ background:D.dangerBg, color:"#991B1B", fontSize:13, padding:"10px 14px", borderRadius:8, marginBottom:16, textAlign:"center" }}>{err}</div>}
+
+        <button onClick={modo==="login"?handleLogin:handleCadastro} disabled={loading} style={{ width:"100%", padding:"14px", background:`linear-gradient(135deg, ${D.accent}, ${D.primary})`, color:"#fff", border:"none", borderRadius:10, fontSize:15, fontWeight:700, cursor: loading?"default":"pointer", opacity: loading?.75:1, letterSpacing:".3px", boxShadow:`0 4px 16px rgba(30,58,114,0.35)`, fontFamily:D.fontBody }}>
+          {loading ? (modo==="login"?"Verificando...":"Criando conta...") : (modo==="login"?"Entrar":"Criar conta grátis")}
         </button>
-        <p style={{ textAlign:"center", fontSize:11, color:D.textMut, margin:"20px 0 0" }}>Condomínio Vila Real 140 · Sistema Privado</p>
+
+        <div style={{ textAlign:"center", marginTop:20, paddingTop:20, borderTop:`1px solid ${D.border}` }}>
+          {modo === "login" ? (
+            <p style={{ fontSize:13, color:D.textSec, margin:0 }}>
+              Ainda não tem conta?{" "}
+              <button onClick={() => { setModo("cadastro"); setErr(""); }} style={{ background:"none", border:"none", color:D.accent, fontWeight:700, cursor:"pointer", fontSize:13, fontFamily:D.fontBody }}>Criar conta grátis</button>
+            </p>
+          ) : (
+            <p style={{ fontSize:13, color:D.textSec, margin:0 }}>
+              Já tem conta?{" "}
+              <button onClick={() => { setModo("login"); setErr(""); }} style={{ background:"none", border:"none", color:D.accent, fontWeight:700, cursor:"pointer", fontSize:13, fontFamily:D.fontBody }}>Fazer login</button>
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1534,6 +1650,35 @@ export default function App() {
           <div>
             <TopBar title="Visão Geral" user={user} readOnly={readOnly} nPendentes={nPagos} />
             <div style={{ padding: isMobile ? "16px 14px 80px" : "24px 28px 40px" }}>
+
+              {/* Setup wizard — condomínio novo sem moradores */}
+              {!readOnly && moradores.length === 0 && (
+                <div style={{ background:`linear-gradient(135deg, ${D.primary}, ${D.accent})`, borderRadius:D.radius, padding: isMobile?"24px 20px":"32px 36px", marginBottom:24, color:"#fff", boxShadow:`0 8px 32px rgba(30,58,114,0.3)` }}>
+                  <div style={{ fontSize:32, marginBottom:12 }}>👋</div>
+                  <h2 style={{ fontFamily:D.fontDisplay, fontSize: isMobile?20:24, fontWeight:700, margin:"0 0 8px", letterSpacing:"-0.02em" }}>
+                    Bem-vindo ao {condominio?.nome || "seu condomínio"}!
+                  </h2>
+                  <p style={{ fontFamily:D.fontBody, fontSize:14, opacity:.9, lineHeight:1.6, margin:"0 0 20px", maxWidth:520 }}>
+                    Seu painel está pronto. Vamos configurar tudo em 3 passos rápidos para você começar a gerir as cobranças.
+                  </p>
+                  <div style={{ display:"flex", flexDirection:"column", gap:10, maxWidth:520 }}>
+                    {[
+                      { n:1, titulo:"Cadastre os moradores", desc:"Adicione as unidades e os contatos de cada apartamento", aba:"moradores", feito: moradores.length > 0 },
+                      { n:2, titulo:"Defina a taxa e o vencimento", desc:"Configure o valor mensal e o dia de vencimento", aba:"config", feito: false },
+                      { n:3, titulo:"Comece a registrar pagamentos", desc:"Acompanhe quem pagou e envie lembretes automáticos", aba:"cobrancas", feito: false },
+                    ].map(passo => (
+                      <button key={passo.n} onClick={() => setAba(passo.aba)} style={{ display:"flex", alignItems:"center", gap:14, background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:D.radiusSm, padding:"14px 16px", cursor:"pointer", textAlign:"left", color:"#fff", fontFamily:D.fontBody }}>
+                        <div style={{ width:32, height:32, borderRadius:"50%", background:"rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:15, flexShrink:0 }}>{passo.n}</div>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:14, fontWeight:600 }}>{passo.titulo}</div>
+                          <div style={{ fontSize:12, opacity:.8, marginTop:2 }}>{passo.desc}</div>
+                        </div>
+                        <span style={{ fontSize:18, opacity:.7 }}>→</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Stat Cards */}
               <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(4,1fr)", gap:isMobile?10:16, marginBottom:20 }}>

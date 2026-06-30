@@ -27,11 +27,26 @@ const MOCK_MORADORES = [
 const VISITANTE_EMAIL = "visitante@vilareal140-ddf4d.firebaseapp.com";
 const VISITANTE_SENHA = "VisualizarVR140";
 
+// ── Multi-tenant ──
+// Cada condomínio é identificado por um condominioId. Coleções "globais"
+// como condominios/usuarios não levam o filtro; as demais sempre filtram.
+const PLANOS = {
+  cortesia:  { nome:"Cortesia",  limite: 9999, preco: 0,   cor:"#6B7A9E" },
+  basico:    { nome:"Básico",    limite: 20,   preco: 79,  cor:"#22A26B" },
+  padrao:    { nome:"Padrão",    limite: 50,   preco: 149, cor:"#4B72C4" },
+  avancado:  { nome:"Avançado",  limite: 100,  preco: 249, cor:"#1E3A72" },
+};
+
 const modoVisitante = typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).get("visualizar") === "1";
 
 const portalMoradorId = typeof window !== "undefined"
   ? new URLSearchParams(window.location.search).get("morador")
+  : null;
+
+// condomínio passado no link do morador/visitante (ex: ?cond=vilareal140&morador=ID)
+const condParam = typeof window !== "undefined"
+  ? new URLSearchParams(window.location.search).get("cond")
   : null;
 
 const mesAtual = () => {
@@ -322,6 +337,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     setEnviandoReserva(true);
     try {
       await addDoc(collection(db, "reservas"), {
+        condominioId: morador.condominioId || null,
         moradorId, nome: morador.nome, unidade: morador.unidade,
         area: formReserva.area, data: formReserva.data, horario: formReserva.horario,
         observacao: formReserva.observacao || "",
@@ -354,7 +370,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     <div style={{ minHeight:"100vh", background:"#F0F4F8", fontFamily:D.fontBody }}>
       {/* Cabeçalho */}
       <div style={{ background:`linear-gradient(135deg, ${D.sidebar}, ${D.primary})`, padding: isMobile ? "24px 20px" : "32px 40px", color:"#fff" }}>
-        <div style={{ fontSize:13, opacity:.7, marginBottom:6 }}>🏢 Condomínio Vila Real 140</div>
+        <div style={{ fontSize:13, opacity:.7, marginBottom:6 }}>🏢 {morador.condominioNome || "Condomínio"}</div>
         <h1 style={{ fontFamily:D.fontDisplay, fontSize: isMobile?22:28, margin:"0 0 4px", fontWeight:700, letterSpacing:"-0.02em" }}>{morador.nome}</h1>
         <div style={{ fontSize:14, opacity:.85 }}>{morador.unidade}{morador.proprietario ? ` · Prop: ${morador.proprietario}` : ""}</div>
         {morador.email && <div style={{ fontSize:12, opacity:.7, marginTop:4 }}>📧 {morador.email}</div>}
@@ -485,7 +501,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
         </div>
 
         <div style={{ textAlign:"center", marginTop:24, fontSize:11, color:D.textMut, fontFamily:D.fontBody }}>
-          Vila Real 140 · Portal do Morador · Acesso somente leitura
+          {morador.condominioNome || "Condomínio"} · Portal do Morador
         </div>
       </div>
     </div>
@@ -496,6 +512,9 @@ export default function App() {
   const isMobile = useIsMobile();
   const [user, setUser]             = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [condominioId, setCondominioId] = useState(null);
+  const [condominio, setCondominio]   = useState(null); // { nome, plano, numApartamentos, ... }
+  const [condCarregado, setCondCarregado] = useState(false);
   const [aba, setAba]               = useState("dashboard");
   const [moradores, setMoradores]   = useState([]);
   const [cobrancas, setCobrancas]   = useState([]);
@@ -538,58 +557,83 @@ export default function App() {
 
   const readOnly = user?.email === VISITANTE_EMAIL;
 
-  // ── Firestore listeners ──
+  // ── Carregar o condomínio vinculado ao usuário (multi-tenant) ──
   useEffect(() => {
-    if (!user) return;
-    const u1 = onSnapshot(collection(db, "moradores"), s => setMoradores(s.docs.map(d => ({ id:d.id, ...d.data() }))));
-    const u2 = onSnapshot(collection(db, "cobrancas"), s => setCobrancas(s.docs.map(d => d.data())));
-    const u3 = onSnapshot(doc(db, "config", "geral"),  d => {
+    if (!user) { setCondCarregado(false); return; }
+
+    // Modo visitante/morador: o condomínio vem do parâmetro ?cond= da URL
+    if (readOnly && condParam) {
+      setCondominioId(condParam);
+      getDoc(doc(db, "condominios", condParam)).then(snap => {
+        if (snap.exists()) setCondominio({ id:snap.id, ...snap.data() });
+        setCondCarregado(true);
+      }).catch(() => setCondCarregado(true));
+      return;
+    }
+
+    // Síndico: busca o vínculo usuario → condominioId
+    (async () => {
+      try {
+        const uSnap = await getDoc(doc(db, "usuarios", user.uid));
+        if (uSnap.exists() && uSnap.data().condominioId) {
+          const cId = uSnap.data().condominioId;
+          setCondominioId(cId);
+          const cSnap = await getDoc(doc(db, "condominios", cId));
+          if (cSnap.exists()) setCondominio({ id:cSnap.id, ...cSnap.data() });
+        } else {
+          // Sem vínculo — usuário ainda não tem condomínio (será tratado na Fase 2)
+          setCondominioId(null);
+          setCondominio(null);
+        }
+      } catch (e) {
+        console.error("Erro ao carregar condomínio:", e);
+      } finally {
+        setCondCarregado(true);
+      }
+    })();
+  }, [user, readOnly]);
+
+  // ── Firestore listeners (filtrados por condomínio) ──
+  useEffect(() => {
+    if (!user || !condominioId) return;
+    const byCond = (col) => query(collection(db, col), where("condominioId", "==", condominioId));
+
+    const u1 = onSnapshot(byCond("moradores"), s => setMoradores(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const u2 = onSnapshot(byCond("cobrancas"), s => setCobrancas(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const u4 = onSnapshot(byCond("despesas"),  s => setDespesas(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const u5 = onSnapshot(byCond("servicos"),  s => setServicos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const u7 = onSnapshot(byCond("logs"),      s => setLogs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u8 = onSnapshot(byCond("acessos"),   s => setAcessos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u9 = onSnapshot(byCond("reservas"),  s => setReservas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+
+    // Config (taxa/dia de vencimento) vem do próprio documento do condomínio
+    const u3 = onSnapshot(doc(db, "condominios", condominioId), d => {
       if (d.exists()) {
-        setTaxa(d.data().taxa ?? 180);
-        setDiaVencimento(d.data().diaVencimento ?? 10);
+        const data = d.data();
+        setCondominio({ id:d.id, ...data });
+        setTaxa(data.taxa ?? 180);
+        setDiaVencimento(data.diaVencimento ?? 10);
       }
     });
-    const u4 = onSnapshot(collection(db, "despesas"),  s => setDespesas(s.docs.map(d => ({ id:d.id, ...d.data() }))));
-    const u5 = onSnapshot(collection(db, "servicos"),  s => setServicos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
-    const u6 = onSnapshot(doc(db, "observacoes", mesSel), d => {
+    // Observações: doc com id composto condominioId_mes
+    const u6 = onSnapshot(doc(db, "observacoes", `${condominioId}_${mesSel}`), d => {
       const texto = d.exists() ? (d.data().texto || "") : "";
       setObsMes(texto); setObsSalva(texto);
     });
-    const u7 = onSnapshot(
-      query(collection(db, "logs")),
-      s => setLogs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
-    );
-    const u8 = onSnapshot(collection(db, "acessos"),
-      s => setAcessos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
-    );
-    const u9 = onSnapshot(collection(db, "reservas"),
-      s => setReservas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
-    );
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); };
-  }, [user]);
 
-  // ── Popular na primeira vez ──
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const snap = await getDocs(collection(db, "moradores"));
-      if (snap.empty) {
-        const batch = writeBatch(db);
-        MOCK_MORADORES.forEach(m => {
-          const ref = doc(collection(db, "moradores"));
-          batch.set(ref, m);
-          batch.set(doc(db, "cobrancas", `${ref.id}_${mesAtual()}`), { moradorId:ref.id, mes:mesAtual(), status:"pendente", comprovante:null, dataPagamento:null, obs:"" });
-        });
-        await batch.commit();
-      }
-    })();
-  }, [user]);
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); };
+  }, [user, condominioId, mesSel]);
+
+  // (Removido o auto-popular com MOCK_MORADORES — no multi-tenant cada
+  //  condomínio cadastra seus próprios moradores via a página de setup.)
+
 
   const showToast = (msg, type="success") => setToast({ msg, type });
 
   const registrarLog = async (icone, descricao) => {
     try {
       await addDoc(collection(db, "logs"), {
+        condominioId,
         icone,
         descricao,
         usuario: user?.email || "sistema",
@@ -613,16 +657,18 @@ export default function App() {
   const saldoCaixa = totalEntradas - totalSaidasDespesas - totalSaidasServicos;
 
   const garantirMes = async (mes) => {
+    if (!condominioId) return;
     const existentes = new Set(cobrancas.filter(c => c.mes === mes).map(c => c.moradorId));
     const batch = writeBatch(db); let mudou = false;
     moradores.forEach(m => {
-      if (!existentes.has(m.id)) { batch.set(doc(db, "cobrancas", `${m.id}_${mes}`), { moradorId:m.id, mes, status:"pendente", comprovante:null, dataPagamento:null, obs:"" }); mudou=true; }
+      if (!existentes.has(m.id)) { batch.set(doc(db, "cobrancas", `${condominioId}_${m.id}_${mes}`), { condominioId, moradorId:m.id, mes, status:"pendente", comprovante:null, dataPagamento:null, obs:"" }); mudou=true; }
     });
     if (mudou) await batch.commit();
   };
 
   // ── Marcar cobranças vencidas como "atrasado" ──
   const atualizarAtrasados = async () => {
+    if (!condominioId) return;
     const hoje = new Date();
     hoje.setHours(0,0,0,0);
     const batch = writeBatch(db);
@@ -632,7 +678,7 @@ export default function App() {
       const venc = dataVencimentoMes(c.mes);
       venc.setHours(0,0,0,0);
       if (hoje > venc) {
-        batch.set(doc(db, "cobrancas", `${c.moradorId}_${c.mes}`), { status:"atrasado" }, { merge:true });
+        batch.set(doc(db, "cobrancas", `${condominioId}_${c.moradorId}_${c.mes}`), { status:"atrasado" }, { merge:true });
         mudou = true;
       }
     });
@@ -640,16 +686,16 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (user && moradores.length > 0) {
+    if (user && condominioId && moradores.length > 0) {
       garantirMes(mesSel);
       atualizarAtrasados();
     }
-  }, [user, moradores.length, cobrancas.length, diaVencimento]);
+  }, [user, condominioId, moradores.length, cobrancas.length, diaVencimento]);
 
   const mudarMes = async (m) => {
     setMesSel(m);
     garantirMes(m);
-    const snap = await getDoc(doc(db, "observacoes", m));
+    const snap = await getDoc(doc(db, "observacoes", `${condominioId}_${m}`));
     const texto = snap.exists() ? (snap.data().texto || "") : "";
     setObsMes(texto);
     setObsSalva(texto);
@@ -745,7 +791,7 @@ export default function App() {
     const morador = moradores.find(m => m.id === moradorId);
     const dataPgto = new Date().toLocaleDateString("pt-BR");
     const salvar = async (base64="") => {
-      await setDoc(doc(db, "cobrancas", `${moradorId}_${mesSel}`), { moradorId, mes:mesSel, status:"pago", dataPagamento:dataPgto, obs:pagForm.obs, comprovante:base64, arquivoNome:pagForm.arquivoNome }, { merge:true });
+      await setDoc(doc(db, "cobrancas", `${condominioId}_${moradorId}_${mesSel}`), { condominioId, moradorId, mes:mesSel, status:"pago", dataPagamento:dataPgto, obs:pagForm.obs, comprovante:base64, arquivoNome:pagForm.arquivoNome }, { merge:true });
       setModal(null); setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
       showToast("Pagamento registrado! Recibo e e-mail enviados.");
       if (morador) {
@@ -774,7 +820,7 @@ export default function App() {
     const hoje = new Date(); hoje.setHours(0,0,0,0);
     const venc = dataVencimentoMes(mesSel); venc.setHours(0,0,0,0);
     const novoStatus = hoje > venc ? "atrasado" : "pendente";
-    await setDoc(doc(db, "cobrancas", `${moradorId}_${mesSel}`), { moradorId, mes:mesSel, status:novoStatus, dataPagamento:null, obs:"", comprovante:null, arquivoNome:"" }, { merge:true });
+    await setDoc(doc(db, "cobrancas", `${condominioId}_${moradorId}_${mesSel}`), { condominioId, moradorId, mes:mesSel, status:novoStatus, dataPagamento:null, obs:"", comprovante:null, arquivoNome:"" }, { merge:true });
     const m = moradores.find(x => x.id === moradorId);
     registrarLog("↩️", `Pagamento estornado: ${m?.nome || moradorId} (${m?.unidade || ""}) — ${mesLabel(mesSel)}`);
     setModal(null); showToast("Pagamento estornado.", "error");
@@ -783,8 +829,8 @@ export default function App() {
   // ── Moradores ──
   const adicionarMorador = async () => {
     if (!novoMorador.nome || !novoMorador.unidade || !novoMorador.email) { showToast("Preencha nome, unidade e e-mail.", "error"); return; }
-    const ref = await addDoc(collection(db, "moradores"), novoMorador);
-    await setDoc(doc(db, "cobrancas", `${ref.id}_${mesSel}`), { moradorId:ref.id, mes:mesSel, status:"pendente", comprovante:null, dataPagamento:null, obs:"" });
+    const ref = await addDoc(collection(db, "moradores"), { ...novoMorador, condominioId });
+    await setDoc(doc(db, "cobrancas", `${condominioId}_${ref.id}_${mesSel}`), { condominioId, moradorId:ref.id, mes:mesSel, status:"pendente", comprovante:null, dataPagamento:null, obs:"" });
     registrarLog("👤", `Morador cadastrado: ${novoMorador.nome} (${novoMorador.unidade})`);
     setNovoMorador({ nome:"", unidade:"", email:"", telefone:"" }); setModal(null); showToast("Morador cadastrado!");
   };
@@ -812,7 +858,7 @@ export default function App() {
   const adicionarDespesa = () => {
     if (!novaDespesa.valor || !novaDespesa.mes) { showToast("Preencha o valor e o mês.", "error"); return; }
     const salvar = async (base64="") => {
-      await addDoc(collection(db, "despesas"), { tipo:novaDespesa.tipo, descricao:novaDespesa.descricao, valor:parseFloat(novaDespesa.valor)||0, mes:novaDespesa.mes, status:"pendente", dataPagamento:null, comprovante:base64, arquivoNome:novaDespesa.arquivoNome });
+      await addDoc(collection(db, "despesas"), { condominioId, tipo:novaDespesa.tipo, descricao:novaDespesa.descricao, valor:parseFloat(novaDespesa.valor)||0, mes:novaDespesa.mes, status:"pendente", dataPagamento:null, comprovante:base64, arquivoNome:novaDespesa.arquivoNome });
       registrarLog("💧", `Despesa registrada: ${novaDespesa.descricao||novaDespesa.tipo} — R$ ${novaDespesa.valor} (${mesLabel(novaDespesa.mes)})`);
       setNovaDespesa({ tipo:"agua", descricao:"", valor:"", mes:mesAtual(), arquivo:null, arquivoNome:"" }); setModal(null); showToast("Despesa registrada!");
     };
@@ -835,7 +881,7 @@ export default function App() {
   // ── Serviços ──
   const adicionarServico = async () => {
     if (!novoServico.titulo) { showToast("Dê um título ao serviço.","error"); return; }
-    await addDoc(collection(db,"servicos"), { titulo:novoServico.titulo, descricao:novoServico.descricao, status:"pendente", dataAbertura:new Date().toLocaleDateString("pt-BR"), dataInicio:null, dataFim:null, valorMaterial:null, valorMaoDeObra:null, obsConclusao:"" });
+    await addDoc(collection(db,"servicos"), { condominioId, titulo:novoServico.titulo, descricao:novoServico.descricao, status:"pendente", dataAbertura:new Date().toLocaleDateString("pt-BR"), dataInicio:null, dataFim:null, valorMaterial:null, valorMaoDeObra:null, obsConclusao:"" });
     registrarLog("🔧", `Serviço registrado: ${novoServico.titulo}`);
     setNovoServico({ titulo:"", descricao:"" }); setModal(null); showToast("Serviço registrado!");
   };
@@ -866,6 +912,7 @@ export default function App() {
     const dataHoje = hoje.toLocaleDateString("pt-BR");
     const horaAgora = hoje.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" });
     await addDoc(collection(db, "acessos"), {
+      condominioId,
       ...novoAcesso,
       dataEntrada: novoAcesso.dataEntrada || dataHoje,
       horaEntrada: novoAcesso.horaEntrada || horaAgora,
@@ -895,6 +942,7 @@ export default function App() {
     const conflito = reservas.find(r => r.area === form.area && r.data === form.data && r.status === "aprovada");
     if (conflito) { showToast(`Já existe reserva aprovada para ${form.area} nessa data.`, "error"); return false; }
     await addDoc(collection(db, "reservas"), {
+      condominioId,
       moradorId, nome: morador.nome, unidade: morador.unidade,
       area: form.area, data: form.data, horario: form.horario,
       observacao: form.observacao || "",
@@ -933,16 +981,16 @@ export default function App() {
     showToast(`📧 Lembretes para ${dev.length} morador(es): ${dev.map(d=>`${d.nome}`).join(", ")}`);
   };
 
-  const salvarTaxa = async (v) => { await setDoc(doc(db,"config","geral"), { taxa:v }, { merge:true }); showToast("Taxa atualizada!"); };
+  const salvarTaxa = async (v) => { await setDoc(doc(db,"condominios",condominioId), { taxa:v }, { merge:true }); showToast("Taxa atualizada!"); };
 
   const salvarObsMes = async () => {
-    await setDoc(doc(db, "observacoes", mesSel), { texto: obsMes, mes: mesSel, atualizadoEm: new Date().toLocaleString("pt-BR") }, { merge:true });
+    await setDoc(doc(db, "observacoes", `${condominioId}_${mesSel}`), { condominioId, texto: obsMes, mes: mesSel, atualizadoEm: new Date().toLocaleString("pt-BR") }, { merge:true });
     setObsSalva(obsMes);
     showToast("Observação salva!");
   };
 
   const salvarDiaVencimento = async (v) => {
-    await setDoc(doc(db,"config","geral"), { diaVencimento: parseInt(v) }, { merge:true });
+    await setDoc(doc(db,"condominios",condominioId), { diaVencimento: parseInt(v) }, { merge:true });
     showToast("Dia de vencimento salvo!");
   };
 
@@ -1319,6 +1367,27 @@ export default function App() {
     return <PortalMorador moradorId={portalMoradorId} db={db} taxa={taxa} mesLabel={mesLabel} mesAtual={mesAtual} />;
   }
 
+  // ── Carregando dados do condomínio ──
+  if (!condCarregado) return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:D.sidebar, color:"#fff", fontFamily:D.fontBody }}>
+      Carregando condomínio...
+    </div>
+  );
+
+  // ── Síndico autenticado mas sem condomínio vinculado ──
+  if (!condominioId && !readOnly) return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:D.sidebar, color:"#fff", fontFamily:D.fontBody, padding:24 }}>
+      <div style={{ background:"#fff", borderRadius:D.radius, padding:"36px 32px", maxWidth:440, textAlign:"center", boxShadow:D.shadowMd }}>
+        <div style={{ fontSize:40, marginBottom:14 }}>🏢</div>
+        <h2 style={{ fontFamily:D.fontDisplay, color:D.text, fontSize:20, margin:"0 0 10px", letterSpacing:"-0.02em" }}>Conta sem condomínio</h2>
+        <p style={{ fontFamily:D.fontBody, color:D.textSec, fontSize:14, lineHeight:1.6, margin:"0 0 20px" }}>
+          Sua conta ainda não está vinculada a nenhum condomínio. Se você é o administrador, execute a página de migração/configuração para vincular seu condomínio.
+        </p>
+        <button onClick={() => signOut(auth)} style={{ padding:"11px 24px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Sair</button>
+      </div>
+    </div>
+  );
+
   // ── helpers de estilo responsivo ──
   const h2size = isMobile ? 20 : 22;
   const pad    = isMobile ? "16px 16px 100px" : "24px 28px 40px"; // mantido por compatibilidade
@@ -1379,10 +1448,10 @@ export default function App() {
           <div style={{ padding:"22px 18px 18px", borderBottom:`1px solid ${D.sidebarBdr}` }}>
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
               <div style={{ width:36, height:36, borderRadius:9, background:D.accent, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:`0 2px 8px rgba(75,114,196,0.4)` }}>
-                <span style={{ color:"#fff", fontFamily:D.fontDisplay, fontSize:13, fontWeight:700 }}>VR</span>
+                <span style={{ color:"#fff", fontFamily:D.fontDisplay, fontSize:13, fontWeight:700 }}>{(condominio?.nome || "VR").split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()}</span>
               </div>
               <div>
-                <div style={{ fontFamily:D.fontDisplay, fontSize:14, color:D.sidebarFg, fontWeight:600, letterSpacing:"-0.02em", lineHeight:1.2 }}>Vila Real 140</div>
+                <div style={{ fontFamily:D.fontDisplay, fontSize:14, color:D.sidebarFg, fontWeight:600, letterSpacing:"-0.02em", lineHeight:1.2 }}>{condominio?.nome || "Condomínio"}</div>
                 <div style={{ fontFamily:D.fontBody, fontSize:11, color:"rgba(226,232,245,0.4)", marginTop:1 }}>Gestão Condominial</div>
               </div>
             </div>
@@ -1714,7 +1783,7 @@ export default function App() {
                           <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.email}</div>
                           <div style={{ display:"flex", gap:8, marginTop:10, flexWrap:"wrap" }}>
                             <button onClick={() => { setModal({ type:"historico", data:m }); }} style={{ padding:"5px 12px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>📋 Histórico</button>
-                            <button onClick={() => { const link=`${window.location.origin}${window.location.pathname}?morador=${m.id}`; navigator.clipboard.writeText(link); showToast(`Link do ${m.unidade} copiado!`); }} style={{ padding:"5px 12px", background:"#F0FDFA", color:D.success, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🔗 Link</button>
+                            <button onClick={() => { const link=`${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}`; navigator.clipboard.writeText(link); showToast(`Link do ${m.unidade} copiado!`); }} style={{ padding:"5px 12px", background:"#F0FDFA", color:D.success, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🔗 Link</button>
                             {!readOnly && <>
                               <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,email:m.email,telefone:m.telefone||""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 12px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
                               <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"5px 12px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
@@ -1752,7 +1821,7 @@ export default function App() {
                             <td style={{ padding:"14px 20px" }}>
                               <div style={{ display:"flex", gap:6 }}>
                                 <button onClick={() => setModal({ type:"historico", data:m })} style={{ padding:"5px 10px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>📋</button>
-                                <button onClick={() => { const link=`${window.location.origin}${window.location.pathname}?morador=${m.id}`; navigator.clipboard.writeText(link); showToast(`Link do ${m.unidade} copiado!`); }} style={{ padding:"5px 10px", background:"#F0FDFA", color:D.success, border:`1px solid #BBF7D0`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🔗</button>
+                                <button onClick={() => { const link=`${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}`; navigator.clipboard.writeText(link); showToast(`Link do ${m.unidade} copiado!`); }} style={{ padding:"5px 10px", background:"#F0FDFA", color:D.success, border:`1px solid #BBF7D0`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🔗</button>
                                 {!readOnly && <>
                                   <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,email:m.email,telefone:m.telefone||""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 10px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
                                   <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"5px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
@@ -2368,9 +2437,9 @@ export default function App() {
               const m = moradores.find(x=>x.id===novaReserva.moradorId);
               const ok = await solicitarReserva(novaReserva.moradorId, m, novaReserva);
               if (ok) {
-                // síndico aprova automaticamente
-                const snap = await getDocs(collection(db, "reservas"));
-                const ultima = snap.docs.sort((a,b)=>b.data().timestamp-a.data().timestamp)[0];
+                // síndico aprova automaticamente — busca a reserva recém-criada deste morador
+                const snap = await getDocs(query(collection(db, "reservas"), where("condominioId","==",condominioId), where("moradorId","==",novaReserva.moradorId)));
+                const ultima = snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.timestamp-a.timestamp)[0];
                 if (ultima) await aprovarReserva(ultima.id);
                 setModal(null);
               }

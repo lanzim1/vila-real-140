@@ -1378,6 +1378,8 @@ export default function App() {
   const [novoComunicado, setNovoComunicado] = useState({ titulo:"", mensagem:"", fixado:false });
   const [documentos, setDocumentos] = useState([]);
   const [novoDocumento, setNovoDocumento] = useState({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"" });
+  const [fundoMovs, setFundoMovs] = useState([]);
+  const [novaMovFundo, setNovaMovFundo] = useState({ tipo:"aporte", valor:"", descricao:"", data:"" });
   const fileRef        = useRef();
   const fileRefDespesa = useRef();
 
@@ -1479,6 +1481,7 @@ export default function App() {
     const u9 = onSnapshot(byCond("reservas"),  s => setReservas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
     const u10 = onSnapshot(byCond("comunicados"), s => setComunicados(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (b.fixado?1:0)-(a.fixado?1:0) || b.timestamp - a.timestamp)));
     const u11 = onSnapshot(byCond("documentos"), s => setDocumentos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u12 = onSnapshot(byCond("fundo_movs"), s => setFundoMovs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
 
     // Config (taxa/dia de vencimento) vem do próprio documento do condomínio
     const u3 = onSnapshot(doc(db, "condominios", condominioId), d => {
@@ -1495,7 +1498,7 @@ export default function App() {
       setObsMes(texto); setObsSalva(texto);
     });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); };
   }, [user, condominioId, mesSel]);
 
   // (Removido o auto-popular com MOCK_MORADORES — no multi-tenant cada
@@ -1911,6 +1914,35 @@ export default function App() {
     showToast("Documento removido.", "error");
   };
 
+  // ── Fundo de Reserva ──
+  const registrarMovFundo = async () => {
+    const valor = parseFloat(novaMovFundo.valor) || 0;
+    if (valor <= 0) { showToast("Informe um valor válido.", "error"); return; }
+    if (!novaMovFundo.descricao.trim()) { showToast("Informe uma descrição.", "error"); return; }
+    await addDoc(collection(db, "fundo_movs"), {
+      condominioId,
+      tipo: novaMovFundo.tipo, // "aporte" | "retirada"
+      valor,
+      descricao: novaMovFundo.descricao.trim(),
+      data: novaMovFundo.data || new Date().toLocaleDateString("pt-BR"),
+      timestamp: Date.now(),
+    });
+    registrarLog("🏦", `Fundo de reserva: ${novaMovFundo.tipo === "aporte" ? "aporte" : "retirada"} de R$ ${valor.toFixed(2).replace(".",",")} — ${novaMovFundo.descricao.trim()}`);
+    setNovaMovFundo({ tipo:"aporte", valor:"", descricao:"", data:"" });
+    setModal(null);
+    showToast("Movimentação registrada!");
+  };
+
+  const removerMovFundo = async (id) => {
+    await deleteDoc(doc(db, "fundo_movs", id));
+    showToast("Movimentação removida.", "error");
+  };
+
+  const salvarPercentualFundo = async (pct) => {
+    await setDoc(doc(db, "condominios", condominioId), { percentualFundo: pct }, { merge:true });
+    showToast("Percentual do fundo atualizado!");
+  };
+
   // Calcula situação do vencimento de um documento
   const situacaoDoc = (venc) => {
     if (!venc) return { label:"Sem vencimento", cor:D.textMut, bg:D.muted, dias:null };
@@ -2286,6 +2318,7 @@ export default function App() {
     { id:"acessos",     icon:"🚪", label:"Acessos"     },
     { id:"comunicados", icon:"📢", label:"Comunicados" },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
+    { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
     { id:"historico",   icon:"📋", label:"Histórico"   },
     ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config."  }] : []),
   ];
@@ -2300,6 +2333,7 @@ export default function App() {
     { id:"acessos",     icon:"🚪", label:"Acessos"     },
     { id:"comunicados", icon:"📢", label:"Comunicados" },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
+    { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
     { id:"historico",   icon:"📋", label:"Histórico"   },
     ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config." }] : []),
   ];
@@ -2975,9 +3009,9 @@ export default function App() {
 
         {/* ── Serviços ── */}
         {/* Trava de plano: abas bloqueadas para planos inferiores */}
-        {["servicos","reservas","acessos","historico","comunicados","documentos"].includes(aba) && !podeUsar(aba) && (
+        {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva"].includes(aba) && !podeUsar(aba) && (
           <div>
-            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
             <UpgradeCard recurso={aba} planoNecessario={RECURSO_PLANO[aba]} isMobile={isMobile} />
           </div>
         )}
@@ -3362,6 +3396,105 @@ export default function App() {
           </div>
         )}
 
+        {/* ── Fundo de Reserva ── */}
+        {aba === "fundoReserva" && podeUsar("fundoReserva") && (() => {
+          const totalAportes  = fundoMovs.filter(m=>m.tipo==="aporte").reduce((s,m)=>s+(m.valor||0),0);
+          const totalRetiradas= fundoMovs.filter(m=>m.tipo==="retirada").reduce((s,m)=>s+(m.valor||0),0);
+          const saldoFundo    = totalAportes - totalRetiradas;
+          const pctFundo      = condominio?.percentualFundo ?? 10;
+          const arrecadadoMes = pagos * taxa;
+          const aporteSugerido= arrecadadoMes * (pctFundo/100);
+          return (
+          <div>
+            <TopBar title="Fundo de Reserva" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
+
+              {/* Saldo do fundo — hero */}
+              <div style={{ background:`linear-gradient(135deg, ${D.sidebar}, ${D.primary})`, borderRadius:D.radiusXl, padding: isMobile?"22px 20px":"28px 32px", marginBottom:20, color:"#fff", boxShadow:`0 8px 32px rgba(30,58,114,0.3)`, position:"relative", overflow:"hidden" }}>
+                <div style={{ position:"absolute", top:-20, right:-10, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,0.06)", pointerEvents:"none" }} />
+                <div style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, textTransform:"uppercase", letterSpacing:"1px", opacity:.75, marginBottom:8 }}>🏦 Saldo do Fundo de Reserva</div>
+                <div style={{ fontFamily:D.fontDisplay, fontSize: isMobile?30:38, fontWeight:700, letterSpacing:"-0.02em", lineHeight:1, marginBottom:12 }}>R$ {saldoFundo.toFixed(2).replace(".",",")}</div>
+                <div style={{ display:"flex", gap:20, flexWrap:"wrap" }}>
+                  <div>
+                    <div style={{ fontSize:10, opacity:.6, textTransform:"uppercase", letterSpacing:".5px", fontFamily:D.fontBody }}>Total aportado</div>
+                    <div style={{ fontSize:14, fontWeight:600, fontFamily:D.fontBody }}>R$ {totalAportes.toFixed(2).replace(".",",")}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:10, opacity:.6, textTransform:"uppercase", letterSpacing:".5px", fontFamily:D.fontBody }}>Total retirado</div>
+                    <div style={{ fontSize:14, fontWeight:600, fontFamily:D.fontBody }}>R$ {totalRetiradas.toFixed(2).replace(".",",")}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Configuração do percentual + aporte sugerido */}
+              <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"1fr 1fr", gap:14, marginBottom:20 }}>
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"18px 20px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:10, letterSpacing:"-0.02em" }}>Percentual do fundo</div>
+                  <p style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, margin:"0 0 12px", lineHeight:1.5 }}>Percentual da arrecadação mensal destinado ao fundo (comum: 10%).</p>
+                  {!readOnly ? (
+                    <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                      <input type="number" min={0} max={100} defaultValue={pctFundo} id="pctFundoInput" style={{ width:90, padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:15, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
+                      <span style={{ fontFamily:D.fontBody, fontSize:15, color:D.textSec }}>%</span>
+                      <button onClick={()=>{ const v=parseFloat(document.getElementById("pctFundoInput").value)||0; salvarPercentualFundo(v); }} style={{ padding:"9px 16px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Salvar</button>
+                    </div>
+                  ) : (
+                    <div style={{ fontFamily:D.fontDisplay, fontSize:24, fontWeight:700, color:D.text }}>{pctFundo}%</div>
+                  )}
+                </div>
+                <div style={{ background:D.secondary, borderRadius:D.radius, padding:"18px 20px", border:`1px solid ${D.border}` }}>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:10, letterSpacing:"-0.02em" }}>Aporte sugerido do mês</div>
+                  <p style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, margin:"0 0 8px", lineHeight:1.5 }}>{pctFundo}% de R$ {arrecadadoMes.toFixed(2).replace(".",",")} arrecadados em {mesLabel(mesSel)}:</p>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:24, fontWeight:700, color:D.primary, letterSpacing:"-0.02em" }}>R$ {aporteSugerido.toFixed(2).replace(".",",")}</div>
+                  {!readOnly && (
+                    <button onClick={()=>{ setNovaMovFundo({ tipo:"aporte", valor:aporteSugerido.toFixed(2), descricao:`Aporte de ${mesLabel(mesSel)}`, data:"" }); setModal({ type:"novaMovFundo" }); }} style={{ marginTop:12, padding:"8px 16px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Registrar este aporte</button>
+                  )}
+                </div>
+              </div>
+
+              {/* Botões de ação */}
+              {!readOnly && (
+                <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
+                  <button onClick={()=>{ setNovaMovFundo({ tipo:"aporte", valor:"", descricao:"", data:"" }); setModal({ type:"novaMovFundo" }); }} style={{ padding:"10px 18px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>+ Aporte manual</button>
+                  <button onClick={()=>{ setNovaMovFundo({ tipo:"retirada", valor:"", descricao:"", data:"" }); setModal({ type:"novaMovFundo" }); }} style={{ padding:"10px 18px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>− Retirada</button>
+                </div>
+              )}
+
+              {/* Histórico de movimentações */}
+              <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>Movimentações</div>
+              {fundoMovs.length === 0 ? (
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>🏦</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhuma movimentação ainda</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Registre aportes mensais para construir o fundo de reserva do condomínio.</div>
+                </div>
+              ) : (
+                <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
+                  {fundoMovs.map((m,i) => (
+                    <div key={m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom: i<fundoMovs.length-1?`1px solid ${D.border}`:"none" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                        <div style={{ width:36, height:36, borderRadius:9, background: m.tipo==="aporte"?D.successBg:D.dangerBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>{m.tipo==="aporte"?"↑":"↓"}</div>
+                        <div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:600, color:D.text }}>{m.descricao}</div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut }}>{m.data}</div>
+                        </div>
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                        <span style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:700, color: m.tipo==="aporte"?D.success:D.danger }}>
+                          {m.tipo==="aporte"?"+":"−"} R$ {m.valor.toFixed(2).replace(".",",")}
+                        </span>
+                        {!readOnly && (
+                          <button onClick={()=>{ if(window.confirm("Remover esta movimentação?")) removerMovFundo(m.id); }} style={{ background:"none", border:"none", color:D.textMut, cursor:"pointer", fontSize:16 }}>×</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          );
+        })()}
+
         {/* ── Histórico ── */}
         {aba === "historico" && podeUsar("historico") && (
           <div>
@@ -3633,6 +3766,34 @@ export default function App() {
           <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
             <button onClick={salvarEdicaoMorador} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Salvar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "novaMovFundo" && (
+        <Modal title={novaMovFundo.tipo === "aporte" ? "Aporte ao Fundo" : "Retirada do Fundo"} onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={()=>setNovaMovFundo(p=>({...p,tipo:"aporte"}))} style={{ flex:1, padding:"10px", background: novaMovFundo.tipo==="aporte"?D.success:D.muted, color: novaMovFundo.tipo==="aporte"?"#fff":D.text, border:`1px solid ${novaMovFundo.tipo==="aporte"?D.success:D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>↑ Aporte</button>
+              <button onClick={()=>setNovaMovFundo(p=>({...p,tipo:"retirada"}))} style={{ flex:1, padding:"10px", background: novaMovFundo.tipo==="retirada"?D.danger:D.muted, color: novaMovFundo.tipo==="retirada"?"#fff":D.text, border:`1px solid ${novaMovFundo.tipo==="retirada"?D.danger:D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>↓ Retirada</button>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Valor (R$) *</label>
+              <input type="number" value={novaMovFundo.valor} onChange={e=>setNovaMovFundo(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Descrição *</label>
+              <input value={novaMovFundo.descricao} onChange={e=>setNovaMovFundo(p=>({...p,descricao:e.target.value}))} placeholder={novaMovFundo.tipo==="aporte"?"Ex: Aporte de Janeiro":"Ex: Reforma da fachada"} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Data</label>
+              <input type="date" value={novaMovFundo.data ? (()=>{ const p=novaMovFundo.data.split("/"); return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:""; })() : ""} onChange={e=>{ const v=e.target.value; if(v){ const [a,m,d]=v.split("-"); setNovaMovFundo(p=>({...p,data:`${d}/${m}/${a}`})); } else setNovaMovFundo(p=>({...p,data:""})); }} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              <p style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, margin:"5px 0 0" }}>Em branco = data de hoje.</p>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+            <button onClick={registrarMovFundo} style={{ padding:"10px 20px", background: novaMovFundo.tipo==="aporte"?D.success:D.danger, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>Registrar</button>
           </div>
         </Modal>
       )}

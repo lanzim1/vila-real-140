@@ -269,8 +269,8 @@ const gerarCondId = (nome) => {
 };
 
 // ── Login / Cadastro ──
-const Login = () => {
-  const [modo, setModo]   = useState("login"); // "login" | "cadastro"
+const Login = ({ modoInicial = "login", onVoltar }) => {
+  const [modo, setModo]   = useState(modoInicial); // "login" | "cadastro"
   const [email, setEmail] = useState("");
   const [pass, setPass]   = useState("");
   const [verPass, setVerPass] = useState(false);
@@ -413,8 +413,173 @@ const Login = () => {
               <button onClick={() => { setModo("login"); setErr(""); }} style={{ background:"none", border:"none", color:D.accent, fontWeight:700, cursor:"pointer", fontSize:13, fontFamily:D.fontBody }}>Fazer login</button>
             </p>
           )}
+          {onVoltar && (
+            <button onClick={onVoltar} style={{ background:"none", border:"none", color:D.textMut, fontSize:12, cursor:"pointer", fontFamily:D.fontBody, marginTop:12 }}>← Voltar ao início</button>
+          )}
         </div>
       </div>
+    </div>
+  );
+};
+
+// ── Landing Page (MySindi) ──
+const LandingPage = ({ onEntrar, onCadastrar }) => {
+  const isMobile = useIsMobile();
+
+  const Logo = ({ light }) => (
+    <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+      <div style={{ width:34, height:34, borderRadius:9, background:`linear-gradient(135deg, ${D.accent}, ${D.primary})`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:`0 2px 8px rgba(30,58,114,0.3)` }}>
+        <span style={{ color:"#fff", fontSize:17 }}>🏢</span>
+      </div>
+      <span style={{ fontFamily:D.fontDisplay, fontSize:19, fontWeight:700, letterSpacing:"-0.02em", color: light ? "#fff" : D.text }}>
+        My<span style={{ color:D.accent }}>Sindi</span>
+      </span>
+    </div>
+  );
+
+  const features = [
+    { icon:"💰", titulo:"Cobranças automáticas", desc:"Controle de taxas mensais, status de pagamento e lembretes por e-mail automáticos." },
+    { icon:"📊", titulo:"Dashboard financeiro", desc:"Visão completa do caixa, receitas, despesas e inadimplência em tempo real." },
+    { icon:"👥", titulo:"Gestão de moradores", desc:"Cadastro completo de unidades, com portal individual para cada morador." },
+    { icon:"📅", titulo:"Reserva de áreas", desc:"Churrasqueira, salão de festas e espaço gourmet com aprovação pelo síndico." },
+    { icon:"🔧", titulo:"Serviços e manutenção", desc:"Registre e acompanhe manutenções, com controle de custos de material e mão de obra." },
+    { icon:"📄", titulo:"Relatórios em PDF", desc:"Prestação de contas formal e comprovantes de pagamento gerados automaticamente." },
+    { icon:"🚪", titulo:"Controle de acessos", desc:"Registre entrada e saída de visitantes e prestadores de serviço." },
+    { icon:"📋", titulo:"Histórico completo", desc:"Todas as ações ficam registradas para total transparência da gestão." },
+  ];
+
+  const planos = [
+    { nome:"Básico",   preco:79,  apt:"até 20 apartamentos",   destaque:false, recursos:["Todas as funcionalidades","Cobranças automáticas","Portal do morador","Relatórios em PDF","Suporte por e-mail"] },
+    { nome:"Padrão",   preco:149, apt:"21 a 50 apartamentos",  destaque:true,  recursos:["Tudo do plano Básico","Dashboard financeiro anual","Controle de acessos","Reserva de áreas","Suporte prioritário"] },
+    { nome:"Avançado", preco:249, apt:"51 a 100 apartamentos", destaque:false, recursos:["Tudo do plano Padrão","Múltiplos administradores","Backup automático","Suporte via WhatsApp","Onboarding assistido"] },
+  ];
+
+  return (
+    <div style={{ fontFamily:D.fontBody, background:D.bgApp, minHeight:"100vh" }}>
+      {/* Header */}
+      <header style={{ position:"sticky", top:0, zIndex:100, background:"rgba(255,255,255,0.85)", backdropFilter:"blur(12px)", borderBottom:`1px solid ${D.border}`, padding: isMobile?"12px 16px":"14px 40px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <Logo />
+        <div style={{ display:"flex", gap:isMobile?8:12, alignItems:"center" }}>
+          <button onClick={onEntrar} style={{ padding:isMobile?"8px 14px":"9px 18px", background:"none", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, color:D.text, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Entrar</button>
+          <button onClick={onCadastrar} style={{ padding:isMobile?"8px 14px":"9px 18px", background:D.primary, border:"none", borderRadius:D.radiusSm, color:"#fff", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>Começar grátis</button>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <section style={{ background:`linear-gradient(135deg, ${D.sidebar} 0%, ${D.primary} 100%)`, color:"#fff", padding: isMobile?"48px 20px 56px":"80px 40px 90px", position:"relative", overflow:"hidden" }}>
+        <div style={{ position:"absolute", top:-60, right:-40, width:280, height:280, borderRadius:"50%", background:"rgba(75,114,196,0.15)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", bottom:-80, left:-60, width:240, height:240, borderRadius:"50%", background:"rgba(75,114,196,0.1)", pointerEvents:"none" }} />
+        <div style={{ maxWidth:820, margin:"0 auto", textAlign:"center", position:"relative" }}>
+          <div style={{ display:"inline-block", background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"6px 16px", fontSize:13, fontWeight:500, marginBottom:24 }}>
+            ✨ 14 dias grátis · sem cartão de crédito
+          </div>
+          <h1 style={{ fontFamily:D.fontDisplay, fontSize: isMobile?32:52, fontWeight:700, letterSpacing:"-0.03em", lineHeight:1.1, margin:"0 0 20px" }}>
+            A gestão do seu condomínio,<br/>simples e sem complicação
+          </h1>
+          <p style={{ fontSize: isMobile?16:19, opacity:.85, lineHeight:1.6, margin:"0 auto 32px", maxWidth:600 }}>
+            O MySindi organiza cobranças, moradores, reservas e finanças em um só lugar. Feito para síndicos que querem controle total sem dor de cabeça.
+          </p>
+          <div style={{ display:"flex", gap:12, justifyContent:"center", flexWrap:"wrap" }}>
+            <button onClick={onCadastrar} style={{ padding:"14px 28px", background:"#fff", border:"none", borderRadius:D.radius, color:D.primary, fontSize:16, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody, boxShadow:"0 8px 24px rgba(0,0,0,0.2)" }}>
+              Começar teste grátis →
+            </button>
+            <button onClick={onEntrar} style={{ padding:"14px 28px", background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.3)", borderRadius:D.radius, color:"#fff", fontSize:16, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+              Já sou cliente
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Funcionalidades */}
+      <section style={{ padding: isMobile?"48px 20px":"72px 40px", maxWidth:1100, margin:"0 auto" }}>
+        <div style={{ textAlign:"center", marginBottom:isMobile?32:48 }}>
+          <h2 style={{ fontFamily:D.fontDisplay, fontSize:isMobile?26:36, fontWeight:700, letterSpacing:"-0.02em", color:D.text, margin:"0 0 12px" }}>Tudo que você precisa</h2>
+          <p style={{ fontSize:16, color:D.textSec, margin:0 }}>Uma plataforma completa para a gestão do seu condomínio</p>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"repeat(auto-fit,minmax(250px,1fr))", gap:16 }}>
+          {features.map((f,i) => (
+            <div key={i} style={{ background:D.bgCard, borderRadius:D.radius, padding:"24px", border:`1px solid ${D.border}`, boxShadow:D.shadow }}>
+              <div style={{ width:48, height:48, borderRadius:12, background:D.secondary, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, marginBottom:16 }}>{f.icon}</div>
+              <h3 style={{ fontFamily:D.fontDisplay, fontSize:17, fontWeight:600, color:D.text, margin:"0 0 8px", letterSpacing:"-0.01em" }}>{f.titulo}</h3>
+              <p style={{ fontSize:14, color:D.textSec, lineHeight:1.6, margin:0 }}>{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Planos */}
+      <section style={{ padding: isMobile?"48px 20px":"72px 40px", background:D.bgCard, borderTop:`1px solid ${D.border}`, borderBottom:`1px solid ${D.border}` }}>
+        <div style={{ maxWidth:1000, margin:"0 auto" }}>
+          <div style={{ textAlign:"center", marginBottom:isMobile?32:48 }}>
+            <h2 style={{ fontFamily:D.fontDisplay, fontSize:isMobile?26:36, fontWeight:700, letterSpacing:"-0.02em", color:D.text, margin:"0 0 12px" }}>Planos que cabem no seu bolso</h2>
+            <p style={{ fontSize:16, color:D.textSec, margin:0 }}>Escolha de acordo com o tamanho do seu condomínio. Cancele quando quiser.</p>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"repeat(3,1fr)", gap:20, alignItems:"start" }}>
+            {planos.map((p,i) => (
+              <div key={i} style={{ background: p.destaque?`linear-gradient(135deg, ${D.sidebar}, ${D.primary})`:D.bgApp, borderRadius:D.radiusXl, padding:"32px 28px", border: p.destaque?"none":`1px solid ${D.border}`, position:"relative", boxShadow: p.destaque?"0 16px 40px rgba(30,58,114,0.3)":D.shadow, transform: p.destaque&&!isMobile?"scale(1.05)":"none" }}>
+                {p.destaque && (
+                  <div style={{ position:"absolute", top:-12, left:"50%", transform:"translateX(-50%)", background:D.accent, color:"#fff", fontSize:12, fontWeight:700, padding:"5px 16px", borderRadius:20, whiteSpace:"nowrap" }}>MAIS POPULAR</div>
+                )}
+                <h3 style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color: p.destaque?"#fff":D.text, margin:"0 0 4px" }}>{p.nome}</h3>
+                <p style={{ fontSize:13, color: p.destaque?"rgba(255,255,255,0.7)":D.textSec, margin:"0 0 20px" }}>{p.apt}</p>
+                <div style={{ marginBottom:24 }}>
+                  <span style={{ fontFamily:D.fontDisplay, fontSize:40, fontWeight:700, color: p.destaque?"#fff":D.text, letterSpacing:"-0.02em" }}>R$ {p.preco}</span>
+                  <span style={{ fontSize:15, color: p.destaque?"rgba(255,255,255,0.7)":D.textSec }}>/mês</span>
+                </div>
+                <button onClick={onCadastrar} style={{ width:"100%", padding:"12px", background: p.destaque?"#fff":D.primary, color: p.destaque?D.primary:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody, marginBottom:24 }}>Começar grátis</button>
+                <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                  {p.recursos.map((r,j) => (
+                    <div key={j} style={{ display:"flex", alignItems:"center", gap:10, fontSize:14, color: p.destaque?"rgba(255,255,255,0.9)":D.text }}>
+                      <span style={{ color: p.destaque?"#fff":D.success, fontWeight:700, flexShrink:0 }}>✓</span>{r}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p style={{ textAlign:"center", fontSize:13, color:D.textMut, margin:"28px 0 0" }}>
+            Condomínios com mais de 100 apartamentos: <button onClick={onCadastrar} style={{ background:"none", border:"none", color:D.accent, fontWeight:600, cursor:"pointer", fontSize:13, fontFamily:D.fontBody }}>fale conosco</button>
+          </p>
+        </div>
+      </section>
+
+      {/* Prova social */}
+      <section style={{ padding: isMobile?"48px 20px":"72px 40px", maxWidth:1000, margin:"0 auto" }}>
+        <div style={{ textAlign:"center", marginBottom:isMobile?32:48 }}>
+          <h2 style={{ fontFamily:D.fontDisplay, fontSize:isMobile?26:36, fontWeight:700, letterSpacing:"-0.02em", color:D.text, margin:"0 0 12px" }}>Síndicos que confiam no MySindi</h2>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"repeat(3,1fr)", gap:16 }}>
+          {[
+            { nome:"Ricardo M.", cargo:"Síndico · 32 unidades", texto:"Reduzi o tempo que gastava com planilhas em 80%. As cobranças automáticas mudaram minha rotina." },
+            { nome:"Ana Paula S.", cargo:"Síndica · 18 unidades", texto:"Os moradores adoraram o portal individual. Ficou tudo mais transparente e profissional." },
+            { nome:"Carlos E.", cargo:"Síndico · 64 unidades", texto:"A prestação de contas em PDF impressiona na assembleia. Recomendo para qualquer condomínio." },
+          ].map((d,i) => (
+            <div key={i} style={{ background:D.bgCard, borderRadius:D.radius, padding:"24px", border:`1px solid ${D.border}`, boxShadow:D.shadow }}>
+              <div style={{ fontSize:20, marginBottom:12, color:D.warning }}>★★★★★</div>
+              <p style={{ fontSize:14, color:D.text, lineHeight:1.6, margin:"0 0 16px", fontStyle:"italic" }}>"{d.texto}"</p>
+              <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>{d.nome}</div>
+              <div style={{ fontSize:12, color:D.textSec }}>{d.cargo}</div>
+            </div>
+          ))}
+        </div>
+        <p style={{ textAlign:"center", fontSize:12, color:D.textMut, margin:"24px 0 0", fontStyle:"italic" }}>* Depoimentos ilustrativos</p>
+      </section>
+
+      {/* CTA final */}
+      <section style={{ background:`linear-gradient(135deg, ${D.primary}, ${D.accent})`, color:"#fff", padding: isMobile?"48px 20px":"72px 40px", textAlign:"center" }}>
+        <h2 style={{ fontFamily:D.fontDisplay, fontSize:isMobile?26:38, fontWeight:700, letterSpacing:"-0.02em", margin:"0 0 16px" }}>Pronto para simplificar sua gestão?</h2>
+        <p style={{ fontSize:17, opacity:.9, margin:"0 0 28px", maxWidth:520, marginLeft:"auto", marginRight:"auto" }}>Experimente grátis por 14 dias. Sem compromisso, sem cartão de crédito.</p>
+        <button onClick={onCadastrar} style={{ padding:"16px 36px", background:"#fff", border:"none", borderRadius:D.radius, color:D.primary, fontSize:17, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody, boxShadow:"0 8px 24px rgba(0,0,0,0.2)" }}>
+          Criar minha conta grátis
+        </button>
+      </section>
+
+      {/* Footer */}
+      <footer style={{ background:D.sidebar, color:"rgba(226,232,245,0.6)", padding: isMobile?"32px 20px":"40px", textAlign:"center" }}>
+        <div style={{ display:"flex", justifyContent:"center", marginBottom:16 }}><Logo light /></div>
+        <p style={{ fontSize:13, margin:"0 0 8px" }}>Gestão de condomínios simples e profissional.</p>
+        <p style={{ fontSize:12, color:"rgba(226,232,245,0.4)", margin:0 }}>© {new Date().getFullYear()} MySindi · Todos os direitos reservados</p>
+      </footer>
     </div>
   );
 };
@@ -627,6 +792,7 @@ export default function App() {
   const isMobile = useIsMobile();
   const [user, setUser]             = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [authView, setAuthView]     = useState("landing"); // "landing" | "login" | "cadastro"
   const [condominioId, setCondominioId] = useState(null);
   const [condominio, setCondominio]   = useState(null); // { nome, plano, numApartamentos, ... }
   const [condCarregado, setCondCarregado] = useState(false);
@@ -1481,7 +1647,13 @@ export default function App() {
     </div>
   );
 
-  if (!user) return <Login />;
+  if (!user) {
+    // Modo visitante entra direto no login; senão, mostra landing → login/cadastro
+    if (authView === "landing" && !modoVisitante) {
+      return <LandingPage onEntrar={() => setAuthView("login")} onCadastrar={() => setAuthView("cadastro")} />;
+    }
+    return <Login modoInicial={authView === "cadastro" ? "cadastro" : "login"} onVoltar={modoVisitante ? null : () => setAuthView("landing")} />;
+  }
 
   // ── Portal do morador (link individual) ──
   if (portalMoradorId && user) {

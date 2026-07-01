@@ -1114,6 +1114,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const [morador, setMorador]     = useState(null);
   const [cobrancas, setCobrancas] = useState([]);
   const [reservasMor, setReservasMor] = useState([]);
+  const [comunicadosMor, setComunicadosMor] = useState([]);
   const [mesSel, setMesSel]       = useState(mesAtual());
   const [formReserva, setFormReserva] = useState({ area:"Churrasqueira", data:"", horario:"", observacao:"" });
   const [enviandoReserva, setEnviandoReserva] = useState(false);
@@ -1135,6 +1136,16 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     );
     return () => { u1(); u2(); u3(); };
   }, [moradorId]);
+
+  // Comunicados do condomínio (carrega quando o morador é conhecido)
+  useEffect(() => {
+    if (!morador?.condominioId) return;
+    const u = onSnapshot(
+      query(collection(db, "comunicados"), where("condominioId","==",morador.condominioId)),
+      s => setComunicadosMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (b.fixado?1:0)-(a.fixado?1:0) || b.timestamp - a.timestamp))
+    );
+    return () => u();
+  }, [morador?.condominioId]);
 
   const fazerReserva = async () => {
     if (!formReserva.data || !formReserva.horario) { setMsgReserva("Preencha a data e o horário."); return; }
@@ -1243,6 +1254,25 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
           </div>
         </div>
 
+        {/* Comunicados do condomínio */}
+        {comunicadosMor.length > 0 && (
+          <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginTop:20 }}>
+            <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:16, letterSpacing:"-0.02em" }}>📢 Comunicados</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              {comunicadosMor.map(com => (
+                <div key={com.id} style={{ background: com.fixado ? D.secondary : D.muted, borderRadius:D.radiusSm, padding:"14px 16px", borderLeft:`3px solid ${com.fixado ? D.accent : D.border}` }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, flexWrap:"wrap" }}>
+                    {com.fixado && <span style={{ background:D.bgCard, color:D.accent, fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:10, fontFamily:D.fontBody }}>📌 Fixado</span>}
+                    <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>{com.titulo}</span>
+                  </div>
+                  <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.text, lineHeight:1.6, margin:"0 0 6px", whiteSpace:"pre-wrap" }}>{com.mensagem}</p>
+                  <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut }}>{com.data}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Reservas */}
         <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginTop:20 }}>
           <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:16, letterSpacing:"-0.02em" }}>📅 Reservar Churrasqueira</div>
@@ -1344,6 +1374,10 @@ export default function App() {
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
   const [novaReserva, setNovaReserva] = useState({ area:"Churrasqueira", data:"", horario:"", observacao:"" });
+  const [comunicados, setComunicados] = useState([]);
+  const [novoComunicado, setNovoComunicado] = useState({ titulo:"", mensagem:"", fixado:false });
+  const [documentos, setDocumentos] = useState([]);
+  const [novoDocumento, setNovoDocumento] = useState({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"" });
   const fileRef        = useRef();
   const fileRefDespesa = useRef();
 
@@ -1443,6 +1477,8 @@ export default function App() {
     const u7 = onSnapshot(byCond("logs"),      s => setLogs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
     const u8 = onSnapshot(byCond("acessos"),   s => setAcessos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
     const u9 = onSnapshot(byCond("reservas"),  s => setReservas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u10 = onSnapshot(byCond("comunicados"), s => setComunicados(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (b.fixado?1:0)-(a.fixado?1:0) || b.timestamp - a.timestamp)));
+    const u11 = onSnapshot(byCond("documentos"), s => setDocumentos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
 
     // Config (taxa/dia de vencimento) vem do próprio documento do condomínio
     const u3 = onSnapshot(doc(db, "condominios", condominioId), d => {
@@ -1459,7 +1495,7 @@ export default function App() {
       setObsMes(texto); setObsSalva(texto);
     });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); };
   }, [user, condominioId, mesSel]);
 
   // (Removido o auto-popular com MOCK_MORADORES — no multi-tenant cada
@@ -1811,6 +1847,81 @@ export default function App() {
   const removerReserva = async (id) => {
     await deleteDoc(doc(db, "reservas", id));
     showToast("Reserva removida.", "error");
+  };
+
+  // ── Comunicados ──
+  const publicarComunicado = async () => {
+    if (!novoComunicado.titulo.trim() || !novoComunicado.mensagem.trim()) {
+      showToast("Preencha o título e a mensagem.", "error"); return;
+    }
+    await addDoc(collection(db, "comunicados"), {
+      condominioId,
+      titulo: novoComunicado.titulo.trim(),
+      mensagem: novoComunicado.mensagem.trim(),
+      fixado: novoComunicado.fixado || false,
+      data: new Date().toLocaleDateString("pt-BR"),
+      timestamp: Date.now(),
+    });
+    registrarLog("📢", `Comunicado publicado: ${novoComunicado.titulo.trim()}`);
+    setNovoComunicado({ titulo:"", mensagem:"", fixado:false });
+    setModal(null);
+    showToast("Comunicado publicado!");
+  };
+
+  const alternarFixado = async (com) => {
+    await setDoc(doc(db, "comunicados", com.id), { fixado: !com.fixado }, { merge:true });
+    showToast(com.fixado ? "Comunicado desafixado." : "Comunicado fixado no topo.");
+  };
+
+  const removerComunicado = async (id) => {
+    await deleteDoc(doc(db, "comunicados", id));
+    showToast("Comunicado removido.", "error");
+  };
+
+  // ── Documentos ──
+  const salvarDocumento = async () => {
+    if (!novoDocumento.nome.trim()) { showToast("Informe o nome do documento.", "error"); return; }
+    let base64 = null;
+    if (novoDocumento.arquivo) {
+      base64 = await new Promise((res) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.readAsDataURL(novoDocumento.arquivo);
+      });
+    }
+    await addDoc(collection(db, "documentos"), {
+      condominioId,
+      nome: novoDocumento.nome.trim(),
+      categoria: novoDocumento.categoria,
+      vencimento: novoDocumento.vencimento || "",
+      obs: novoDocumento.obs || "",
+      arquivo: base64,
+      arquivoNome: novoDocumento.arquivoNome || "",
+      criadoEm: new Date().toLocaleDateString("pt-BR"),
+      timestamp: Date.now(),
+    });
+    registrarLog("📁", `Documento adicionado: ${novoDocumento.nome.trim()}`);
+    setNovoDocumento({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"" });
+    setModal(null);
+    showToast("Documento salvo!");
+  };
+
+  const removerDocumento = async (id) => {
+    await deleteDoc(doc(db, "documentos", id));
+    showToast("Documento removido.", "error");
+  };
+
+  // Calcula situação do vencimento de um documento
+  const situacaoDoc = (venc) => {
+    if (!venc) return { label:"Sem vencimento", cor:D.textMut, bg:D.muted, dias:null };
+    const [a,m,d] = venc.split("-").map(Number);
+    const fim = new Date(a, m-1, d);
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const dias = Math.ceil((fim - hoje) / (1000*60*60*24));
+    if (dias < 0)  return { label:`Vencido há ${Math.abs(dias)} dia(s)`, cor:D.danger, bg:D.dangerBg, dias };
+    if (dias === 0) return { label:"Vence hoje", cor:D.danger, bg:D.dangerBg, dias };
+    if (dias <= 30) return { label:`Vence em ${dias} dia(s)`, cor:D.warning, bg:D.warningBg, dias };
+    return { label:`Válido · vence ${new Date(a,m-1,d).toLocaleDateString("pt-BR")}`, cor:D.success, bg:D.successBg, dias };
   };
 
   const enviarLembretes = () => {
@@ -2171,21 +2282,25 @@ export default function App() {
     { id:"servicos",  icon:"🔧", label:"Serviços"   },
   ];
   const navSecundario = [
-    { id:"reservas",  icon:"📅", label:"Reservas"   },
-    { id:"acessos",   icon:"🚪", label:"Acessos"    },
-    { id:"historico", icon:"📋", label:"Histórico"  },
+    { id:"reservas",    icon:"📅", label:"Reservas"    },
+    { id:"acessos",     icon:"🚪", label:"Acessos"     },
+    { id:"comunicados", icon:"📢", label:"Comunicados" },
+    { id:"documentos",  icon:"📁", label:"Documentos"  },
+    { id:"historico",   icon:"📋", label:"Histórico"   },
     ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config."  }] : []),
   ];
 
   const navItems = [
-    { id:"dashboard", icon:"📊", label:"Dashboard" },
-    { id:"cobrancas", icon:"💰", label:"Cobranças"  },
-    { id:"moradores", icon:"👥", label:"Moradores"  },
-    { id:"despesas",  icon:"💧", label:"Água/Luz"   },
-    { id:"servicos",  icon:"🔧", label:"Serviços"   },
-    { id:"reservas",  icon:"📅", label:"Reservas"   },
-    { id:"acessos",   icon:"🚪", label:"Acessos"    },
-    { id:"historico", icon:"📋", label:"Histórico"  },
+    { id:"dashboard",   icon:"📊", label:"Dashboard"   },
+    { id:"cobrancas",   icon:"💰", label:"Cobranças"   },
+    { id:"moradores",   icon:"👥", label:"Moradores"   },
+    { id:"despesas",    icon:"💧", label:"Água/Luz"    },
+    { id:"servicos",    icon:"🔧", label:"Serviços"    },
+    { id:"reservas",    icon:"📅", label:"Reservas"    },
+    { id:"acessos",     icon:"🚪", label:"Acessos"     },
+    { id:"comunicados", icon:"📢", label:"Comunicados" },
+    { id:"documentos",  icon:"📁", label:"Documentos"  },
+    { id:"historico",   icon:"📋", label:"Histórico"   },
     ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config." }] : []),
   ];
 
@@ -2859,10 +2974,10 @@ export default function App() {
         )}
 
         {/* ── Serviços ── */}
-        {/* Trava de plano: abas Padrão bloqueadas para plano Básico */}
-        {["servicos","reservas","acessos","historico"].includes(aba) && !podeUsar(aba) && (
+        {/* Trava de plano: abas bloqueadas para planos inferiores */}
+        {["servicos","reservas","acessos","historico","comunicados","documentos"].includes(aba) && !podeUsar(aba) && (
           <div>
-            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
             <UpgradeCard recurso={aba} planoNecessario={RECURSO_PLANO[aba]} isMobile={isMobile} />
           </div>
         )}
@@ -3122,6 +3237,128 @@ export default function App() {
               </div>
             )}
           </div>
+          </div>
+        )}
+
+        {/* ── Comunicados ── */}
+        {aba === "comunicados" && podeUsar("comunicados") && (
+          <div>
+            <TopBar title="Comunicados" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
+
+              {/* Cabeçalho + ação */}
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
+                <div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>Avisos e comunicados publicados para todos os moradores</div>
+                </div>
+                {!readOnly && (
+                  <button onClick={() => { setNovoComunicado({ titulo:"", mensagem:"", fixado:false }); setModal({ type:"novoComunicado" }); }} style={{ padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
+                    + Novo comunicado
+                  </button>
+                )}
+              </div>
+
+              {/* Lista de comunicados */}
+              {comunicados.length === 0 ? (
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>📢</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhum comunicado ainda</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Publique avisos para que todos os moradores vejam no portal individual.</div>
+                </div>
+              ) : (
+                <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                  {comunicados.map(com => (
+                    <div key={com.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:"18px 20px", boxShadow:D.shadow, border:`1px solid ${com.fixado ? D.accent : D.border}`, borderLeft:`4px solid ${com.fixado ? D.accent : D.border}` }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, marginBottom:8 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                          {com.fixado && <span style={{ background:D.secondary, color:D.accent, fontSize:11, fontWeight:700, padding:"2px 10px", borderRadius:12, fontFamily:D.fontBody }}>📌 Fixado</span>}
+                          <span style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{com.titulo}</span>
+                        </div>
+                        {!readOnly && (
+                          <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+                            <button onClick={() => alternarFixado(com)} title={com.fixado?"Desafixar":"Fixar no topo"} style={{ padding:"5px 10px", background:D.muted, color:D.textSec, border:`1px solid ${D.border}`, borderRadius:6, fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>📌</button>
+                            <button onClick={() => { if(window.confirm("Remover este comunicado?")) removerComunicado(com.id); }} style={{ padding:"5px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
+                          </div>
+                        )}
+                      </div>
+                      <p style={{ fontFamily:D.fontBody, fontSize:14, color:D.text, lineHeight:1.6, margin:"0 0 10px", whiteSpace:"pre-wrap" }}>{com.mensagem}</p>
+                      <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut }}>Publicado em {com.data}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Documentos ── */}
+        {aba === "documentos" && podeUsar("documentos") && (
+          <div>
+            <TopBar title="Documentos" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
+
+              {/* Cabeçalho + ação */}
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>Documentos importantes do condomínio, com alerta de vencimento</div>
+                {!readOnly && (
+                  <button onClick={() => { setNovoDocumento({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"" }); setModal({ type:"novoDocumento" }); }} style={{ padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
+                    + Novo documento
+                  </button>
+                )}
+              </div>
+
+              {/* Alertas de vencimento próximo */}
+              {(() => {
+                const vencendo = documentos.filter(d => { const s = situacaoDoc(d.vencimento); return s.dias !== null && s.dias <= 30; });
+                if (vencendo.length === 0) return null;
+                return (
+                  <div style={{ background:D.warningBg, border:`1px solid ${D.warning}`, borderRadius:D.radius, padding:"14px 18px", marginBottom:20, display:"flex", alignItems:"center", gap:12 }}>
+                    <span style={{ fontSize:22 }}>⚠️</span>
+                    <div style={{ fontFamily:D.fontBody, fontSize:13, color:"#92400E" }}>
+                      <b>{vencendo.length} documento(s)</b> vencido(s) ou vencendo nos próximos 30 dias. Verifique a lista abaixo.
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Lista de documentos */}
+              {documentos.length === 0 ? (
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>📁</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhum documento cadastrado</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Guarde alvará, apólice de seguro, ART do elevador, contratos e outros documentos importantes.</div>
+                </div>
+              ) : (
+                <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"repeat(auto-fill,minmax(320px,1fr))", gap:14 }}>
+                  {documentos.map(docItem => {
+                    const s = situacaoDoc(docItem.vencimento);
+                    return (
+                      <div key={docItem.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:"18px 20px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, marginBottom:10 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                            <div style={{ width:38, height:38, borderRadius:9, background:D.secondary, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>📄</div>
+                            <div>
+                              <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{docItem.nome}</div>
+                              <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{docItem.categoria}</div>
+                            </div>
+                          </div>
+                          {!readOnly && (
+                            <button onClick={() => { if(window.confirm("Remover este documento?")) removerDocumento(docItem.id); }} style={{ padding:"4px 8px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, cursor:"pointer", fontFamily:D.fontBody, flexShrink:0 }}>🗑️</button>
+                          )}
+                        </div>
+                        <div style={{ display:"inline-block", background:s.bg, color:s.cor, fontSize:12, fontWeight:600, padding:"4px 12px", borderRadius:20, fontFamily:D.fontBody, marginBottom:10 }}>{s.label}</div>
+                        {docItem.obs && <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.5, margin:"0 0 10px" }}>{docItem.obs}</p>}
+                        {docItem.arquivo && (
+                          <a href={docItem.arquivo} download={docItem.arquivoNome||docItem.nome} style={{ display:"inline-flex", alignItems:"center", gap:6, fontFamily:D.fontBody, fontSize:13, color:D.accent, fontWeight:600, textDecoration:"none" }}>
+                            📎 Baixar arquivo
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -3396,6 +3633,71 @@ export default function App() {
           <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
             <button onClick={salvarEdicaoMorador} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Salvar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "novoDocumento" && (
+        <Modal title="Novo Documento" onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Nome do documento *</label>
+              <input value={novoDocumento.nome} onChange={e=>setNovoDocumento(p=>({...p,nome:e.target.value}))} placeholder="Ex: Alvará de funcionamento" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Categoria</label>
+              <select value={novoDocumento.categoria} onChange={e=>setNovoDocumento(p=>({...p,categoria:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", background:"#fff", fontFamily:D.fontBody, color:D.text }}>
+                <option>Alvará</option>
+                <option>Seguro / Apólice</option>
+                <option>Elevador (ART)</option>
+                <option>Contrato</option>
+                <option>Certidão</option>
+                <option>AVCB (Bombeiros)</option>
+                <option>Outro</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Data de vencimento</label>
+              <input type="date" value={novoDocumento.vencimento} onChange={e=>setNovoDocumento(p=>({...p,vencimento:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              <p style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, margin:"5px 0 0" }}>Deixe em branco se o documento não vence.</p>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Observação</label>
+              <input value={novoDocumento.obs} onChange={e=>setNovoDocumento(p=>({...p,obs:e.target.value}))} placeholder="Ex: renovar na prefeitura" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Arquivo (opcional)</label>
+              <input type="file" onChange={e=>{ const f=e.target.files[0]; if(f) setNovoDocumento(p=>({...p,arquivo:f,arquivoNome:f.name})); }} style={{ display:"block", width:"100%", fontFamily:D.fontBody, fontSize:13, color:D.textSec }} />
+              {novoDocumento.arquivoNome && <p style={{ fontFamily:D.fontBody, fontSize:12, color:D.success, margin:"6px 0 0" }}>✓ {novoDocumento.arquivoNome}</p>}
+              <p style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, margin:"5px 0 0" }}>Arquivos grandes podem deixar o sistema lento. Ideal até ~1 MB (PDF ou imagem).</p>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+            <button onClick={salvarDocumento} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>📁 Salvar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "novoComunicado" && (
+        <Modal title="Novo Comunicado" onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Título *</label>
+              <input value={novoComunicado.titulo} onChange={e=>setNovoComunicado(p=>({...p,titulo:e.target.value}))} placeholder="Ex: Falta d'água na terça-feira" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Mensagem *</label>
+              <textarea value={novoComunicado.mensagem} onChange={e=>setNovoComunicado(p=>({...p,mensagem:e.target.value}))} rows={5} placeholder="Escreva o comunicado completo aqui..." style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text, resize:"vertical", lineHeight:1.5 }} />
+            </div>
+            <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
+              <input type="checkbox" checked={novoComunicado.fixado} onChange={e=>setNovoComunicado(p=>({...p,fixado:e.target.checked}))} style={{ width:18, height:18, cursor:"pointer" }} />
+              <span style={{ fontFamily:D.fontBody, fontSize:14, color:D.text }}>📌 Fixar no topo (destaque)</span>
+            </label>
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+            <button onClick={publicarComunicado} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>📢 Publicar</button>
           </div>
         </Modal>
       )}

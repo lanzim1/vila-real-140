@@ -27,6 +27,11 @@ const MOCK_MORADORES = [
 const VISITANTE_EMAIL = "visitante@vilareal140-ddf4d.firebaseapp.com";
 const VISITANTE_SENHA = "VisualizarVR140";
 
+// ── Admin do MySindi (dono do negócio) ──
+const ADMIN_EMAIL = "comercial.mysindi@gmail.com";
+const modoAdmin = typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("admin") === "1";
+
 // ── Multi-tenant ──
 // Cada condomínio é identificado por um condominioId. Coleções "globais"
 // como condominios/usuarios não levam o filtro; as demais sempre filtram.
@@ -580,6 +585,402 @@ const LandingPage = ({ onEntrar, onCadastrar }) => {
         <p style={{ fontSize:13, margin:"0 0 8px" }}>Gestão de condomínios simples e profissional.</p>
         <p style={{ fontSize:12, color:"rgba(226,232,245,0.4)", margin:0 }}>© {new Date().getFullYear()} MySindi · Todos os direitos reservados</p>
       </footer>
+    </div>
+  );
+};
+
+// ── Painel do Administrador (MySindi) ──
+const AdminPanel = ({ onSair }) => {
+  const isMobile = useIsMobile();
+  const [condominios, setCondominios] = useState([]);
+  const [gastos, setGastos]           = useState([]);
+  const [carregando, setCarregando]   = useState(true);
+  const [modalAcao, setModalAcao]     = useState(null); // { tipo, cond }
+  const [novoGasto, setNovoGasto]     = useState({ descricao:"", valor:"", mes: (()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; })() });
+  const [confirmNome, setConfirmNome] = useState("");
+  const [toast, setToast]             = useState(null);
+  const [mesFiltro, setMesFiltro]     = useState((()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; })());
+
+  const showToast = (msg, type="success") => setToast({ msg, type });
+
+  useEffect(() => {
+    const u1 = onSnapshot(collection(db, "condominios"), s => {
+      setCondominios(s.docs.map(d => ({ id:d.id, ...d.data() })));
+      setCarregando(false);
+    });
+    const u2 = onSnapshot(collection(db, "gastos_mysindi"), s => {
+      setGastos(s.docs.map(d => ({ id:d.id, ...d.data() })));
+    });
+    return () => { u1(); u2(); };
+  }, []);
+
+  // ── Cálculo do status de cada condomínio ──
+  const statusCond = (c) => {
+    if (c.plano === "cortesia") return "cortesia";
+    if (c.statusAssinatura === "ativo") return "ativo";
+    if (c.statusAssinatura === "bloqueado") return "expirado";
+    if (c.trialAte) {
+      const [d,m,a] = c.trialAte.split("/").map(Number);
+      const fim = new Date(a, m-1, d, 23,59,59);
+      if (new Date() > fim) return "expirado";
+      return "trial";
+    }
+    return "trial";
+  };
+
+  const precoPlano = (plano) => PLANOS[plano]?.preco || 0;
+
+  // ── Métricas do negócio ──
+  const ativos     = condominios.filter(c => statusCond(c) === "ativo");
+  const emTrial    = condominios.filter(c => statusCond(c) === "trial");
+  const expirados  = condominios.filter(c => statusCond(c) === "expirado");
+  const cortesias  = condominios.filter(c => statusCond(c) === "cortesia");
+  const clientesPagantes = ativos.length;
+  const mrr        = ativos.reduce((s,c) => s + precoPlano(c.plano), 0);
+  const ticketMedio = clientesPagantes > 0 ? mrr / clientesPagantes : 0;
+  const projecaoAnual = mrr * 12;
+
+  // ── Financeiro do mês selecionado ──
+  const gastosMes  = gastos.filter(g => g.mes === mesFiltro);
+  const totalGastosMes = gastosMes.reduce((s,g) => s + (g.valor||0), 0);
+  const receitaMes = mrr; // assinaturas ativas (recorrente)
+  const lucroMes   = receitaMes - totalGastosMes;
+  const margemLucro = receitaMes > 0 ? (lucroMes / receitaMes) * 100 : 0;
+
+  // ── Ações ──
+  const mudarStatus = async (cond, novoStatus) => {
+    await setDoc(doc(db, "condominios", cond.id), { statusAssinatura: novoStatus }, { merge:true });
+    showToast(novoStatus === "ativo" ? `${cond.nome} ativado!` : `${cond.nome} bloqueado.`, novoStatus === "ativo" ? "success" : "error");
+    setModalAcao(null);
+  };
+
+  const mudarPlano = async (cond, novoPlano) => {
+    await setDoc(doc(db, "condominios", cond.id), { plano: novoPlano }, { merge:true });
+    showToast(`Plano de ${cond.nome} alterado para ${PLANOS[novoPlano].nome}.`);
+    setModalAcao(null);
+  };
+
+  const estenderTrial = async (cond, dias) => {
+    const novaData = new Date(Date.now() + dias*24*60*60*1000).toLocaleDateString("pt-BR");
+    await setDoc(doc(db, "condominios", cond.id), { trialAte: novaData, statusAssinatura: "trial" }, { merge:true });
+    showToast(`Trial de ${cond.nome} estendido por ${dias} dias.`);
+    setModalAcao(null);
+  };
+
+  const excluirCondominio = async (cond) => {
+    // Apaga o condomínio e todos os dados vinculados
+    const colecoes = ["moradores","cobrancas","despesas","servicos","logs","acessos","reservas","observacoes"];
+    for (const col of colecoes) {
+      const snap = await getDocs(query(collection(db, col), where("condominioId","==",cond.id)));
+      const batch = writeBatch(db);
+      snap.docs.forEach(d => batch.delete(d.ref));
+      if (snap.docs.length) await batch.commit();
+    }
+    // Apaga o vínculo do usuário
+    if (cond.sindicoUid) {
+      try { await deleteDoc(doc(db, "usuarios", cond.sindicoUid)); } catch(e){}
+    }
+    await deleteDoc(doc(db, "condominios", cond.id));
+    showToast(`${cond.nome} e todos os dados foram excluídos.`, "error");
+    setModalAcao(null);
+    setConfirmNome("");
+  };
+
+  const addGasto = async () => {
+    if (!novoGasto.descricao || !novoGasto.valor) { showToast("Preencha descrição e valor.", "error"); return; }
+    await addDoc(collection(db, "gastos_mysindi"), {
+      descricao: novoGasto.descricao.trim(),
+      valor: parseFloat(novoGasto.valor) || 0,
+      mes: novoGasto.mes,
+      criadoEm: new Date().toLocaleDateString("pt-BR"),
+    });
+    setNovoGasto({ descricao:"", valor:"", mes: mesFiltro });
+    showToast("Gasto registrado!");
+  };
+
+  const removerGasto = async (id) => {
+    await deleteDoc(doc(db, "gastos_mysindi", id));
+    showToast("Gasto removido.", "error");
+  };
+
+  const mesLabelAdmin = (m) => {
+    const [a,mo] = m.split("-");
+    return `${["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][parseInt(mo)-1]}/${a}`;
+  };
+
+  const mesesGasto = () => {
+    const arr = [];
+    const hoje = new Date();
+    for (let i=0;i<12;i++){ const d=new Date(hoje.getFullYear(),hoje.getMonth()-i,1); arr.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`); }
+    return arr;
+  };
+
+  const badgeStatus = (st) => {
+    const map = {
+      cortesia:{ label:"Cortesia", bg:D.secondary, color:D.primary },
+      ativo:   { label:"Ativo",    bg:D.successBg, color:D.success },
+      trial:   { label:"Trial",    bg:D.warningBg, color:"#92400E" },
+      expirado:{ label:"Expirado", bg:D.dangerBg,  color:D.danger },
+    };
+    const b = map[st] || map.trial;
+    return <span style={{ background:b.bg, color:b.color, fontSize:11, fontWeight:600, padding:"3px 10px", borderRadius:20, fontFamily:D.fontBody }}>{b.label}</span>;
+  };
+
+  const card = { background:D.bgCard, borderRadius:D.radius, border:`1px solid ${D.border}`, boxShadow:D.shadow };
+
+  return (
+    <div style={{ minHeight:"100vh", background:D.bgApp, fontFamily:D.fontBody }}>
+      {toast && (()=>{ setTimeout(()=>setToast(null),3000); return (
+        <div style={{ position:"fixed", bottom:20, right:20, left: isMobile?20:"auto", background: toast.type==="error"?D.danger:D.success, color:"#fff", padding:"14px 18px", borderRadius:12, fontSize:14, zIndex:9999, boxShadow:D.shadowMd, fontFamily:D.fontBody }}>{toast.msg}</div>
+      );})()}
+
+      {/* Header */}
+      <header style={{ background:D.sidebar, color:"#fff", padding: isMobile?"16px 20px":"18px 40px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <div style={{ width:38, height:38, borderRadius:10, background:`linear-gradient(135deg, ${D.accent}, ${D.primary})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🏢</div>
+          <div>
+            <div style={{ fontFamily:D.fontDisplay, fontSize:17, fontWeight:700, letterSpacing:"-0.02em" }}>My<span style={{ color:D.accent }}>Sindi</span> · Admin</div>
+            <div style={{ fontSize:11, color:"rgba(226,232,245,0.5)" }}>Painel do administrador</div>
+          </div>
+        </div>
+        <button onClick={onSair} style={{ padding:"9px 18px", background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:D.radiusSm, color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Sair</button>
+      </header>
+
+      <div style={{ padding: isMobile?"20px 16px 40px":"28px 40px 60px", maxWidth:1200, margin:"0 auto" }}>
+
+        {carregando ? (
+          <div style={{ textAlign:"center", padding:60, color:D.textMut }}>Carregando dados...</div>
+        ) : (
+        <>
+          {/* Métricas principais */}
+          <h2 style={{ fontFamily:D.fontDisplay, fontSize:isMobile?20:24, fontWeight:700, color:D.text, margin:"0 0 16px", letterSpacing:"-0.02em" }}>Visão geral do negócio</h2>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(4,1fr)", gap:14, marginBottom:24 }}>
+            {[
+              { label:"Receita mensal (MRR)", valor:`R$ ${mrr.toFixed(2).replace(".",",")}`, icon:"💰", cor:D.success, bg:D.successBg },
+              { label:"Clientes pagantes", valor:clientesPagantes, icon:"✅", cor:D.primary, bg:D.secondary },
+              { label:"Em teste grátis", valor:emTrial.length, icon:"✨", cor:D.warning, bg:D.warningBg },
+              { label:"Projeção anual", valor:`R$ ${projecaoAnual.toFixed(0)}`, icon:"📈", cor:D.accent, bg:D.secondary },
+            ].map((m,i)=>(
+              <div key={i} style={{ ...card, padding:"18px 20px" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+                  <div style={{ width:34, height:34, borderRadius:9, background:m.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>{m.icon}</div>
+                </div>
+                <div style={{ fontFamily:D.fontDisplay, fontSize:isMobile?18:22, fontWeight:700, color:m.cor, letterSpacing:"-0.02em" }}>{m.valor}</div>
+                <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>{m.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Resumo de status */}
+          <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(4,1fr)", gap:14, marginBottom:32 }}>
+            {[
+              { label:"Total de condomínios", valor:condominios.length, cor:D.text },
+              { label:"Ativos", valor:ativos.length, cor:D.success },
+              { label:"Expirados", valor:expirados.length, cor:D.danger },
+              { label:"Cortesia", valor:cortesias.length, cor:D.textSec },
+            ].map((m,i)=>(
+              <div key={i} style={{ ...card, padding:"14px 18px", textAlign:"center" }}>
+                <div style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:700, color:m.cor }}>{m.valor}</div>
+                <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textSec, marginTop:2 }}>{m.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Financeiro */}
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:10 }}>
+            <h2 style={{ fontFamily:D.fontDisplay, fontSize:isMobile?20:24, fontWeight:700, color:D.text, margin:0, letterSpacing:"-0.02em" }}>Financeiro</h2>
+            <select value={mesFiltro} onChange={e=>setMesFiltro(e.target.value)} style={{ padding:"8px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, fontFamily:D.fontBody }}>
+              {mesesGasto().map(m => <option key={m} value={m}>{mesLabelAdmin(m)}</option>)}
+            </select>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"repeat(4,1fr)", gap:14, marginBottom:20 }}>
+            {[
+              { label:"Receita", valor:receitaMes, icon:"↑", cor:D.success },
+              { label:"Gastos", valor:totalGastosMes, icon:"↓", cor:D.danger },
+              { label:"Lucro", valor:lucroMes, icon:"=", cor: lucroMes>=0?D.success:D.danger },
+              { label:"Margem", valor:null, texto:`${margemLucro.toFixed(1)}%`, icon:"%", cor:D.accent },
+            ].map((m,i)=>(
+              <div key={i} style={{ ...card, padding:"18px 20px" }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginBottom:6 }}>{m.label}</div>
+                <div style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:700, color:m.cor, letterSpacing:"-0.02em" }}>
+                  {m.texto || `R$ ${m.valor.toFixed(2).replace(".",",")}`}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Registrar gastos */}
+          <div style={{ ...card, padding: isMobile?18:24, marginBottom:32 }}>
+            <h3 style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, margin:"0 0 14px", letterSpacing:"-0.02em" }}>Registrar gasto — {mesLabelAdmin(mesFiltro)}</h3>
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:16 }}>
+              <input value={novoGasto.descricao} onChange={e=>setNovoGasto(p=>({...p,descricao:e.target.value}))} placeholder="Descrição (ex: Firebase, Vercel...)" style={{ flex: isMobile?"1 1 100%":"2 1 200px", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
+              <input type="number" value={novoGasto.valor} onChange={e=>setNovoGasto(p=>({...p,valor:e.target.value}))} placeholder="Valor (R$)" style={{ flex: isMobile?"1 1 100%":"1 1 100px", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
+              <select value={novoGasto.mes} onChange={e=>setNovoGasto(p=>({...p,mes:e.target.value}))} style={{ flex: isMobile?"1 1 100%":"1 1 120px", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontFamily:D.fontBody, color:D.text, background:"#fff" }}>
+                {mesesGasto().map(m => <option key={m} value={m}>{mesLabelAdmin(m)}</option>)}
+              </select>
+              <button onClick={addGasto} style={{ flex: isMobile?"1 1 100%":"0 0 auto", padding:"10px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>+ Adicionar</button>
+            </div>
+            {gastosMes.length > 0 ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {gastosMes.map(g => (
+                  <div key={g.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", background:D.muted, borderRadius:D.radiusSm }}>
+                    <span style={{ fontFamily:D.fontBody, fontSize:14, color:D.text }}>{g.descricao}</span>
+                    <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                      <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.danger }}>R$ {g.valor.toFixed(2).replace(".",",")}</span>
+                      <button onClick={()=>removerGasto(g.id)} style={{ background:"none", border:"none", color:D.textMut, cursor:"pointer", fontSize:16 }}>×</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut, textAlign:"center", padding:"16px 0" }}>Nenhum gasto registrado neste mês.</div>
+            )}
+          </div>
+
+          {/* Lista de condomínios */}
+          <h2 style={{ fontFamily:D.fontDisplay, fontSize:isMobile?20:24, fontWeight:700, color:D.text, margin:"0 0 16px", letterSpacing:"-0.02em" }}>Condomínios ({condominios.length})</h2>
+          <div style={{ ...card, overflow:"hidden" }}>
+            {condominios.length === 0 ? (
+              <div style={{ padding:40, textAlign:"center", color:D.textMut, fontFamily:D.fontBody }}>Nenhum condomínio cadastrado ainda.</div>
+            ) : isMobile ? (
+              <div style={{ padding:12, display:"flex", flexDirection:"column", gap:10 }}>
+                {condominios.map(c => (
+                  <div key={c.id} style={{ background:D.muted, borderRadius:D.radiusSm, padding:14 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                      <div>
+                        <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text }}>{c.nome}</div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{c.numApartamentos} apt · {PLANOS[c.plano]?.nome}</div>
+                      </div>
+                      {badgeStatus(statusCond(c))}
+                    </div>
+                    <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginBottom:10 }}>{c.sindicoEmail}</div>
+                    <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                      <button onClick={()=>setModalAcao({tipo:"gerenciar",cond:c})} style={{ padding:"6px 12px", background:D.primary, color:"#fff", border:"none", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Gerenciar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                <thead>
+                  <tr style={{ background:D.muted }}>
+                    {["Condomínio","Síndico","Plano","Status","MRR","Ações"].map(h=>(
+                      <th key={h} style={{ padding:"12px 18px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {condominios.map(c => (
+                    <tr key={c.id} style={{ borderBottom:`1px solid ${D.border}` }}>
+                      <td style={{ padding:"14px 18px" }}>
+                        <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>{c.nome}</div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut }}>{c.numApartamentos} apartamentos</div>
+                      </td>
+                      <td style={{ padding:"14px 18px", fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{c.sindicoEmail}</td>
+                      <td style={{ padding:"14px 18px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{PLANOS[c.plano]?.nome}</td>
+                      <td style={{ padding:"14px 18px" }}>{badgeStatus(statusCond(c))}</td>
+                      <td style={{ padding:"14px 18px", fontFamily:D.fontDisplay, fontSize:13, fontWeight:600, color: statusCond(c)==="ativo"?D.success:D.textMut }}>
+                        {statusCond(c)==="ativo" ? `R$ ${precoPlano(c.plano)}` : "—"}
+                      </td>
+                      <td style={{ padding:"14px 18px" }}>
+                        <button onClick={()=>setModalAcao({tipo:"gerenciar",cond:c})} style={{ padding:"6px 14px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Gerenciar</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+        )}
+      </div>
+
+      {/* Modal de gerenciamento */}
+      {modalAcao?.tipo === "gerenciar" && (() => {
+        const c = modalAcao.cond;
+        const st = statusCond(c);
+        return (
+          <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.65)", zIndex:1000, display:"flex", alignItems: isMobile?"flex-end":"center", justifyContent:"center", padding: isMobile?0:16 }} onClick={()=>setModalAcao(null)}>
+            <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius: isMobile?"20px 20px 0 0":D.radius, width:"100%", maxWidth:480, maxHeight:"90vh", overflow:"auto", boxShadow:D.shadowMd }}>
+              <div style={{ padding:"20px 24px 16px", borderBottom:`1px solid ${D.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:17, fontWeight:700, color:D.text, letterSpacing:"-0.02em" }}>{c.nome}</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>{c.sindicoEmail}</div>
+                </div>
+                <button onClick={()=>setModalAcao(null)} style={{ background:D.muted, border:"none", width:32, height:32, borderRadius:"50%", cursor:"pointer", fontSize:18, color:D.textSec }}>×</button>
+              </div>
+              <div style={{ padding:"20px 24px 28px" }}>
+                {/* Status atual */}
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:20 }}>
+                  <span style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>Status atual:</span>
+                  {badgeStatus(st)}
+                  {c.trialAte && st==="trial" && <span style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut }}>até {c.trialAte}</span>}
+                </div>
+
+                {/* Ativar/Bloquear */}
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", marginBottom:10 }}>Assinatura</div>
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                    <button onClick={()=>mudarStatus(c,"ativo")} disabled={st==="cortesia"} style={{ flex:1, padding:"10px", background: st==="ativo"?D.success:D.successBg, color: st==="ativo"?"#fff":D.success, border:`1px solid ${D.success}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: st==="cortesia"?"not-allowed":"pointer", opacity: st==="cortesia"?.5:1, fontFamily:D.fontBody }}>✓ Ativar</button>
+                    <button onClick={()=>mudarStatus(c,"bloqueado")} disabled={st==="cortesia"} style={{ flex:1, padding:"10px", background: st==="expirado"?D.danger:D.dangerBg, color: st==="expirado"?"#fff":D.danger, border:`1px solid ${D.danger}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: st==="cortesia"?"not-allowed":"pointer", opacity: st==="cortesia"?.5:1, fontFamily:D.fontBody }}>✕ Bloquear</button>
+                  </div>
+                  {st==="cortesia" && <p style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, margin:"8px 0 0" }}>Condomínio em cortesia não é afetado por bloqueios.</p>}
+                </div>
+
+                {/* Mudar plano */}
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", marginBottom:10 }}>Mudar plano</div>
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                    {Object.keys(PLANOS).map(pk => (
+                      <button key={pk} onClick={()=>mudarPlano(c,pk)} style={{ flex:"1 1 auto", padding:"8px 12px", background: c.plano===pk?D.primary:D.muted, color: c.plano===pk?"#fff":D.text, border:`1px solid ${c.plano===pk?D.primary:D.border}`, borderRadius:D.radiusSm, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                        {PLANOS[pk].nome}<br/><span style={{ fontSize:10, opacity:.8 }}>R$ {PLANOS[pk].preco}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Estender trial */}
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", marginBottom:10 }}>Estender teste grátis</div>
+                  <div style={{ display:"flex", gap:8 }}>
+                    {[7,14,30].map(d => (
+                      <button key={d} onClick={()=>estenderTrial(c,d)} style={{ flex:1, padding:"9px", background:D.warningBg, color:"#92400E", border:`1px solid ${D.warning}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>+{d} dias</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Excluir */}
+                <div style={{ borderTop:`1px solid ${D.border}`, paddingTop:20 }}>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.danger, textTransform:"uppercase", letterSpacing:".8px", marginBottom:10 }}>Zona de perigo</div>
+                  <button onClick={()=>setModalAcao({tipo:"excluir",cond:c})} style={{ width:"100%", padding:"10px", background:"#fff", color:D.danger, border:`1.5px solid ${D.danger}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>🗑️ Excluir condomínio permanentemente</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal de confirmação de exclusão */}
+      {modalAcao?.tipo === "excluir" && (() => {
+        const c = modalAcao.cond;
+        return (
+          <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.75)", zIndex:1100, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+            <div style={{ background:"#fff", borderRadius:D.radius, width:"100%", maxWidth:440, boxShadow:D.shadowMd, padding:"28px 26px" }}>
+              <div style={{ fontSize:32, marginBottom:12, textAlign:"center" }}>⚠️</div>
+              <h3 style={{ fontFamily:D.fontDisplay, fontSize:18, fontWeight:700, color:D.text, margin:"0 0 10px", textAlign:"center", letterSpacing:"-0.02em" }}>Excluir {c.nome}?</h3>
+              <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.6, margin:"0 0 18px", textAlign:"center" }}>
+                Esta ação é <b>irreversível</b>. Todos os dados serão apagados permanentemente: moradores, cobranças, despesas, serviços, reservas e histórico.
+              </p>
+              <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.text, margin:"0 0 8px" }}>Digite <b>{c.nome}</b> para confirmar:</p>
+              <input value={confirmNome} onChange={e=>setConfirmNome(e.target.value)} placeholder={c.nome} style={{ width:"100%", padding:"11px 14px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box", marginBottom:18 }} />
+              <div style={{ display:"flex", gap:10 }}>
+                <button onClick={()=>{setModalAcao({tipo:"gerenciar",cond:c}); setConfirmNome("");}} style={{ flex:1, padding:"11px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+                <button onClick={()=>excluirCondominio(c)} disabled={confirmNome !== c.nome} style={{ flex:1, padding:"11px", background: confirmNome===c.nome?D.danger:D.dangerBg, color: confirmNome===c.nome?"#fff":D.danger, border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor: confirmNome===c.nome?"pointer":"not-allowed", opacity: confirmNome===c.nome?1:.6, fontFamily:D.fontBody }}>Excluir</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
@@ -1677,6 +2078,11 @@ export default function App() {
     return <Login modoInicial={authView === "cadastro" ? "cadastro" : "login"} onVoltar={modoVisitante ? null : () => setAuthView("landing")} />;
   }
 
+  // ── Painel do administrador (MySindi) ──
+  if (user && user.email === ADMIN_EMAIL && modoAdmin) {
+    return <AdminPanel onSair={() => { signOut(auth); window.location.href = window.location.origin + window.location.pathname; }} />;
+  }
+
   // ── Portal do morador (link individual) ──
   if (portalMoradorId && user) {
     return <PortalMorador moradorId={portalMoradorId} db={db} taxa={taxa} mesLabel={mesLabel} mesAtual={mesAtual} />;
@@ -1686,6 +2092,22 @@ export default function App() {
   if (!condCarregado) return (
     <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:D.sidebar, color:"#fff", fontFamily:D.fontBody }}>
       Carregando condomínio...
+    </div>
+  );
+
+  // ── Admin sem ?admin=1 na URL: oferece ir para o painel ──
+  if (!condominioId && !readOnly && user.email === ADMIN_EMAIL) return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:D.sidebar, color:"#fff", fontFamily:D.fontBody, padding:24 }}>
+      <div style={{ background:"#fff", borderRadius:D.radius, padding:"36px 32px", maxWidth:440, textAlign:"center", boxShadow:D.shadowMd }}>
+        <div style={{ width:60, height:60, borderRadius:16, background:`linear-gradient(135deg, ${D.accent}, ${D.primary})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", fontSize:28 }}>🏢</div>
+        <h2 style={{ fontFamily:D.fontDisplay, color:D.text, fontSize:20, margin:"0 0 10px", letterSpacing:"-0.02em" }}>Bem-vindo, Admin</h2>
+        <p style={{ fontFamily:D.fontBody, color:D.textSec, fontSize:14, lineHeight:1.6, margin:"0 0 20px" }}>
+          Você está logado como administrador do MySindi. Acesse o painel para gerenciar todos os condomínios e ver as métricas do negócio.
+        </p>
+        <a href={`${window.location.origin}${window.location.pathname}?admin=1`} style={{ display:"inline-block", padding:"12px 28px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, textDecoration:"none", marginBottom:12 }}>Abrir painel admin →</a>
+        <br/>
+        <button onClick={() => signOut(auth)} style={{ padding:"9px 20px", background:"none", color:D.textSec, border:"none", fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>Sair</button>
+      </div>
     </div>
   );
 

@@ -305,7 +305,16 @@ const Login = () => {
       const condId = gerarCondId(nomeCond);
       const plano = planoPorTamanho(numApt);
 
-      // 2. Cria o condomínio
+      // 2. Vincula usuário → condomínio PRIMEIRO (o app lê isto ao carregar)
+      await setDoc(doc(db, "usuarios", uid), {
+        email: email.trim(),
+        nome: nomeSindico.trim(),
+        condominioId: condId,
+        papel: "sindico",
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
+      });
+
+      // 3. Cria o condomínio
       await setDoc(doc(db, "condominios", condId), {
         nome: nomeCond.trim(),
         plano,
@@ -317,18 +326,8 @@ const Login = () => {
         sindicoUid: uid,
         criadoEm: new Date().toLocaleDateString("pt-BR"),
         ativo: true,
-        // Teste grátis de 14 dias
         trialAte: new Date(Date.now() + 14*24*60*60*1000).toLocaleDateString("pt-BR"),
         statusAssinatura: "trial",
-      });
-
-      // 3. Vincula usuário → condomínio
-      await setDoc(doc(db, "usuarios", uid), {
-        email: email.trim(),
-        nome: nomeSindico.trim(),
-        condominioId: condId,
-        papel: "sindico",
-        criadoEm: new Date().toLocaleDateString("pt-BR"),
       });
       // O onAuthStateChanged já vai detectar o login e carregar o condomínio
     } catch (e) {
@@ -687,25 +686,31 @@ export default function App() {
       return;
     }
 
-    // Síndico: busca o vínculo usuario → condominioId
+    // Síndico: busca o vínculo usuario → condominioId (com retry para contas recém-criadas)
     (async () => {
-      try {
-        const uSnap = await getDoc(doc(db, "usuarios", user.uid));
-        if (uSnap.exists() && uSnap.data().condominioId) {
-          const cId = uSnap.data().condominioId;
-          setCondominioId(cId);
-          const cSnap = await getDoc(doc(db, "condominios", cId));
-          if (cSnap.exists()) setCondominio({ id:cSnap.id, ...cSnap.data() });
-        } else {
-          // Sem vínculo — usuário ainda não tem condomínio (será tratado na Fase 2)
-          setCondominioId(null);
-          setCondominio(null);
+      const buscarVinculo = async (tentativas = 5) => {
+        for (let i = 0; i < tentativas; i++) {
+          try {
+            const uSnap = await getDoc(doc(db, "usuarios", user.uid));
+            if (uSnap.exists() && uSnap.data().condominioId) {
+              const cId = uSnap.data().condominioId;
+              setCondominioId(cId);
+              const cSnap = await getDoc(doc(db, "condominios", cId));
+              if (cSnap.exists()) setCondominio({ id:cSnap.id, ...cSnap.data() });
+              return true;
+            }
+          } catch (e) {
+            console.error("Erro ao carregar condomínio:", e);
+          }
+          // Aguarda antes de tentar de novo (conta recém-criada pode não ter propagado)
+          if (i < tentativas - 1) await new Promise(r => setTimeout(r, 800));
         }
-      } catch (e) {
-        console.error("Erro ao carregar condomínio:", e);
-      } finally {
-        setCondCarregado(true);
-      }
+        return false;
+      };
+
+      const achou = await buscarVinculo();
+      if (!achou) { setCondominioId(null); setCondominio(null); }
+      setCondCarregado(true);
     })();
   }, [user, readOnly]);
 

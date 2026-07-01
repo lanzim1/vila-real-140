@@ -1724,9 +1724,10 @@ export default function App() {
             </div>
           </div>
         </div>
-        <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.6, margin:"0 0 20px" }}>
+        <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.7, margin:"0 0 20px" }}>
           Entre em contato para ativar sua assinatura:<br/>
-          <a href="mailto:contato@mysindi.com.br" style={{ color:D.accent, fontWeight:600, textDecoration:"none" }}>contato@mysindi.com.br</a>
+          <a href="mailto:comercial.mysindi@gmail.com" style={{ color:D.accent, fontWeight:600, textDecoration:"none" }}>comercial.mysindi@gmail.com</a><br/>
+          <a href="https://wa.me/5585996532638" target="_blank" rel="noopener noreferrer" style={{ color:D.success, fontWeight:600, textDecoration:"none" }}>WhatsApp: (85) 99653-2638</a>
         </p>
         <button onClick={() => signOut(auth)} style={{ padding:"11px 24px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Sair</button>
       </div>
@@ -1884,7 +1885,7 @@ export default function App() {
                   : `Teste grátis: ${infoAssinatura.diasRestantes} ${infoAssinatura.diasRestantes === 1 ? "dia restante" : "dias restantes"}`}
               </span>
             </div>
-            <a href="mailto:contato@mysindi.com.br" style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.accent, textDecoration:"none", whiteSpace:"nowrap" }}>Assinar agora →</a>
+            <a href="mailto:comercial.mysindi@gmail.com" style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.accent, textDecoration:"none", whiteSpace:"nowrap" }}>Assinar agora →</a>
           </div>
         )}
 
@@ -2629,7 +2630,7 @@ export default function App() {
                   )}
                 </div>
                 {infoAssinatura.estado !== "cortesia" && infoAssinatura.estado !== "ativo" && (
-                  <a href="mailto:contato@mysindi.com.br" style={{ padding:"10px 20px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>Assinar</a>
+                  <a href="mailto:comercial.mysindi@gmail.com" style={{ padding:"10px 20px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>Assinar</a>
                 )}
               </div>
             </div>

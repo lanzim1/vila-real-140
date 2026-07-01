@@ -838,6 +838,28 @@ export default function App() {
 
   const readOnly = user?.email === VISITANTE_EMAIL;
 
+  // ── Status da assinatura (Fase 4a) ──
+  // Retorna { estado, diasRestantes } onde estado ∈ 'cortesia'|'ativo'|'trial'|'expirado'
+  const infoAssinatura = (() => {
+    if (!condominio) return { estado:"trial", diasRestantes:0 };
+    // Plano cortesia (ex: Vila Real) nunca expira
+    if (condominio.plano === "cortesia") return { estado:"cortesia", diasRestantes:null };
+    // Assinatura ativa (pagante)
+    if (condominio.statusAssinatura === "ativo") return { estado:"ativo", diasRestantes:null };
+    // Bloqueio manual
+    if (condominio.statusAssinatura === "bloqueado") return { estado:"expirado", diasRestantes:0 };
+    // Trial: calcula dias restantes a partir de trialAte (formato dd/mm/aaaa)
+    if (condominio.trialAte) {
+      const [d,m,a] = condominio.trialAte.split("/").map(Number);
+      const fim = new Date(a, m-1, d, 23, 59, 59);
+      const hoje = new Date();
+      const diff = Math.ceil((fim - hoje) / (1000*60*60*24));
+      if (diff < 0) return { estado:"expirado", diasRestantes:0 };
+      return { estado:"trial", diasRestantes:diff };
+    }
+    return { estado:"trial", diasRestantes:0 };
+  })();
+
   // ── Carregar o condomínio vinculado ao usuário (multi-tenant) ──
   useEffect(() => {
     if (!user) { setCondCarregado(false); return; }
@@ -1681,6 +1703,36 @@ export default function App() {
     </div>
   );
 
+  // ── Trial expirado — bloqueio de acesso (Fase 4a) ──
+  if (!readOnly && condominioId && infoAssinatura.estado === "expirado") return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:D.sidebar, color:"#fff", fontFamily:D.fontBody, padding:24 }}>
+      <div style={{ background:"#fff", borderRadius:D.radiusXl, padding:"40px 34px", maxWidth:460, textAlign:"center", boxShadow:D.shadowMd }}>
+        <div style={{ width:64, height:64, borderRadius:16, background:D.warningBg, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 18px", fontSize:30 }}>⏰</div>
+        <h2 style={{ fontFamily:D.fontDisplay, color:D.text, fontSize:22, margin:"0 0 10px", letterSpacing:"-0.02em" }}>Seu teste grátis expirou</h2>
+        <p style={{ fontFamily:D.fontBody, color:D.textSec, fontSize:14, lineHeight:1.7, margin:"0 0 24px" }}>
+          Esperamos que tenha gostado do MySindi! Para continuar gerenciando o <b>{condominio?.nome}</b> com todas as funcionalidades, ative sua assinatura.
+        </p>
+        <div style={{ background:D.muted, borderRadius:D.radius, padding:"18px 20px", marginBottom:24, textAlign:"left" }}>
+          <div style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", marginBottom:8 }}>Seu plano</div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div>
+              <div style={{ fontFamily:D.fontDisplay, fontSize:18, fontWeight:700, color:D.text }}>{PLANOS[condominio?.plano]?.nome || "Básico"}</div>
+              <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{condominio?.numApartamentos} apartamentos</div>
+            </div>
+            <div style={{ fontFamily:D.fontDisplay, fontSize:24, fontWeight:700, color:D.primary }}>
+              R$ {PLANOS[condominio?.plano]?.preco || 79}<span style={{ fontSize:14, color:D.textSec, fontWeight:400 }}>/mês</span>
+            </div>
+          </div>
+        </div>
+        <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.6, margin:"0 0 20px" }}>
+          Entre em contato para ativar sua assinatura:<br/>
+          <a href="mailto:contato@mysindi.com.br" style={{ color:D.accent, fontWeight:600, textDecoration:"none" }}>contato@mysindi.com.br</a>
+        </p>
+        <button onClick={() => signOut(auth)} style={{ padding:"11px 24px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Sair</button>
+      </div>
+    </div>
+  );
+
   // ── helpers de estilo responsivo ──
   const h2size = isMobile ? 20 : 22;
   const pad    = isMobile ? "16px 16px 100px" : "24px 28px 40px"; // mantido por compatibilidade
@@ -1821,6 +1873,21 @@ export default function App() {
 
       {/* ── Conteúdo ── */}
       <main style={{ flex:1, overflow:"auto", background:D.bgApp }}>
+        {/* Faixa de aviso do trial */}
+        {!readOnly && infoAssinatura.estado === "trial" && (
+          <div style={{ background: infoAssinatura.diasRestantes <= 3 ? D.warningBg : D.secondary, borderBottom:`1px solid ${D.border}`, padding: isMobile?"10px 16px":"10px 28px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, fontFamily:D.fontBody, fontSize:13, color: infoAssinatura.diasRestantes <= 3 ? "#92400E" : D.primary, fontWeight:500 }}>
+              <span>{infoAssinatura.diasRestantes <= 3 ? "⏰" : "✨"}</span>
+              <span>
+                {infoAssinatura.diasRestantes === 0
+                  ? "Seu teste grátis termina hoje!"
+                  : `Teste grátis: ${infoAssinatura.diasRestantes} ${infoAssinatura.diasRestantes === 1 ? "dia restante" : "dias restantes"}`}
+              </span>
+            </div>
+            <a href="mailto:contato@mysindi.com.br" style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.accent, textDecoration:"none", whiteSpace:"nowrap" }}>Assinar agora →</a>
+          </div>
+        )}
+
 
         {/* ── Dashboard ── */}
         {aba === "dashboard" && (
@@ -2534,6 +2601,39 @@ export default function App() {
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Configurações</h2>
             <p style={{ color:"#6B7A8D", margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>
+
+            {/* Card de assinatura */}
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
+              <h3 style={{ color:D.text, margin:"0 0 16px", fontSize:14, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>💳 Sua assinatura</h3>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
+                <div>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                    <span style={{ fontFamily:D.fontDisplay, fontSize:18, fontWeight:700, color:D.text }}>Plano {PLANOS[condominio?.plano]?.nome || "—"}</span>
+                    {(() => {
+                      const badges = {
+                        cortesia: { label:"Cortesia",  bg:D.secondary,  color:D.primary },
+                        ativo:    { label:"Ativo",     bg:D.successBg,  color:D.success },
+                        trial:    { label:`Teste · ${infoAssinatura.diasRestantes}d`, bg:D.warningBg, color:"#92400E" },
+                        expirado: { label:"Expirado",  bg:D.dangerBg,   color:D.danger },
+                      };
+                      const b = badges[infoAssinatura.estado] || badges.trial;
+                      return <span style={{ background:b.bg, color:b.color, fontSize:12, fontWeight:600, padding:"3px 12px", borderRadius:20, fontFamily:D.fontBody }}>{b.label}</span>;
+                    })()}
+                  </div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>
+                    {condominio?.numApartamentos} apartamentos
+                    {condominio?.plano !== "cortesia" && ` · R$ ${PLANOS[condominio?.plano]?.preco || 0}/mês`}
+                  </div>
+                  {infoAssinatura.estado === "trial" && (
+                    <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:4 }}>Teste grátis até {condominio?.trialAte}</div>
+                  )}
+                </div>
+                {infoAssinatura.estado !== "cortesia" && infoAssinatura.estado !== "ativo" && (
+                  <a href="mailto:contato@mysindi.com.br" style={{ padding:"10px 20px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>Assinar</a>
+                )}
+              </div>
+            </div>
+
             <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
               <h3 style={{ color:D.text, margin:"0 0 16px", fontSize:14, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Taxa mensal</h3>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Valor (R$)</label>

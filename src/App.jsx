@@ -36,10 +36,45 @@ const modoAdmin = typeof window !== "undefined" &&
 // Cada condomínio é identificado por um condominioId. Coleções "globais"
 // como condominios/usuarios não levam o filtro; as demais sempre filtram.
 const PLANOS = {
-  cortesia:  { nome:"Cortesia",  limite: 9999, preco: 0,   cor:"#6B7A9E" },
-  basico:    { nome:"Básico",    limite: 20,   preco: 79,  cor:"#22A26B" },
-  padrao:    { nome:"Padrão",    limite: 50,   preco: 149, cor:"#4B72C4" },
-  avancado:  { nome:"Avançado",  limite: 100,  preco: 249, cor:"#1E3A72" },
+  cortesia:  { nome:"Cortesia",  limite: 9999, preco: 0,   precoAnual: 0,    cor:"#6B7A9E" },
+  basico:    { nome:"Básico",    limite: 20,   preco: 79,  precoAnual: 790,  cor:"#22A26B" },
+  padrao:    { nome:"Padrão",    limite: 50,   preco: 149, precoAnual: 1490, cor:"#4B72C4" },
+  avancado:  { nome:"Avançado",  limite: 100,  preco: 249, precoAnual: 2490, cor:"#1E3A72" },
+};
+
+// Hierarquia de planos (nível de acesso). Cortesia tem acesso total (uso interno).
+const NIVEL_PLANO = { basico: 1, padrao: 2, avancado: 3, cortesia: 99 };
+
+// Plano mínimo exigido por cada recurso/aba.
+const RECURSO_PLANO = {
+  // Básico (essencial)
+  dashboard:  "basico",
+  moradores:  "basico",
+  cobrancas:  "basico",
+  despesas:   "basico",
+  config:     "basico",
+  // Padrão (gestão completa)
+  servicos:   "padrao",
+  reservas:   "padrao",
+  acessos:    "padrao",
+  historico:  "padrao",
+  emailAuto:  "padrao",
+  dashAnual:  "padrao",
+  prestacao:  "padrao",
+  // Avançado (premium — a construir)
+  comunicados:"avancado",
+  entregas:   "avancado",
+  fundoReserva:"avancado",
+  documentos: "avancado",
+  agenda:     "avancado",
+};
+
+// Verifica se um plano tem acesso a um recurso
+const temAcesso = (plano, recurso) => {
+  const nivelPlano = NIVEL_PLANO[plano] ?? 0;
+  const recursoMin = RECURSO_PLANO[recurso] || "basico";
+  const nivelRecurso = NIVEL_PLANO[recursoMin] ?? 1;
+  return nivelPlano >= nivelRecurso;
 };
 
 const modoVisitante = typeof window !== "undefined" &&
@@ -174,6 +209,50 @@ const Badge = ({ status }) => {
   );
 };
 
+
+// ── Tela de upgrade (recurso bloqueado pelo plano) ──
+const UpgradeCard = ({ recurso, planoNecessario, isMobile }) => {
+  const p = PLANOS[planoNecessario] || {};
+  const descricoes = {
+    servicos:    "Registre e acompanhe manutenções, com controle de custos de material e mão de obra.",
+    reservas:    "Permita que moradores reservem churrasqueira, salão de festas e outras áreas comuns, com aprovação do síndico.",
+    acessos:     "Controle a entrada e saída de visitantes e prestadores de serviço.",
+    historico:   "Acompanhe todo o histórico de ações do condomínio para total transparência.",
+    comunicados: "Publique avisos e comunicados para todos os moradores de uma vez.",
+    entregas:    "Registre encomendas e notifique os moradores automaticamente.",
+    fundoReserva:"Separe automaticamente uma parte da arrecadação para o fundo de reserva.",
+    documentos:  "Guarde documentos importantes com alerta de vencimento (alvará, seguro, etc.).",
+    agenda:      "Organize eventos, manutenções e assembleias em um calendário do condomínio.",
+  };
+  return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"60vh", padding: isMobile?"20px":"40px" }}>
+      <div style={{ background:D.bgCard, borderRadius:D.radiusXl, border:`1px solid ${D.border}`, boxShadow:D.shadow, padding: isMobile?"32px 24px":"48px 40px", maxWidth:460, textAlign:"center" }}>
+        <div style={{ width:64, height:64, borderRadius:16, background:D.secondary, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", fontSize:30 }}>🔒</div>
+        <div style={{ display:"inline-block", background: p.cor||D.accent, color:"#fff", fontSize:12, fontWeight:700, padding:"4px 14px", borderRadius:20, marginBottom:16, fontFamily:D.fontBody }}>
+          Plano {p.nome}
+        </div>
+        <h2 style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:D.text, margin:"0 0 12px", letterSpacing:"-0.02em" }}>
+          Recurso disponível no plano {p.nome}
+        </h2>
+        <p style={{ fontFamily:D.fontBody, fontSize:14, color:D.textSec, lineHeight:1.6, margin:"0 0 24px" }}>
+          {descricoes[recurso] || "Este recurso está disponível em um plano superior."}
+        </p>
+        <div style={{ background:D.muted, borderRadius:D.radius, padding:"16px 20px", marginBottom:24 }}>
+          <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, marginBottom:4 }}>Faça upgrade por</div>
+          <div style={{ fontFamily:D.fontDisplay, fontSize:28, fontWeight:700, color:D.text, letterSpacing:"-0.02em" }}>
+            R$ {p.preco}<span style={{ fontSize:15, color:D.textSec, fontWeight:400 }}>/mês</span>
+          </div>
+        </div>
+        <a href="mailto:comercial.mysindi@gmail.com?subject=Upgrade de plano — MySindi" style={{ display:"inline-block", padding:"13px 32px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:15, fontWeight:700, textDecoration:"none", fontFamily:D.fontBody, boxShadow:`0 4px 16px rgba(30,58,114,0.3)` }}>
+          Fazer upgrade →
+        </a>
+        <p style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, margin:"16px 0 0" }}>
+          Fale conosco: comercial.mysindi@gmail.com · (85) 99653-2638
+        </p>
+      </div>
+    </div>
+  );
+};
 
 // ── Top Bar ──
 const TopBar = ({ title, user, readOnly, nPendentes }) => {
@@ -333,6 +412,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
         ativo: true,
         trialAte: new Date(Date.now() + 14*24*60*60*1000).toLocaleDateString("pt-BR"),
         statusAssinatura: "trial",
+        cicloCobranca: "mensal",
       });
       // O onAuthStateChanged já vai detectar o login e carregar o condomínio
     } catch (e) {
@@ -453,10 +533,12 @@ const LandingPage = ({ onEntrar, onCadastrar }) => {
     { icon:"📋", titulo:"Histórico completo", desc:"Todas as ações ficam registradas para total transparência da gestão." },
   ];
 
+  const [cicloAnual, setCicloAnual] = useState(false);
+
   const planos = [
-    { nome:"Básico",   preco:79,  apt:"até 20 apartamentos",   destaque:false, recursos:["Todas as funcionalidades","Cobranças automáticas","Portal do morador","Relatórios em PDF","Suporte por e-mail"] },
-    { nome:"Padrão",   preco:149, apt:"21 a 50 apartamentos",  destaque:true,  recursos:["Tudo do plano Básico","Dashboard financeiro anual","Controle de acessos","Reserva de áreas","Suporte prioritário"] },
-    { nome:"Avançado", preco:249, apt:"51 a 100 apartamentos", destaque:false, recursos:["Tudo do plano Padrão","Múltiplos administradores","Backup automático","Suporte via WhatsApp","Onboarding assistido"] },
+    { nome:"Básico",   preco:79,  precoAnual:790,  apt:"até 20 apartamentos",   destaque:false, recursos:["Cadastro de moradores","Cobranças e pagamentos","Portal do morador","Registro de despesas","Comprovantes em PDF","Suporte por e-mail"] },
+    { nome:"Padrão",   preco:149, precoAnual:1490, apt:"21 a 50 apartamentos",  destaque:true,  recursos:["Tudo do Básico +","E-mails automáticos","Reserva de áreas","Controle de acessos","Serviços e manutenção","Dashboard financeiro anual","Prestação de contas em PDF"] },
+    { nome:"Avançado", preco:249, precoAnual:2490, apt:"51 a 100 apartamentos", destaque:false, recursos:["Tudo do Padrão +","Avisos e comunicados","Controle de entregas","Fundo de reserva","Controle de documentos","Agenda do condomínio","Suporte via WhatsApp"] },
   ];
 
   return (
@@ -515,9 +597,16 @@ const LandingPage = ({ onEntrar, onCadastrar }) => {
       {/* Planos */}
       <section style={{ padding: isMobile?"48px 20px":"72px 40px", background:D.bgCard, borderTop:`1px solid ${D.border}`, borderBottom:`1px solid ${D.border}` }}>
         <div style={{ maxWidth:1000, margin:"0 auto" }}>
-          <div style={{ textAlign:"center", marginBottom:isMobile?32:48 }}>
+          <div style={{ textAlign:"center", marginBottom:isMobile?28:36 }}>
             <h2 style={{ fontFamily:D.fontDisplay, fontSize:isMobile?26:36, fontWeight:700, letterSpacing:"-0.02em", color:D.text, margin:"0 0 12px" }}>Planos que cabem no seu bolso</h2>
-            <p style={{ fontSize:16, color:D.textSec, margin:0 }}>Escolha de acordo com o tamanho do seu condomínio. Cancele quando quiser.</p>
+            <p style={{ fontSize:16, color:D.textSec, margin:"0 0 24px" }}>Escolha de acordo com o tamanho do seu condomínio. Cancele quando quiser.</p>
+            {/* Seletor mensal/anual */}
+            <div style={{ display:"inline-flex", background:D.muted, borderRadius:30, padding:4, position:"relative" }}>
+              <button onClick={()=>setCicloAnual(false)} style={{ padding:"9px 22px", borderRadius:24, border:"none", cursor:"pointer", fontFamily:D.fontBody, fontSize:14, fontWeight:600, background: !cicloAnual?D.bgCard:"transparent", color: !cicloAnual?D.text:D.textSec, boxShadow: !cicloAnual?D.shadow:"none" }}>Mensal</button>
+              <button onClick={()=>setCicloAnual(true)} style={{ padding:"9px 22px", borderRadius:24, border:"none", cursor:"pointer", fontFamily:D.fontBody, fontSize:14, fontWeight:600, background: cicloAnual?D.bgCard:"transparent", color: cicloAnual?D.text:D.textSec, boxShadow: cicloAnual?D.shadow:"none", display:"flex", alignItems:"center", gap:8 }}>
+                Anual <span style={{ background:D.successBg, color:D.success, fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:12 }}>-17%</span>
+              </button>
+            </div>
           </div>
           <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"repeat(3,1fr)", gap:20, alignItems:"start" }}>
             {planos.map((p,i) => (
@@ -528,8 +617,18 @@ const LandingPage = ({ onEntrar, onCadastrar }) => {
                 <h3 style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color: p.destaque?"#fff":D.text, margin:"0 0 4px" }}>{p.nome}</h3>
                 <p style={{ fontSize:13, color: p.destaque?"rgba(255,255,255,0.7)":D.textSec, margin:"0 0 20px" }}>{p.apt}</p>
                 <div style={{ marginBottom:24 }}>
-                  <span style={{ fontFamily:D.fontDisplay, fontSize:40, fontWeight:700, color: p.destaque?"#fff":D.text, letterSpacing:"-0.02em" }}>R$ {p.preco}</span>
-                  <span style={{ fontSize:15, color: p.destaque?"rgba(255,255,255,0.7)":D.textSec }}>/mês</span>
+                  {cicloAnual ? (
+                    <>
+                      <span style={{ fontFamily:D.fontDisplay, fontSize:40, fontWeight:700, color: p.destaque?"#fff":D.text, letterSpacing:"-0.02em" }}>R$ {p.precoAnual}</span>
+                      <span style={{ fontSize:15, color: p.destaque?"rgba(255,255,255,0.7)":D.textSec }}>/ano</span>
+                      <div style={{ fontSize:12, color: p.destaque?"rgba(255,255,255,0.6)":D.textMut, marginTop:4 }}>equivale a R$ {Math.round(p.precoAnual/12)}/mês · 2 meses grátis</div>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontFamily:D.fontDisplay, fontSize:40, fontWeight:700, color: p.destaque?"#fff":D.text, letterSpacing:"-0.02em" }}>R$ {p.preco}</span>
+                      <span style={{ fontSize:15, color: p.destaque?"rgba(255,255,255,0.7)":D.textSec }}>/mês</span>
+                    </>
+                  )}
                 </div>
                 <button onClick={onCadastrar} style={{ width:"100%", padding:"12px", background: p.destaque?"#fff":D.primary, color: p.destaque?D.primary:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody, marginBottom:24 }}>Começar grátis</button>
                 <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
@@ -629,6 +728,11 @@ const AdminPanel = ({ onSair }) => {
   };
 
   const precoPlano = (plano) => PLANOS[plano]?.preco || 0;
+  // Valor mensal efetivo (anual dividido por 12)
+  const mrrCond = (c) => {
+    if (c.cicloCobranca === "anual") return (PLANOS[c.plano]?.precoAnual || 0) / 12;
+    return precoPlano(c.plano);
+  };
 
   // ── Métricas do negócio ──
   const ativos     = condominios.filter(c => statusCond(c) === "ativo");
@@ -636,7 +740,7 @@ const AdminPanel = ({ onSair }) => {
   const expirados  = condominios.filter(c => statusCond(c) === "expirado");
   const cortesias  = condominios.filter(c => statusCond(c) === "cortesia");
   const clientesPagantes = ativos.length;
-  const mrr        = ativos.reduce((s,c) => s + precoPlano(c.plano), 0);
+  const mrr        = ativos.reduce((s,c) => s + mrrCond(c), 0);
   const ticketMedio = clientesPagantes > 0 ? mrr / clientesPagantes : 0;
   const projecaoAnual = mrr * 12;
 
@@ -657,6 +761,12 @@ const AdminPanel = ({ onSair }) => {
   const mudarPlano = async (cond, novoPlano) => {
     await setDoc(doc(db, "condominios", cond.id), { plano: novoPlano }, { merge:true });
     showToast(`Plano de ${cond.nome} alterado para ${PLANOS[novoPlano].nome}.`);
+    setModalAcao(null);
+  };
+
+  const mudarCiclo = async (cond, ciclo) => {
+    await setDoc(doc(db, "condominios", cond.id), { cicloCobranca: ciclo }, { merge:true });
+    showToast(`Cobrança de ${cond.nome} definida como ${ciclo}.`);
     setModalAcao(null);
   };
 
@@ -936,6 +1046,19 @@ const AdminPanel = ({ onSair }) => {
                         {PLANOS[pk].nome}<br/><span style={{ fontSize:10, opacity:.8 }}>R$ {PLANOS[pk].preco}</span>
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                {/* Ciclo de cobrança */}
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", marginBottom:10 }}>Ciclo de cobrança</div>
+                  <div style={{ display:"flex", gap:8 }}>
+                    <button onClick={()=>mudarCiclo(c,"mensal")} style={{ flex:1, padding:"9px", background: (c.cicloCobranca||"mensal")==="mensal"?D.primary:D.muted, color: (c.cicloCobranca||"mensal")==="mensal"?"#fff":D.text, border:`1px solid ${(c.cicloCobranca||"mensal")==="mensal"?D.primary:D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                      Mensal<br/><span style={{ fontSize:10, opacity:.8 }}>R$ {PLANOS[c.plano]?.preco}/mês</span>
+                    </button>
+                    <button onClick={()=>mudarCiclo(c,"anual")} style={{ flex:1, padding:"9px", background: c.cicloCobranca==="anual"?D.primary:D.muted, color: c.cicloCobranca==="anual"?"#fff":D.text, border:`1px solid ${c.cicloCobranca==="anual"?D.primary:D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                      Anual<br/><span style={{ fontSize:10, opacity:.8 }}>R$ {PLANOS[c.plano]?.precoAnual}/ano</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1260,6 +1383,11 @@ export default function App() {
     }
     return { estado:"trial", diasRestantes:0 };
   })();
+
+  // Plano efetivo do condomínio (cortesia/basico/padrao/avancado)
+  const planoAtual = condominio?.plano || "basico";
+  // Atalho: este condomínio tem acesso a tal recurso?
+  const podeUsar = (recurso) => temAcesso(planoAtual, recurso);
 
   // ── Carregar o condomínio vinculado ao usuário (multi-tenant) ──
   useEffect(() => {
@@ -1808,6 +1936,7 @@ export default function App() {
   // ── Verificação automática ao abrir o app ──
   useEffect(() => {
     if (!user || readOnly || moradores.length === 0 || !diaVencimento) return;
+    if (!podeUsar("emailAuto")) return; // e-mails automáticos são recurso do plano Padrão
     const hoje     = new Date();
     const venc     = dataVencimentoMes(mesSel);
     const diffDias = Math.round((venc - hoje) / (1000*60*60*24));
@@ -1818,7 +1947,7 @@ export default function App() {
       dispararEmails("vencimento");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, moradores.length, diaVencimento]);
+  }, [user, moradores.length, diaVencimento, planoAtual]);
 
   const mesesDisponiveis = () => {
     const s = new Set(cobrancas.map(c=>c.mes)); s.add(mesAtual());
@@ -2227,11 +2356,16 @@ export default function App() {
           </div>
           {/* Nav */}
           <nav style={{ flex:1, padding:"8px 10px" }}>
-            {navItems.map(n => (
+            {navItems.map(n => {
+              const bloqueado = !podeUsar(n.id);
+              return (
               <button key={n.id} onClick={() => setAba(n.id)} style={{ display:"flex", alignItems:"center", gap:9, width:"100%", padding:"9px 11px", background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", color: aba===n.id ? "#fff" : "rgba(226,232,245,0.85)", fontFamily:D.fontBody, fontSize:13, fontWeight: aba===n.id ? 600 : 500, textAlign:"left", borderRadius:8, marginBottom:1, outline:"none", borderLeft: aba===n.id ? `2px solid ${D.sidebarActBdr}` : "2px solid transparent" }}>
-                <span style={{ fontSize:15, minWidth:18, textAlign:"center", opacity: aba===n.id?1:.8 }}>{n.icon}</span>{n.label}
+                <span style={{ fontSize:15, minWidth:18, textAlign:"center", opacity: aba===n.id?1:.8 }}>{n.icon}</span>
+                <span style={{ flex:1 }}>{n.label}</span>
+                {bloqueado && <span style={{ fontSize:11, opacity:.6 }}>🔒</span>}
               </button>
-            ))}
+              );
+            })}
           </nav>
           {/* Bottom */}
           <div style={{ padding:"10px 10px 18px", borderTop:`1px solid ${D.sidebarBdr}` }}>
@@ -2258,12 +2392,16 @@ export default function App() {
             <div style={{ position:"fixed", inset:0, zIndex:498 }} onClick={() => setMaisAberto(false)}>
               <div style={{ position:"absolute", bottom:68, left:0, right:0, background:D.sidebar, borderTop:`1px solid ${D.sidebarBdr}`, padding:"8px 12px 12px", boxShadow:"0 -8px 24px rgba(0,0,0,.3)" }} onClick={e=>e.stopPropagation()}>
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:4, marginBottom:8 }}>
-                  {navSecundario.map(n => (
-                    <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", padding:"10px 4px", display:"flex", flexDirection:"column", alignItems:"center", gap:4, color: aba===n.id ? "#fff" : "rgba(226,232,245,0.75)", borderRadius:10, fontFamily:D.fontBody }}>
+                  {navSecundario.map(n => {
+                    const bloqueado = !podeUsar(n.id);
+                    return (
+                    <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", padding:"10px 4px", display:"flex", flexDirection:"column", alignItems:"center", gap:4, color: aba===n.id ? "#fff" : "rgba(226,232,245,0.75)", borderRadius:10, fontFamily:D.fontBody, position:"relative" }}>
                       <span style={{ fontSize:20 }}>{n.icon}</span>
                       <span style={{ fontSize:10, fontWeight: aba===n.id?600:400 }}>{n.label}</span>
+                      {bloqueado && <span style={{ position:"absolute", top:4, right:8, fontSize:10 }}>🔒</span>}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div style={{ borderTop:`1px solid ${D.sidebarBdr}`, paddingTop:8 }}>
                   {readOnly ? (
@@ -2721,7 +2859,15 @@ export default function App() {
         )}
 
         {/* ── Serviços ── */}
-        {aba === "servicos" && (
+        {/* Trava de plano: abas Padrão bloqueadas para plano Básico */}
+        {["servicos","reservas","acessos","historico"].includes(aba) && !podeUsar(aba) && (
+          <div>
+            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <UpgradeCard recurso={aba} planoNecessario={RECURSO_PLANO[aba]} isMobile={isMobile} />
+          </div>
+        )}
+
+        {aba === "servicos" && podeUsar("servicos") && (
           <div>
             <TopBar title="Serviços & Manutenção" user={user} readOnly={readOnly} nPendentes={nPagos} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
@@ -2779,7 +2925,7 @@ export default function App() {
         )}
 
         {/* ── Reservas ── */}
-        {aba === "reservas" && (
+        {aba === "reservas" && podeUsar("reservas") && (
           <div>
             <TopBar title="Reservas" user={user} readOnly={readOnly} nPendentes={nPagos} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
@@ -2902,7 +3048,7 @@ export default function App() {
         )}
 
         {/* ── Acessos ── */}
-        {aba === "acessos" && (
+        {aba === "acessos" && podeUsar("acessos") && (
           <div>
             <TopBar title="Controle de Acessos" user={user} readOnly={readOnly} nPendentes={nPagos} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
@@ -2980,7 +3126,7 @@ export default function App() {
         )}
 
         {/* ── Histórico ── */}
-        {aba === "historico" && (
+        {aba === "historico" && podeUsar("historico") && (
           <div>
             <TopBar title="Histórico de Atividades" user={user} readOnly={readOnly} nPendentes={nPagos} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
@@ -3077,15 +3223,28 @@ export default function App() {
               <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
 
               <h3 style={{ color:"#1E3A5F", margin:"0 0 6px", fontSize:15, fontWeight:700 }}>📧 Disparar e-mails manualmente</h3>
-              <p style={{ color:"#6B7A8D", fontSize:12, margin:"0 0 14px" }}>Use estes botões caso queira enviar fora do disparo automático. O sistema evita duplicatas no mesmo dia.</p>
-              <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-                <button onClick={() => dispararEmails("lembrete")} disabled={enviandoEmails} style={{ padding:"10px 18px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>
-                  {enviandoEmails ? "Enviando..." : `📧 Lembrete a todos (${moradores.length})`}
-                </button>
-                <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"10px 18px", background:"#C9933A", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>
-                  {enviandoEmails ? "Enviando..." : `⚠️ Cobrar pendentes (${pendentes})`}
-                </button>
-              </div>
+              {podeUsar("emailAuto") ? (
+                <>
+                  <p style={{ color:"#6B7A8D", fontSize:12, margin:"0 0 14px" }}>Use estes botões caso queira enviar fora do disparo automático. O sistema evita duplicatas no mesmo dia.</p>
+                  <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                    <button onClick={() => dispararEmails("lembrete")} disabled={enviandoEmails} style={{ padding:"10px 18px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>
+                      {enviandoEmails ? "Enviando..." : `📧 Lembrete a todos (${moradores.length})`}
+                    </button>
+                    <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"10px 18px", background:"#C9933A", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>
+                      {enviandoEmails ? "Enviando..." : `⚠️ Cobrar pendentes (${pendentes})`}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ background:D.muted, borderRadius:D.radiusSm, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                  <span style={{ fontSize:20 }}>🔒</span>
+                  <div style={{ flex:1, minWidth:180 }}>
+                    <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>E-mails automáticos — plano Padrão</div>
+                    <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Envie lembretes e cobranças automáticas por e-mail.</div>
+                  </div>
+                  <a href="mailto:comercial.mysindi@gmail.com?subject=Upgrade de plano — MySindi" style={{ padding:"8px 16px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>Fazer upgrade</a>
+                </div>
+              )}
 
               <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
 

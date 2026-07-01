@@ -2079,7 +2079,8 @@ export default function App() {
   }
 
   // ── Painel do administrador (MySindi) ──
-  if (user && user.email === ADMIN_EMAIL && modoAdmin) {
+  // O admin vai direto ao painel ao logar (?admin=1 continua funcionando como atalho)
+  if (user && user.email === ADMIN_EMAIL) {
     return <AdminPanel onSair={() => { signOut(auth); window.location.href = window.location.origin + window.location.pathname; }} />;
   }
 

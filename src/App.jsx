@@ -1382,6 +1382,8 @@ export default function App() {
   const [novaMovFundo, setNovaMovFundo] = useState({ tipo:"aporte", valor:"", descricao:"", data:"" });
   const [entregas, setEntregas] = useState([]);
   const [novaEntrega, setNovaEntrega] = useState({ moradorId:"", remetente:"", descricao:"", obs:"" });
+  const [eventos, setEventos] = useState([]);
+  const [novoEvento, setNovoEvento] = useState({ titulo:"", tipo:"Evento", data:"", hora:"", descricao:"" });
   const fileRef        = useRef();
   const fileRefDespesa = useRef();
 
@@ -1485,6 +1487,7 @@ export default function App() {
     const u11 = onSnapshot(byCond("documentos"), s => setDocumentos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
     const u12 = onSnapshot(byCond("fundo_movs"), s => setFundoMovs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
     const u13 = onSnapshot(byCond("entregas"), s => setEntregas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u14 = onSnapshot(byCond("eventos"), s => setEventos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
 
     // Config (taxa/dia de vencimento) vem do próprio documento do condomínio
     const u3 = onSnapshot(doc(db, "condominios", condominioId), d => {
@@ -1501,7 +1504,7 @@ export default function App() {
       setObsMes(texto); setObsSalva(texto);
     });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); };
   }, [user, condominioId, mesSel]);
 
   // (Removido o auto-popular com MOCK_MORADORES — no multi-tenant cada
@@ -2003,6 +2006,31 @@ export default function App() {
     showToast("Registro removido.", "error");
   };
 
+  // ── Agenda / Eventos ──
+  const salvarEvento = async () => {
+    if (!novoEvento.titulo.trim()) { showToast("Informe o título do evento.", "error"); return; }
+    if (!novoEvento.data) { showToast("Informe a data do evento.", "error"); return; }
+    await addDoc(collection(db, "eventos"), {
+      condominioId,
+      titulo: novoEvento.titulo.trim(),
+      tipo: novoEvento.tipo,
+      data: novoEvento.data,   // formato aaaa-mm-dd
+      hora: novoEvento.hora || "",
+      descricao: novoEvento.descricao.trim(),
+      criadoEm: new Date().toLocaleDateString("pt-BR"),
+      timestamp: Date.now(),
+    });
+    registrarLog("🗓️", `Evento na agenda: ${novoEvento.titulo.trim()}`);
+    setNovoEvento({ titulo:"", tipo:"Evento", data:"", hora:"", descricao:"" });
+    setModal(null);
+    showToast("Evento adicionado à agenda!");
+  };
+
+  const removerEvento = async (id) => {
+    await deleteDoc(doc(db, "eventos", id));
+    showToast("Evento removido.", "error");
+  };
+
   // Calcula situação do vencimento de um documento
   const situacaoDoc = (venc) => {
     if (!venc) return { label:"Sem vencimento", cor:D.textMut, bg:D.muted, dias:null };
@@ -2380,6 +2408,7 @@ export default function App() {
     { id:"comunicados", icon:"📢", label:"Comunicados" },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
     { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
+    { id:"agenda",      icon:"🗓️", label:"Agenda"      },
     { id:"historico",   icon:"📋", label:"Histórico"   },
     ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config."  }] : []),
   ];
@@ -2396,6 +2425,7 @@ export default function App() {
     { id:"comunicados", icon:"📢", label:"Comunicados" },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
     { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
+    { id:"agenda",      icon:"🗓️", label:"Agenda"      },
     { id:"historico",   icon:"📋", label:"Histórico"   },
     ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config." }] : []),
   ];
@@ -3071,9 +3101,9 @@ export default function App() {
 
         {/* ── Serviços ── */}
         {/* Trava de plano: abas bloqueadas para planos inferiores */}
-        {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas"].includes(aba) && !podeUsar(aba) && (
+        {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas","agenda"].includes(aba) && !podeUsar(aba) && (
           <div>
-            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
             <UpgradeCard recurso={aba} planoNecessario={RECURSO_PLANO[aba]} isMobile={isMobile} />
           </div>
         )}
@@ -3652,6 +3682,87 @@ export default function App() {
           );
         })()}
 
+        {/* ── Agenda ── */}
+        {aba === "agenda" && podeUsar("agenda") && (() => {
+          const hoje = new Date(); hoje.setHours(0,0,0,0);
+          const parseData = (d) => { const [a,m,dia]=d.split("-").map(Number); return new Date(a,m-1,dia); };
+          const ordenados = [...eventos].sort((a,b) => parseData(a.data) - parseData(b.data));
+          const proximos = ordenados.filter(e => parseData(e.data) >= hoje);
+          const passados = ordenados.filter(e => parseData(e.data) < hoje).reverse();
+          const iconeTipo = { "Evento":"🎉", "Manutenção":"🔧", "Assembleia":"📋", "Reunião":"👥", "Feriado":"🏖️", "Outro":"📌" };
+          const corTipo = { "Evento":D.accent, "Manutenção":D.warning, "Assembleia":D.primary, "Reunião":D.success, "Feriado":D.danger, "Outro":D.textSec };
+          const fmtData = (d) => { const dt=parseData(d); return dt.toLocaleDateString("pt-BR",{ weekday:"short", day:"2-digit", month:"short" }); };
+          const diasAte = (d) => { const dt=parseData(d); const diff=Math.ceil((dt-hoje)/(1000*60*60*24)); if(diff===0) return "Hoje"; if(diff===1) return "Amanhã"; return `Em ${diff} dias`; };
+
+          const CardEvento = ({ e, passado }) => (
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${corTipo[e.tipo]||D.textSec}`, opacity: passado?0.7:1 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12 }}>
+                <div style={{ display:"flex", gap:12, flex:1 }}>
+                  <div style={{ width:44, height:44, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>{iconeTipo[e.tipo]||"📌"}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{e.titulo}</div>
+                    <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginTop:3 }}>
+                      <span style={{ fontFamily:D.fontBody, fontSize:12, color:corTipo[e.tipo]||D.textSec, fontWeight:600 }}>{e.tipo}</span>
+                      <span style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, textTransform:"capitalize" }}>· {fmtData(e.data)}{e.hora?` · ${e.hora}`:""}</span>
+                    </div>
+                    {e.descricao && <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.5, margin:"8px 0 0" }}>{e.descricao}</p>}
+                  </div>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8, flexShrink:0 }}>
+                  {!passado && <span style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:600, color: diasAte(e.data)==="Hoje"?D.danger:D.textMut, whiteSpace:"nowrap" }}>{diasAte(e.data)}</span>}
+                  {!readOnly && (
+                    <button onClick={() => { if(window.confirm("Remover este evento?")) removerEvento(e.id); }} style={{ background:"none", border:"none", color:D.textMut, cursor:"pointer", fontSize:15 }}>🗑️</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+
+          return (
+          <div>
+            <TopBar title="Agenda" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
+
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>Eventos, manutenções, assembleias e datas importantes</div>
+                {!readOnly && (
+                  <button onClick={() => { setNovoEvento({ titulo:"", tipo:"Evento", data:"", hora:"", descricao:"" }); setModal({ type:"novoEvento" }); }} style={{ padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
+                    + Novo evento
+                  </button>
+                )}
+              </div>
+
+              {eventos.length === 0 ? (
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>🗓️</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Agenda vazia</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Adicione eventos, manutenções programadas e assembleias para organizar o condomínio.</div>
+                </div>
+              ) : (
+                <>
+                  {proximos.length > 0 && (
+                    <div style={{ marginBottom:24 }}>
+                      <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>Próximos eventos</div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                        {proximos.map(e => <CardEvento key={e.id} e={e} passado={false} />)}
+                      </div>
+                    </div>
+                  )}
+                  {passados.length > 0 && (
+                    <div>
+                      <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.textSec, marginBottom:12, letterSpacing:"-0.02em" }}>Eventos passados</div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                        {passados.map(e => <CardEvento key={e.id} e={e} passado={true} />)}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+          );
+        })()}
+
         {/* ── Histórico ── */}
         {aba === "historico" && podeUsar("historico") && (
           <div>
@@ -3923,6 +4034,46 @@ export default function App() {
           <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
             <button onClick={salvarEdicaoMorador} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Salvar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "novoEvento" && (
+        <Modal title="Novo Evento" onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Título *</label>
+              <input value={novoEvento.titulo} onChange={e=>setNovoEvento(p=>({...p,titulo:e.target.value}))} placeholder="Ex: Assembleia geral ordinária" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Tipo</label>
+              <select value={novoEvento.tipo} onChange={e=>setNovoEvento(p=>({...p,tipo:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", background:"#fff", fontFamily:D.fontBody, color:D.text }}>
+                <option>Evento</option>
+                <option>Manutenção</option>
+                <option>Assembleia</option>
+                <option>Reunião</option>
+                <option>Feriado</option>
+                <option>Outro</option>
+              </select>
+            </div>
+            <div style={{ display:"flex", gap:12 }}>
+              <div style={{ flex:2 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Data *</label>
+                <input type="date" value={novoEvento.data} onChange={e=>setNovoEvento(p=>({...p,data:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Hora</label>
+                <input type="time" value={novoEvento.hora} onChange={e=>setNovoEvento(p=>({...p,hora:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Descrição</label>
+              <textarea value={novoEvento.descricao} onChange={e=>setNovoEvento(p=>({...p,descricao:e.target.value}))} rows={3} placeholder="Detalhes do evento (opcional)" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text, resize:"vertical", lineHeight:1.5 }} />
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+            <button onClick={salvarEvento} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>🗓️ Salvar</button>
           </div>
         </Modal>
       )}

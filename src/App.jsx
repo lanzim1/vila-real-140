@@ -1970,11 +1970,15 @@ export default function App() {
     // Notifica o morador por e-mail, se o plano permite e há e-mail cadastrado
     if (podeUsar("emailAuto") && m?.email) {
       try {
-        await enviarEmailMorador(
-          m,
-          "Você recebeu uma encomenda",
-          `Olá ${m.nome}, chegou uma encomenda para você na portaria${novaEntrega.remetente ? " (remetente: "+novaEntrega.remetente.trim()+")" : ""}. Passe para retirar quando puder.`
-        );
+        await emailjs.send(EJS_SERVICE, EJS_TEMPLATE, {
+          nome_morador:    m.nome,
+          unidade:         m.unidade,
+          valor:           "",
+          data_vencimento: "",
+          assunto:         "Você recebeu uma encomenda",
+          mensagem:        `Olá ${m.nome}, chegou uma encomenda para você na portaria${novaEntrega.remetente ? " (remetente: "+novaEntrega.remetente.trim()+")" : ""}. Passe para retirar quando puder.`,
+          email_destino:   m.email,
+        });
       } catch(e) { /* silencioso — o registro já foi feito */ }
     }
 

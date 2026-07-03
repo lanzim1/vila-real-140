@@ -1380,6 +1380,8 @@ export default function App() {
   const [novoDocumento, setNovoDocumento] = useState({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"" });
   const [fundoMovs, setFundoMovs] = useState([]);
   const [novaMovFundo, setNovaMovFundo] = useState({ tipo:"aporte", valor:"", descricao:"", data:"" });
+  const [entregas, setEntregas] = useState([]);
+  const [novaEntrega, setNovaEntrega] = useState({ moradorId:"", remetente:"", descricao:"", obs:"" });
   const fileRef        = useRef();
   const fileRefDespesa = useRef();
 
@@ -1482,6 +1484,7 @@ export default function App() {
     const u10 = onSnapshot(byCond("comunicados"), s => setComunicados(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (b.fixado?1:0)-(a.fixado?1:0) || b.timestamp - a.timestamp)));
     const u11 = onSnapshot(byCond("documentos"), s => setDocumentos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
     const u12 = onSnapshot(byCond("fundo_movs"), s => setFundoMovs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u13 = onSnapshot(byCond("entregas"), s => setEntregas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
 
     // Config (taxa/dia de vencimento) vem do próprio documento do condomínio
     const u3 = onSnapshot(doc(db, "condominios", condominioId), d => {
@@ -1498,7 +1501,7 @@ export default function App() {
       setObsMes(texto); setObsSalva(texto);
     });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); };
   }, [user, condominioId, mesSel]);
 
   // (Removido o auto-popular com MOCK_MORADORES — no multi-tenant cada
@@ -1943,6 +1946,58 @@ export default function App() {
     showToast("Percentual do fundo atualizado!");
   };
 
+  // ── Entregas / Encomendas ──
+  const registrarEntrega = async () => {
+    if (!novaEntrega.moradorId) { showToast("Selecione o morador destinatário.", "error"); return; }
+    if (!novaEntrega.descricao.trim()) { showToast("Descreva a encomenda.", "error"); return; }
+    const m = moradores.find(x => x.id === novaEntrega.moradorId);
+    await addDoc(collection(db, "entregas"), {
+      condominioId,
+      moradorId: novaEntrega.moradorId,
+      moradorNome: m?.nome || "",
+      unidade: m?.unidade || "",
+      remetente: novaEntrega.remetente.trim(),
+      descricao: novaEntrega.descricao.trim(),
+      obs: novaEntrega.obs.trim(),
+      status: "aguardando", // aguardando | retirada
+      dataChegada: new Date().toLocaleDateString("pt-BR"),
+      horaChegada: new Date().toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" }),
+      dataRetirada: null,
+      timestamp: Date.now(),
+    });
+    registrarLog("📦", `Encomenda recebida para ${m?.nome} (${m?.unidade})`);
+
+    // Notifica o morador por e-mail, se o plano permite e há e-mail cadastrado
+    if (podeUsar("emailAuto") && m?.email) {
+      try {
+        await enviarEmailMorador(
+          m,
+          "Você recebeu uma encomenda",
+          `Olá ${m.nome}, chegou uma encomenda para você na portaria${novaEntrega.remetente ? " (remetente: "+novaEntrega.remetente.trim()+")" : ""}. Passe para retirar quando puder.`
+        );
+      } catch(e) { /* silencioso — o registro já foi feito */ }
+    }
+
+    setNovaEntrega({ moradorId:"", remetente:"", descricao:"", obs:"" });
+    setModal(null);
+    showToast("Encomenda registrada!" + (podeUsar("emailAuto") && m?.email ? " Morador notificado por e-mail." : ""));
+  };
+
+  const marcarRetirada = async (entrega) => {
+    await setDoc(doc(db, "entregas", entrega.id), {
+      status: "retirada",
+      dataRetirada: new Date().toLocaleDateString("pt-BR"),
+      horaRetirada: new Date().toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" }),
+    }, { merge:true });
+    registrarLog("📦", `Encomenda retirada por ${entrega.moradorNome} (${entrega.unidade})`);
+    showToast("Encomenda marcada como retirada!");
+  };
+
+  const removerEntrega = async (id) => {
+    await deleteDoc(doc(db, "entregas", id));
+    showToast("Registro removido.", "error");
+  };
+
   // Calcula situação do vencimento de um documento
   const situacaoDoc = (venc) => {
     if (!venc) return { label:"Sem vencimento", cor:D.textMut, bg:D.muted, dias:null };
@@ -2316,6 +2371,7 @@ export default function App() {
   const navSecundario = [
     { id:"reservas",    icon:"📅", label:"Reservas"    },
     { id:"acessos",     icon:"🚪", label:"Acessos"     },
+    { id:"entregas",    icon:"📦", label:"Entregas"    },
     { id:"comunicados", icon:"📢", label:"Comunicados" },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
     { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
@@ -2331,6 +2387,7 @@ export default function App() {
     { id:"servicos",    icon:"🔧", label:"Serviços"    },
     { id:"reservas",    icon:"📅", label:"Reservas"    },
     { id:"acessos",     icon:"🚪", label:"Acessos"     },
+    { id:"entregas",    icon:"📦", label:"Entregas"    },
     { id:"comunicados", icon:"📢", label:"Comunicados" },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
     { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
@@ -3009,9 +3066,9 @@ export default function App() {
 
         {/* ── Serviços ── */}
         {/* Trava de plano: abas bloqueadas para planos inferiores */}
-        {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva"].includes(aba) && !podeUsar(aba) && (
+        {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas"].includes(aba) && !podeUsar(aba) && (
           <div>
-            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
             <UpgradeCard recurso={aba} planoNecessario={RECURSO_PLANO[aba]} isMobile={isMobile} />
           </div>
         )}
@@ -3495,6 +3552,101 @@ export default function App() {
           );
         })()}
 
+        {/* ── Entregas ── */}
+        {aba === "entregas" && podeUsar("entregas") && (() => {
+          const aguardando = entregas.filter(e => e.status === "aguardando");
+          const retiradas  = entregas.filter(e => e.status === "retirada");
+          return (
+          <div>
+            <TopBar title="Controle de Entregas" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
+
+              {/* Cabeçalho + ação */}
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>Registre encomendas recebidas e notifique os moradores</div>
+                {!readOnly && (
+                  <button onClick={() => { setNovaEntrega({ moradorId:"", remetente:"", descricao:"", obs:"" }); setModal({ type:"novaEntrega" }); }} style={{ padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
+                    + Registrar encomenda
+                  </button>
+                )}
+              </div>
+
+              {/* Cards de resumo */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:20 }}>
+                <div style={{ background:D.warningBg, borderRadius:D.radius, padding:"16px 18px", border:`1px solid ${D.border}` }}>
+                  <div style={{ fontSize:20, marginBottom:6 }}>📦</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:D.warning, letterSpacing:"-0.02em" }}>{aguardando.length}</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>Aguardando retirada</div>
+                </div>
+                <div style={{ background:D.successBg, borderRadius:D.radius, padding:"16px 18px", border:`1px solid ${D.border}` }}>
+                  <div style={{ fontSize:20, marginBottom:6 }}>✅</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:D.success, letterSpacing:"-0.02em" }}>{retiradas.length}</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>Já retiradas</div>
+                </div>
+              </div>
+
+              {/* Aguardando retirada */}
+              {aguardando.length > 0 && (
+                <div style={{ marginBottom:24 }}>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>📦 Aguardando retirada</div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                    {aguardando.map(e => (
+                      <div key={e.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${D.warning}` }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, flexWrap:"wrap" }}>
+                          <div style={{ flex:1, minWidth:180 }}>
+                            <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{e.descricao}</div>
+                            <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, marginTop:3 }}>Para: <b>{e.moradorNome}</b> · {e.unidade}</div>
+                            {e.remetente && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:2 }}>Remetente: {e.remetente}</div>}
+                            {e.obs && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:2 }}>{e.obs}</div>}
+                            <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:6 }}>Chegou em {e.dataChegada} às {e.horaChegada}</div>
+                          </div>
+                          {!readOnly && (
+                            <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+                              <button onClick={() => marcarRetirada(e)} style={{ padding:"7px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>✓ Retirada</button>
+                              <button onClick={() => { if(window.confirm("Remover este registro?")) removerEntrega(e.id); }} style={{ padding:"7px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Histórico de retiradas */}
+              <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>✅ Já retiradas</div>
+              {retiradas.length === 0 && aguardando.length === 0 ? (
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>📦</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhuma encomenda registrada</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Quando chegar uma encomenda, registre aqui e o morador será avisado.</div>
+                </div>
+              ) : retiradas.length === 0 ? (
+                <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut, padding:"12px 0" }}>Nenhuma encomenda retirada ainda.</div>
+              ) : (
+                <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
+                  {retiradas.map((e,i) => (
+                    <div key={e.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", borderBottom: i<retiradas.length-1?`1px solid ${D.border}`:"none", gap:12, flexWrap:"wrap" }}>
+                      <div style={{ flex:1, minWidth:160 }}>
+                        <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:600, color:D.text }}>{e.descricao}</div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{e.moradorNome} · {e.unidade}</div>
+                      </div>
+                      <div style={{ textAlign:"right" }}>
+                        <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.success, fontWeight:600 }}>Retirada</div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut }}>{e.dataRetirada}{e.horaRetirada?` às ${e.horaRetirada}`:""}</div>
+                      </div>
+                      {!readOnly && (
+                        <button onClick={() => { if(window.confirm("Remover este registro?")) removerEntrega(e.id); }} style={{ background:"none", border:"none", color:D.textMut, cursor:"pointer", fontSize:16 }}>×</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          );
+        })()}
+
         {/* ── Histórico ── */}
         {aba === "historico" && podeUsar("historico") && (
           <div>
@@ -3766,6 +3918,43 @@ export default function App() {
           <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
             <button onClick={salvarEdicaoMorador} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Salvar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "novaEntrega" && (
+        <Modal title="Registrar Encomenda" onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Morador destinatário *</label>
+              <select value={novaEntrega.moradorId} onChange={e=>setNovaEntrega(p=>({...p,moradorId:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", background:"#fff", fontFamily:D.fontBody, color:D.text }}>
+                <option value="">Selecione o morador</option>
+                {[...moradores].sort((a,b)=>a.unidade.localeCompare(b.unidade)).map(m => (
+                  <option key={m.id} value={m.id}>{m.unidade} — {m.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Descrição da encomenda *</label>
+              <input value={novaEntrega.descricao} onChange={e=>setNovaEntrega(p=>({...p,descricao:e.target.value}))} placeholder="Ex: Caixa média, envelope, sedex..." style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Remetente / loja</label>
+              <input value={novaEntrega.remetente} onChange={e=>setNovaEntrega(p=>({...p,remetente:e.target.value}))} placeholder="Ex: Mercado Livre, Amazon..." style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Observação</label>
+              <input value={novaEntrega.obs} onChange={e=>setNovaEntrega(p=>({...p,obs:e.target.value}))} placeholder="Ex: deixada na portaria" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+            {podeUsar("emailAuto") && (
+              <div style={{ background:D.secondary, borderRadius:D.radiusSm, padding:"10px 14px", fontFamily:D.fontBody, fontSize:12, color:D.textSec, display:"flex", alignItems:"center", gap:8 }}>
+                <span>📧</span> O morador será notificado por e-mail automaticamente (se tiver e-mail cadastrado).
+              </div>
+            )}
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+            <button onClick={registrarEntrega} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>📦 Registrar</button>
           </div>
         </Modal>
       )}

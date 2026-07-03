@@ -2093,7 +2093,7 @@ export default function App() {
   const dispararEmails = async (tipo) => {
     // tipo: "lembrete" (5 dias antes) ou "vencimento" (dia do vencimento)
     setEnviandoEmails(true);
-    const chave = `${mesSel}_${tipo}`;
+    const chave = `${condominioId}_${mesSel}_${tipo}`;
     try {
       // Verifica se já foi enviado hoje
       const registroRef = doc(db, "emails_enviados", chave);
@@ -2151,7 +2151,7 @@ export default function App() {
 
       // Registra o envio no Firestore
       await setDoc(registroRef, {
-        tipo, mes: mesSel, dataEnvio: new Date().toLocaleDateString("pt-BR"),
+        condominioId, tipo, mes: mesSel, dataEnvio: new Date().toLocaleDateString("pt-BR"),
         enviados, total: destinatarios.length
       });
 

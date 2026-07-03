@@ -1687,6 +1687,7 @@ export default function App() {
             valor:          taxa.toFixed(2).replace(".",","),
             data_pagamento: dataPgto,
             obs:            pagForm.obs ? `Observação: ${pagForm.obs}` : "",
+            nome_condominio: condominio?.nome || "Condomínio",
           });
         } catch(e) {
           console.error("Erro ao enviar e-mail de confirmação:", e);
@@ -1973,10 +1974,10 @@ export default function App() {
         await emailjs.send(EJS_SERVICE, EJS_TEMPLATE, {
           nome_morador:    m.nome,
           unidade:         m.unidade,
-          valor:           "",
-          data_vencimento: "",
+          mensagem:        `Chegou uma encomenda para você na portaria${novaEntrega.remetente ? " (remetente: "+novaEntrega.remetente.trim()+")" : ""}. Passe para retirar quando puder.`,
+          detalhes:        `Unidade: ${m.unidade}`,
+          nome_condominio: condominio?.nome || "Condomínio",
           assunto:         "Você recebeu uma encomenda",
-          mensagem:        `Olá ${m.nome}, chegou uma encomenda para você na portaria${novaEntrega.remetente ? " (remetente: "+novaEntrega.remetente.trim()+")" : ""}. Passe para retirar quando puder.`,
           email_destino:   m.email,
         });
       } catch(e) { /* silencioso — o registro já foi feito */ }
@@ -2053,10 +2054,10 @@ export default function App() {
     await emailjs.send(EJS_SERVICE, EJS_TEMPLATE, {
       nome_morador:    morador.nome,
       unidade:         morador.unidade,
-      valor:           taxa.toFixed(2).replace(".",","),
-      data_vencimento: formatarDataBR(dataVencimentoMes(mesSel)),
-      assunto,
       mensagem,
+      detalhes:        `Unidade: ${morador.unidade}\nValor: R$ ${taxa.toFixed(2).replace(".",",")}\nVencimento: ${formatarDataBR(dataVencimentoMes(mesSel))}`,
+      nome_condominio: condominio?.nome || "Condomínio",
+      assunto,
       email_destino:   morador.email,
     });
   };

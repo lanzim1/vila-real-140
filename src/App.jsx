@@ -1359,11 +1359,11 @@ export default function App() {
   const [mesSel, setMesSel]         = useState(mesAtual);
   const [toast, setToast]           = useState(null);
   const [modal, setModal]           = useState(null);
-  const [novoMorador, setNovoMorador] = useState({ nome:"", unidade:"", email:"", telefone:"" });
+  const [novoMorador, setNovoMorador] = useState({ nome:"", unidade:"", email:"", telefone:"", tipo:"Proprietário", veiculos:"", pets:"", taxaCustom:"" });
   const [editMorador, setEditMorador] = useState(null); // { id, nome, unidade, email, telefone }
   const [pagForm, setPagForm]         = useState({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
   const [despesas, setDespesas]       = useState([]);
-  const [novaDespesa, setNovaDespesa] = useState({ tipo:"agua", descricao:"", valor:"", mes: mesAtual(), arquivo:null, arquivoNome:"" });
+  const [novaDespesa, setNovaDespesa] = useState({ tipo:"agua", descricao:"", valor:"", mes: mesAtual(), arquivo:null, arquivoNome:"", recorrente:false });
   const [servicos, setServicos]       = useState([]);
   const [novoServico, setNovoServico] = useState({ titulo:"", descricao:"" });
   const [concluirForm, setConcluirForm] = useState({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" });
@@ -1531,10 +1531,30 @@ export default function App() {
   const pendentes  = cobMes.filter(c => c.status === "pendente").length;
   const atrasados  = cobMes.filter(c => c.status === "atrasado").length;
   const nPagos     = pendentes + atrasados;
-  const totalArrecadado = pagos * taxa;
-  const totalPendente   = nPagos * taxa;
 
-  const totalEntradas        = cobrancas.filter(c => c.status === "pago").length * taxa;
+  // Taxa individual do morador (taxaCustom) ou a taxa padrão do condomínio
+  const taxaDoMorador = (moradorId) => {
+    const m = moradores.find(x => x.id === moradorId);
+    return (m && m.taxaCustom != null && !isNaN(m.taxaCustom)) ? m.taxaCustom : taxa;
+  };
+  // Soma o valor de um conjunto de cobranças respeitando a taxa de cada morador
+  const somaCobrancas = (lista) => lista.reduce((s,c) => s + taxaDoMorador(c.moradorId), 0);
+
+  // Categorias de despesa (ícone + rótulo)
+  const CATS_DESPESA = {
+    agua:{icon:"💧",label:"Água"}, luz:{icon:"⚡",label:"Luz"}, limpeza:{icon:"🧹",label:"Limpeza"},
+    portaria:{icon:"🛡️",label:"Portaria / Segurança"}, elevador:{icon:"🛗",label:"Elevador"},
+    jardinagem:{icon:"🌳",label:"Jardinagem"}, salario:{icon:"👷",label:"Zelador / Salário"},
+    internet:{icon:"🌐",label:"Internet / Telefone"}, manutencao:{icon:"🔧",label:"Manutenção"},
+    material:{icon:"📦",label:"Material"}, impostos:{icon:"🧾",label:"Impostos / Taxas"},
+    outro:{icon:"📌",label:"Outra despesa"},
+  };
+  const despCat = (tipo) => CATS_DESPESA[tipo] || CATS_DESPESA.outro;
+
+  const totalArrecadado = somaCobrancas(cobMes.filter(c => c.status === "pago"));
+  const totalPendente   = somaCobrancas(cobMes.filter(c => c.status !== "pago"));
+
+  const totalEntradas        = somaCobrancas(cobrancas.filter(c => c.status === "pago"));
   const totalSaidasDespesas  = despesas.filter(d => d.status === "pago").reduce((s,d) => s+(d.valor||0), 0);
   const totalSaidasServicos  = servicos.filter(s => s.status === "concluido").reduce((s,sv) => s+(sv.valorMaterial||0)+(sv.valorMaoDeObra||0), 0);
   const saldoCaixa = totalEntradas - totalSaidasDespesas - totalSaidasServicos;
@@ -1713,10 +1733,14 @@ export default function App() {
   // ── Moradores ──
   const adicionarMorador = async () => {
     if (!novoMorador.nome || !novoMorador.unidade || !novoMorador.email) { showToast("Preencha nome, unidade e e-mail.", "error"); return; }
-    const ref = await addDoc(collection(db, "moradores"), { ...novoMorador, condominioId });
+    // taxaCustom: número se preenchido, null se vazio (usa a taxa padrão)
+    const taxaCustom = novoMorador.taxaCustom !== "" && !isNaN(parseFloat(novoMorador.taxaCustom))
+      ? parseFloat(novoMorador.taxaCustom) : null;
+    const dados = { ...novoMorador, taxaCustom, condominioId };
+    const ref = await addDoc(collection(db, "moradores"), dados);
     await setDoc(doc(db, "cobrancas", `${condominioId}_${ref.id}_${mesSel}`), { condominioId, moradorId:ref.id, mes:mesSel, status:"pendente", comprovante:null, dataPagamento:null, obs:"" });
     registrarLog("👤", `Morador cadastrado: ${novoMorador.nome} (${novoMorador.unidade})`);
-    setNovoMorador({ nome:"", unidade:"", email:"", telefone:"" }); setModal(null); showToast("Morador cadastrado!");
+    setNovoMorador({ nome:"", unidade:"", email:"", telefone:"", tipo:"Proprietário", veiculos:"", pets:"", taxaCustom:"" }); setModal(null); showToast("Morador cadastrado!");
   };
 
   const removerMorador = async (id) => {
@@ -1733,6 +1757,9 @@ export default function App() {
       showToast("Preencha nome, unidade e e-mail.", "error"); return;
     }
     const { id, ...dados } = editMorador;
+    // Converte taxaCustom (string do input) para número ou null
+    dados.taxaCustom = (dados.taxaCustom !== "" && dados.taxaCustom != null && !isNaN(parseFloat(dados.taxaCustom)))
+      ? parseFloat(dados.taxaCustom) : null;
     await setDoc(doc(db, "moradores", id), dados, { merge:true });
     registrarLog("✏️", `Morador editado: ${editMorador.nome} (${editMorador.unidade})`);
     setEditMorador(null); setModal(null); showToast("Morador atualizado com sucesso!");
@@ -1741,10 +1768,31 @@ export default function App() {
   // ── Despesas ──
   const adicionarDespesa = () => {
     if (!novaDespesa.valor || !novaDespesa.mes) { showToast("Preencha o valor e o mês.", "error"); return; }
+    // Monta a lista de meses: só o escolhido, ou até dezembro do mesmo ano se recorrente
+    const mesesAlvo = [];
+    if (novaDespesa.recorrente) {
+      const [ano, mesNum] = novaDespesa.mes.split("-").map(Number);
+      for (let mm = mesNum; mm <= 12; mm++) {
+        mesesAlvo.push(`${ano}-${String(mm).padStart(2,"0")}`);
+      }
+    } else {
+      mesesAlvo.push(novaDespesa.mes);
+    }
     const salvar = async (base64="") => {
-      await addDoc(collection(db, "despesas"), { condominioId, tipo:novaDespesa.tipo, descricao:novaDespesa.descricao, valor:parseFloat(novaDespesa.valor)||0, mes:novaDespesa.mes, status:"pendente", dataPagamento:null, comprovante:base64, arquivoNome:novaDespesa.arquivoNome });
-      registrarLog("💧", `Despesa registrada: ${novaDespesa.descricao||novaDespesa.tipo} — R$ ${novaDespesa.valor} (${mesLabel(novaDespesa.mes)})`);
-      setNovaDespesa({ tipo:"agua", descricao:"", valor:"", mes:mesAtual(), arquivo:null, arquivoNome:"" }); setModal(null); showToast("Despesa registrada!");
+      for (const mesAlvo of mesesAlvo) {
+        // O comprovante só é anexado ao mês original
+        const comp = mesAlvo === novaDespesa.mes ? base64 : "";
+        const nomeComp = mesAlvo === novaDespesa.mes ? novaDespesa.arquivoNome : "";
+        await addDoc(collection(db, "despesas"), {
+          condominioId, tipo:novaDespesa.tipo, descricao:novaDespesa.descricao,
+          valor:parseFloat(novaDespesa.valor)||0, mes:mesAlvo, status:"pendente",
+          dataPagamento:null, comprovante:comp, arquivoNome:nomeComp,
+          recorrente: novaDespesa.recorrente || false,
+        });
+      }
+      registrarLog("💧", `Despesa registrada: ${novaDespesa.descricao||novaDespesa.tipo} — R$ ${novaDespesa.valor}${novaDespesa.recorrente ? ` (recorrente, ${mesesAlvo.length} meses)` : ` (${mesLabel(novaDespesa.mes)})`}`);
+      setNovaDespesa({ tipo:"agua", descricao:"", valor:"", mes:mesAtual(), arquivo:null, arquivoNome:"", recorrente:false }); setModal(null);
+      showToast(novaDespesa.recorrente ? `Despesa lançada em ${mesesAlvo.length} meses!` : "Despesa registrada!");
     };
     if (novaDespesa.arquivo) { const r=new FileReader(); r.onload=e=>salvar(e.target.result); r.readAsDataURL(novaDespesa.arquivo); } else salvar();
   };
@@ -2216,7 +2264,7 @@ export default function App() {
     docPdf.setFontSize(12.5); docPdf.setTextColor(...AZUL); docPdf.text(`Despesas — ${mesLabel(mesSel)}`, X, y); y+=5;
     autoTable(docPdf, { startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
       head:[["Tipo","Descrição","Valor","Status"]],
-      body: despesas.filter(d=>d.mes===mesSel).map(d=>[d.tipo==="agua"?"Água":d.tipo==="luz"?"Luz":"Outro",d.descricao||"—",`R$ ${d.valor.toFixed(2).replace(".",",")}`,d.status==="pago"?"Pago":"Pendente"]),
+      body: despesas.filter(d=>d.mes===mesSel).map(d=>[despCat(d.tipo).label,d.descricao||"—",`R$ ${d.valor.toFixed(2).replace(".",",")}`,d.status==="pago"?"Pago":"Pendente"]),
     }); y=docPdf.lastAutoTable.finalY+12;
     if (y>230) { docPdf.addPage(); y=18; }
     docPdf.setFontSize(12.5); docPdf.setTextColor(...AZUL); docPdf.text("Serviços Concluídos", X, y); y+=5;
@@ -2335,7 +2383,7 @@ export default function App() {
       startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
       head:[["Tipo","Descricao","Status","Valor"]],
       body: despMes.length ? despMes.map(d=>[
-        d.tipo==="agua"?"Agua":d.tipo==="luz"?"Luz":"Outro",
+        despCat(d.tipo).label,
         d.descricao||"",
         d.status==="pago"?"Pago":"Pendente",
         `R$ ${d.valor.toFixed(2).replace(".",",")}`,
@@ -2563,7 +2611,7 @@ export default function App() {
     <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${d.status==="pago"?D.success:D.danger}`, marginBottom:10 }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
         <div>
-          <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{d.tipo==="agua"?"💧":d.tipo==="luz"?"⚡":"📦"} {d.descricao || (d.tipo==="agua"?"Conta de água":d.tipo==="luz"?"Conta de luz":"Outra despesa")}</div>
+          <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{despCat(d.tipo).icon} {d.descricao || despCat(d.tipo).label}</div>
           <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>{mesLabel(d.mes)} · R$ {d.valor.toFixed(2).replace(".",",")}</div>
         </div>
         <Badge status={d.status} />
@@ -2783,7 +2831,7 @@ export default function App() {
                     return ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][parseInt(mo)-1];
                   });
                   const dados6 = mesesAno.map(m => {
-                    const entrada = cobrancas.filter(c=>c.mes===m&&c.status==="pago").length * taxa;
+                    const entrada = somaCobrancas(cobrancas.filter(c=>c.mes===m&&c.status==="pago"));
                     const saida   = despesas.filter(d=>d.mes===m&&d.status==="pago").reduce((s,d)=>s+d.valor,0)
                                   + servicos.filter(s=>{
                                       if(!s.dataFim) return false;
@@ -2977,7 +3025,7 @@ export default function App() {
                             <button onClick={() => { setModal({ type:"historico", data:m }); }} style={{ padding:"5px 12px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>📋 Histórico</button>
                             <button onClick={() => { const link=`${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}`; navigator.clipboard.writeText(link); showToast(`Link do ${m.unidade} copiado!`); }} style={{ padding:"5px 12px", background:"#F0FDFA", color:D.success, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🔗 Link</button>
                             {!readOnly && <>
-                              <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,email:m.email,telefone:m.telefone||""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 12px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
+                              <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,email:m.email,telefone:m.telefone||"",tipo:m.tipo||"Proprietário",veiculos:m.veiculos||"",pets:m.pets||"",taxaCustom:m.taxaCustom!=null?String(m.taxaCustom):""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 12px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
                               <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"5px 12px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
                             </>}
                           </div>
@@ -3015,7 +3063,7 @@ export default function App() {
                                 <button onClick={() => setModal({ type:"historico", data:m })} style={{ padding:"5px 10px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>📋</button>
                                 <button onClick={() => { const link=`${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}`; navigator.clipboard.writeText(link); showToast(`Link do ${m.unidade} copiado!`); }} style={{ padding:"5px 10px", background:"#F0FDFA", color:D.success, border:`1px solid #BBF7D0`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🔗</button>
                                 {!readOnly && <>
-                                  <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,email:m.email,telefone:m.telefone||""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 10px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
+                                  <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,email:m.email,telefone:m.telefone||"",tipo:m.tipo||"Proprietário",veiculos:m.veiculos||"",pets:m.pets||"",taxaCustom:m.taxaCustom!=null?String(m.taxaCustom):""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 10px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
                                   <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"5px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
                                 </>}
                               </div>
@@ -3075,8 +3123,8 @@ export default function App() {
                   <tbody>
                     {[...despesas].sort((a,b)=>b.mes.localeCompare(a.mes)).map(d => (
                       <tr key={d.id} style={{ borderBottom:`1px solid ${D.border}` }}>
-                        <td style={{ padding:"13px 16px", fontSize:18 }}>{d.tipo==="agua"?"💧":d.tipo==="luz"?"⚡":"📦"}</td>
-                        <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>{d.descricao||(d.tipo==="agua"?"Conta de água":d.tipo==="luz"?"Conta de luz":"Outra despesa")}</td>
+                        <td style={{ padding:"13px 16px", fontSize:18 }}>{despCat(d.tipo).icon}</td>
+                        <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>{d.descricao||despCat(d.tipo).label}</td>
                         <td style={{ padding:"13px 16px", fontSize:13, color:"#6B7A8D" }}>{mesLabel(d.mes)}</td>
                         <td style={{ padding:"13px 16px", fontSize:13, fontWeight:600, color:"#1E3A5F" }}>R$ {d.valor.toFixed(2).replace(".",",")}</td>
                         <td style={{ padding:"13px 16px" }}><Badge status={d.status} /></td>
@@ -3494,7 +3542,7 @@ export default function App() {
           const totalRetiradas= fundoMovs.filter(m=>m.tipo==="retirada").reduce((s,m)=>s+(m.valor||0),0);
           const saldoFundo    = totalAportes - totalRetiradas;
           const pctFundo      = condominio?.percentualFundo ?? 10;
-          const arrecadadoMes = pagos * taxa;
+          const arrecadadoMes = totalArrecadado;
           const aporteSugerido= arrecadadoMes * (pctFundo/100);
           return (
           <div>
@@ -3946,14 +3994,50 @@ export default function App() {
 
       {modal?.type === "novoMorador" && (
         <Modal title="Novo Morador" onClose={() => setModal(null)} isMobile={isMobile}>
-          {[{label:"Nome *",key:"nome",placeholder:"Ex: João da Silva"},{label:"Unidade *",key:"unidade",placeholder:"Ex: Apto 103"},{label:"E-mail *",key:"email",placeholder:"joao@email.com",type:"email"},{label:"Telefone",key:"telefone",placeholder:"(85) 99999-0000"}].map(f => (
-            <div key={f.key} style={{ marginBottom:14 }}>
-              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>{f.label}</label>
-              <input type={f.type||"text"} value={novoMorador[f.key]} onChange={e=>setNovoMorador(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Nome *</label>
+              <input value={novoMorador.nome} onChange={e=>setNovoMorador(p=>({...p,nome:e.target.value}))} placeholder="Ex: João da Silva" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
             </div>
-          ))}
-          <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <div style={{ display:"flex", gap:12 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Unidade *</label>
+                <input value={novoMorador.unidade} onChange={e=>setNovoMorador(p=>({...p,unidade:e.target.value}))} placeholder="Ex: Apto 103" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Tipo</label>
+                <select value={novoMorador.tipo} onChange={e=>setNovoMorador(p=>({...p,tipo:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, background:"#fff", fontFamily:D.fontBody }}>
+                  <option>Proprietário</option>
+                  <option>Inquilino</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>E-mail *</label>
+              <input type="email" value={novoMorador.email} onChange={e=>setNovoMorador(p=>({...p,email:e.target.value}))} placeholder="joao@email.com" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Telefone / WhatsApp</label>
+              <input value={novoMorador.telefone} onChange={e=>setNovoMorador(p=>({...p,telefone:e.target.value}))} placeholder="(85) 99999-0000" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+            </div>
+            <div style={{ display:"flex", gap:12 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Veículos</label>
+                <input value={novoMorador.veiculos} onChange={e=>setNovoMorador(p=>({...p,veiculos:e.target.value}))} placeholder="Ex: ABC-1234 (Gol)" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Pets</label>
+                <input value={novoMorador.pets} onChange={e=>setNovoMorador(p=>({...p,pets:e.target.value}))} placeholder="Ex: 1 cão (Rex)" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Taxa individual (opcional)</label>
+              <input type="number" value={novoMorador.taxaCustom} onChange={e=>setNovoMorador(p=>({...p,taxaCustom:e.target.value}))} placeholder={`Padrão: R$ ${taxa.toFixed(2).replace(".",",")}`} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+              <p style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, margin:"5px 0 0" }}>Deixe em branco para usar a taxa padrão do condomínio. Preencha se esta unidade paga um valor diferente.</p>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:18, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
             <button onClick={adicionarMorador} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Cadastrar</button>
           </div>
         </Modal>
@@ -3969,9 +4053,15 @@ export default function App() {
         return (
           <Modal title={`Histórico — ${m.nome}`} onClose={() => setModal(null)} isMobile={isMobile}>
             <div style={{ marginBottom:16, background:D.muted, borderRadius:D.radius, padding:"12px 16px", border:`1px solid ${D.border}` }}>
-              <div style={{ fontSize:13, color:D.text, fontWeight:600, fontFamily:D.fontBody }}>{m.unidade}</div>
-              <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:4, lineHeight:1.8 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                <span style={{ fontSize:13, color:D.text, fontWeight:600, fontFamily:D.fontBody }}>{m.unidade}</span>
+                {m.tipo && <span style={{ background:D.secondary, color:D.primary, fontSize:11, fontWeight:600, padding:"2px 10px", borderRadius:12, fontFamily:D.fontBody }}>{m.tipo}</span>}
+                {m.taxaCustom != null && <span style={{ background:D.warningBg, color:"#92400E", fontSize:11, fontWeight:600, padding:"2px 10px", borderRadius:12, fontFamily:D.fontBody }}>Taxa: R$ {Number(m.taxaCustom).toFixed(2).replace(".",",")}</span>}
+              </div>
+              <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:6, lineHeight:1.8 }}>
                 📧 {m.email}{m.telefone ? ` · 📱 ${m.telefone}` : ""}
+                {m.veiculos ? <><br/>🚗 {m.veiculos}</> : ""}
+                {m.pets ? <><br/>🐾 {m.pets}</> : ""}
               </div>
               <div style={{ display:"flex", gap:16, marginTop:10, flexWrap:"wrap" }}>
                 <div style={{ fontSize:12 }}>✅ <b style={{color:"#2E7D32"}}>{totalPago}</b> pagamento{totalPago!==1?"s":""} em dia</div>
@@ -4014,25 +4104,50 @@ export default function App() {
 
       {modal?.type === "editarMorador" && editMorador && (
         <Modal title="Editar Morador" onClose={() => setModal(null)} isMobile={isMobile}>
-          {[
-            { label:"Nome *",    key:"nome",     placeholder:"Ex: João da Silva"    },
-            { label:"Unidade *", key:"unidade",  placeholder:"Ex: Apto 103"         },
-            { label:"E-mail *",  key:"email",    placeholder:"joao@email.com", type:"email" },
-            { label:"Telefone",  key:"telefone", placeholder:"(85) 99999-0000"      },
-          ].map(f => (
-            <div key={f.key} style={{ marginBottom:14 }}>
-              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>{f.label}</label>
-              <input
-                type={f.type||"text"}
-                value={editMorador[f.key]}
-                onChange={e => setEditMorador(p => ({ ...p, [f.key]: e.target.value }))}
-                placeholder={f.placeholder}
-                style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }}
-              />
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Nome *</label>
+              <input value={editMorador.nome} onChange={e=>setEditMorador(p=>({...p,nome:e.target.value}))} placeholder="Ex: João da Silva" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
             </div>
-          ))}
-          <div style={{ display:"flex", gap:8, marginTop:6, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <div style={{ display:"flex", gap:12 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Unidade *</label>
+                <input value={editMorador.unidade} onChange={e=>setEditMorador(p=>({...p,unidade:e.target.value}))} placeholder="Ex: Apto 103" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Tipo</label>
+                <select value={editMorador.tipo} onChange={e=>setEditMorador(p=>({...p,tipo:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, background:"#fff", fontFamily:D.fontBody }}>
+                  <option>Proprietário</option>
+                  <option>Inquilino</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>E-mail *</label>
+              <input type="email" value={editMorador.email} onChange={e=>setEditMorador(p=>({...p,email:e.target.value}))} placeholder="joao@email.com" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Telefone / WhatsApp</label>
+              <input value={editMorador.telefone} onChange={e=>setEditMorador(p=>({...p,telefone:e.target.value}))} placeholder="(85) 99999-0000" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+            </div>
+            <div style={{ display:"flex", gap:12 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Veículos</label>
+                <input value={editMorador.veiculos} onChange={e=>setEditMorador(p=>({...p,veiculos:e.target.value}))} placeholder="Ex: ABC-1234 (Gol)" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Pets</label>
+                <input value={editMorador.pets} onChange={e=>setEditMorador(p=>({...p,pets:e.target.value}))} placeholder="Ex: 1 cão (Rex)" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Taxa individual (opcional)</label>
+              <input type="number" value={editMorador.taxaCustom} onChange={e=>setEditMorador(p=>({...p,taxaCustom:e.target.value}))} placeholder={`Padrão: R$ ${taxa.toFixed(2).replace(".",",")}`} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+              <p style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, margin:"5px 0 0" }}>Deixe em branco para usar a taxa padrão do condomínio.</p>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:18, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
             <button onClick={salvarEdicaoMorador} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Salvar</button>
           </div>
         </Modal>
@@ -4306,31 +4421,52 @@ export default function App() {
 
       {modal?.type === "novaDespesa" && (
         <Modal title="Nova Despesa" onClose={() => setModal(null)} isMobile={isMobile}>
-          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Tipo</label>
-          <select value={novaDespesa.tipo} onChange={e=>setNovaDespesa(p=>({...p,tipo:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, marginBottom:14, boxSizing:"border-box", background:"#fff", color:D.text }}>
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Categoria</label>
+          <select value={novaDespesa.tipo} onChange={e=>setNovaDespesa(p=>({...p,tipo:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, marginBottom:14, boxSizing:"border-box", background:"#fff", color:D.text, fontFamily:D.fontBody }}>
             <option value="agua">💧 Água</option>
             <option value="luz">⚡ Luz</option>
-            <option value="outro">📦 Outra despesa</option>
+            <option value="limpeza">🧹 Limpeza</option>
+            <option value="portaria">🛡️ Portaria / Segurança</option>
+            <option value="elevador">🛗 Elevador</option>
+            <option value="jardinagem">🌳 Jardinagem</option>
+            <option value="salario">👷 Zelador / Salário</option>
+            <option value="internet">🌐 Internet / Telefone</option>
+            <option value="manutencao">🔧 Manutenção</option>
+            <option value="material">📦 Material</option>
+            <option value="impostos">🧾 Impostos / Taxas</option>
+            <option value="outro">📌 Outra despesa</option>
           </select>
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Descrição</label>
-          <input value={novaDespesa.descricao} onChange={e=>setNovaDespesa(p=>({...p,descricao:e.target.value}))} placeholder="Ex: Conta Enel Jun" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, marginBottom:14, boxSizing:"border-box" }} />
+          <input value={novaDespesa.descricao} onChange={e=>setNovaDespesa(p=>({...p,descricao:e.target.value}))} placeholder="Ex: Conta Enel Jun" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, marginBottom:14, boxSizing:"border-box", fontFamily:D.fontBody }} />
           <div style={{ display:"flex", gap:10 }}>
             <div style={{ flex:1 }}>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Valor *</label>
-              <input type="number" value={novaDespesa.valor} onChange={e=>setNovaDespesa(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
+              <input type="number" value={novaDespesa.valor} onChange={e=>setNovaDespesa(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
             </div>
             <div style={{ flex:1 }}>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Mês *</label>
-              <input type="month" value={novaDespesa.mes} onChange={e=>setNovaDespesa(p=>({...p,mes:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
+              <input type="month" value={novaDespesa.mes} onChange={e=>setNovaDespesa(p=>({...p,mes:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
             </div>
           </div>
+          {/* Despesa recorrente */}
+          <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", marginTop:14, background:D.muted, padding:"12px 14px", borderRadius:D.radiusSm }}>
+            <input type="checkbox" checked={novaDespesa.recorrente} onChange={e=>setNovaDespesa(p=>({...p,recorrente:e.target.checked}))} style={{ width:18, height:18, cursor:"pointer" }} />
+            <div>
+              <div style={{ fontFamily:D.fontBody, fontSize:14, color:D.text, fontWeight:600 }}>🔁 Despesa recorrente</div>
+              <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>
+                {novaDespesa.recorrente && novaDespesa.mes
+                  ? `Será lançada todos os meses até dezembro/${novaDespesa.mes.split("-")[0]}`
+                  : "Repete o lançamento todos os meses até dezembro"}
+              </div>
+            </div>
+          </label>
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginTop:14 }}>Comprovante</label>
           <div onClick={() => fileRefDespesa.current.click()} style={{ marginTop:6, border:"2px dashed #D0DAE6", borderRadius:8, padding:"16px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:"#6B7A8D", fontSize:13 }}>
             {novaDespesa.arquivoNome ? <span style={{color:"#2E6DA4",fontWeight:600}}>📎 {novaDespesa.arquivoNome}</span> : <>📁 Toque para selecionar</>}
           </div>
           <input ref={fileRefDespesa} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f=e.target.files[0]; if(f) setNovaDespesa(p=>({...p,arquivo:f,arquivoNome:f.name})); }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
-            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
             <button onClick={adicionarDespesa} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>
           </div>
         </Modal>

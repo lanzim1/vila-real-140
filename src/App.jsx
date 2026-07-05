@@ -2817,7 +2817,7 @@ export default function App() {
               </div>
 
               {/* Linha: Gráfico + Atividade Recente */}
-              <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"2fr 1fr", gap:isMobile?12:16, marginBottom:isMobile?12:24 }}>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile?"minmax(0,1fr)":"minmax(0,2fr) minmax(0,1fr)", gap:isMobile?12:16, marginBottom:isMobile?12:24 }}>
 
                 {/* Fluxo Financeiro */}
                 {(() => {
@@ -2841,8 +2841,8 @@ export default function App() {
                     return { entrada, saida };
                   });
                   return (
-                    <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
+                    <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:8 }}>
                         <div>
                           <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>Fluxo Financeiro</div>
                           <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>Receitas × Despesas (em R$)</div>
@@ -2862,7 +2862,7 @@ export default function App() {
                 })()}
 
                 {/* Atividade Recente */}
-                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
                   <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em", marginBottom:18 }}>Atividade recente</div>
                   <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
                     {logs.slice(0,6).map((log,i) => (
@@ -2891,7 +2891,7 @@ export default function App() {
                   <thead>
                     <tr style={{ background:D.muted }}>
                       {["Unidade","Morador","Valor","Status"].map(h => (
-                        <th key={h} style={{ padding:"10px 24px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
+                        <th key={h} style={{ padding: isMobile?"10px 14px":"10px 24px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -2901,10 +2901,10 @@ export default function App() {
                       if (!m) return null;
                       return (
                         <tr key={i} style={{ borderBottom:`1px solid ${D.border}` }}>
-                          <td style={{ padding:"14px 24px", fontFamily:D.fontDisplay, fontSize:13, fontWeight:600, color:D.text }}>{m.unidade}</td>
-                          <td style={{ padding:"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{m.nome}</td>
-                          <td style={{ padding:"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>R$ {taxa.toFixed(2).replace(".",",")}</td>
-                          <td style={{ padding:"14px 24px" }}><Badge status={cob.status} /></td>
+                          <td style={{ padding: isMobile?"14px 14px":"14px 24px", fontFamily:D.fontDisplay, fontSize:13, fontWeight:600, color:D.text }}>{m.unidade}</td>
+                          <td style={{ padding: isMobile?"14px 14px":"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{m.nome}</td>
+                          <td style={{ padding: isMobile?"14px 14px":"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>R$ {taxaDoMorador(cob.moradorId).toFixed(2).replace(".",",")}</td>
+                          <td style={{ padding: isMobile?"14px 14px":"14px 24px" }}><Badge status={cob.status} /></td>
                         </tr>
                       );
                     })}

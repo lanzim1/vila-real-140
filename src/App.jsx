@@ -226,6 +226,9 @@ const UpgradeCard = ({ recurso, planoNecessario, isMobile }) => {
     fundoReserva:"Separe automaticamente uma parte da arrecadação para o fundo de reserva.",
     documentos:  "Guarde documentos importantes com alerta de vencimento (alvará, seguro, etc.).",
     agenda:      "Organize eventos, manutenções e assembleias em um calendário do condomínio.",
+    multaJuros:  "Cobre automaticamente multa e juros sobre cobranças em atraso.",
+    cobrancaExtra:"Crie cobranças extras e rateios além da taxa mensal (obras, contas, fundos).",
+    fluxoCaixa:  "Acompanhe o saldo real do condomínio mês a mês, com entradas e saídas.",
   };
   return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"60vh", padding: isMobile?"20px":"40px" }}>
@@ -1464,6 +1467,8 @@ export default function App() {
   const [cobrancasExtras, setCobrancasExtras] = useState([]);
   const [pagExtras, setPagExtras] = useState([]);
   const [novaCobExtra, setNovaCobExtra] = useState({ descricao:"", modo:"unidade", valor:"", mes: mesAtual() });
+  const [receitas, setReceitas] = useState([]);
+  const [novaReceita, setNovaReceita] = useState({ descricao:"", valor:"", categoria:"Outra", mes: mesAtual() });
   const [entregas, setEntregas] = useState([]);
   const [novaEntrega, setNovaEntrega] = useState({ moradorId:"", remetente:"", descricao:"", obs:"" });
   const [eventos, setEventos] = useState([]);
@@ -1574,6 +1579,7 @@ export default function App() {
     const u14 = onSnapshot(byCond("eventos"), s => setEventos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
     const u15 = onSnapshot(byCond("cobrancas_extras"), s => setCobrancasExtras(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
     const u16 = onSnapshot(byCond("pag_extras"), s => setPagExtras(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const u17 = onSnapshot(byCond("receitas"), s => setReceitas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
 
     // Config (taxa/dia de vencimento) vem do próprio documento do condomínio
     const u3 = onSnapshot(doc(db, "condominios", condominioId), d => {
@@ -1593,7 +1599,7 @@ export default function App() {
       setObsMes(texto); setObsSalva(texto);
     });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); u15(); u16(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); u15(); u16(); u17(); };
   }, [user, condominioId, mesSel]);
 
   // (Removido o auto-popular com MOCK_MORADORES — no multi-tenant cada
@@ -2158,6 +2164,50 @@ export default function App() {
     showToast("Pagamento estornado.", "error");
   };
 
+  // ── Receitas avulsas (fluxo de caixa) ──
+  const adicionarReceita = async () => {
+    if (!novaReceita.descricao.trim()) { showToast("Informe a descrição da receita.", "error"); return; }
+    const valor = parseFloat(novaReceita.valor) || 0;
+    if (valor <= 0) { showToast("Informe um valor válido.", "error"); return; }
+    await addDoc(collection(db, "receitas"), {
+      condominioId,
+      descricao: novaReceita.descricao.trim(),
+      valor,
+      categoria: novaReceita.categoria,
+      mes: novaReceita.mes,
+      criadoEm: new Date().toLocaleDateString("pt-BR"),
+      timestamp: Date.now(),
+    });
+    registrarLog("💵", `Receita avulsa: ${novaReceita.descricao.trim()} — R$ ${valor.toFixed(2).replace(".",",")}`);
+    setNovaReceita({ descricao:"", valor:"", categoria:"Outra", mes: mesSel });
+    setModal(null);
+    showToast("Receita registrada!");
+  };
+
+  const removerReceita = async (id) => {
+    await deleteDoc(doc(db, "receitas", id));
+    showToast("Receita removida.", "error");
+  };
+
+  // Calcula o fluxo de caixa de um mês (entradas − saídas)
+  const fluxoDoMes = (mes) => {
+    const taxas = somaCobrancas(cobrancas.filter(c => c.mes === mes && c.status === "pago"));
+    const extras = cobrancasExtras.filter(e => e.mes === mes).reduce((sum, e) => {
+      const nPagos = pagExtras.filter(p => p.extraId === e.id).length;
+      return sum + nPagos * (e.valorUnitario || 0);
+    }, 0);
+    const recAvulsas = receitas.filter(r => r.mes === mes).reduce((s,r) => s + (r.valor||0), 0);
+    const entradas = taxas + extras + recAvulsas;
+    const despesasPagas = despesas.filter(d => d.mes === mes && d.status === "pago").reduce((s,d) => s + (d.valor||0), 0);
+    const servConcluidos = servicos.filter(s => {
+      if (s.status !== "concluido" || !s.dataFim) return false;
+      const p = s.dataFim.split("/");
+      return p.length >= 3 && `${p[2]}-${p[1]}` === mes;
+    }).reduce((s,sv) => s + (sv.valorMaterial||0) + (sv.valorMaoDeObra||0), 0);
+    const saidas = despesasPagas + servConcluidos;
+    return { taxas, extras, recAvulsas, entradas, despesasPagas, servConcluidos, saidas, resultado: entradas - saidas };
+  };
+
   // ── Entregas / Encomendas ──
   const registrarEntrega = async () => {
     if (!novaEntrega.moradorId) { showToast("Selecione o morador destinatário.", "error"); return; }
@@ -2634,6 +2684,7 @@ export default function App() {
     { id:"comunicados", icon:"📢", label:"Comunicados" },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
     { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
+    { id:"fluxoCaixa",  icon:"📈", label:"Fluxo de Caixa" },
     { id:"agenda",      icon:"🗓️", label:"Agenda"      },
     { id:"historico",   icon:"📋", label:"Histórico"   },
     ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config."  }] : []),
@@ -2651,6 +2702,7 @@ export default function App() {
     { id:"comunicados", icon:"📢", label:"Comunicados" },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
     { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
+    { id:"fluxoCaixa",  icon:"📈", label:"Fluxo de Caixa" },
     { id:"agenda",      icon:"🗓️", label:"Agenda"      },
     { id:"historico",   icon:"📋", label:"Histórico"   },
     ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config." }] : []),
@@ -3418,9 +3470,9 @@ export default function App() {
 
         {/* ── Serviços ── */}
         {/* Trava de plano: abas bloqueadas para planos inferiores */}
-        {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas","agenda"].includes(aba) && !podeUsar(aba) && (
+        {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas","agenda","fluxoCaixa"].includes(aba) && !podeUsar(aba) && (
           <div>
-            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
             <UpgradeCard recurso={aba} planoNecessario={RECURSO_PLANO[aba]} isMobile={isMobile} />
           </div>
         )}
@@ -3999,6 +4051,120 @@ export default function App() {
           );
         })()}
 
+        {/* ── Fluxo de Caixa ── */}
+        {aba === "fluxoCaixa" && podeUsar("fluxoCaixa") && (() => {
+          // Monta a lista de meses com qualquer movimento + o mês atual, em ordem cronológica
+          const mesesComMov = [...new Set([
+            mesAtual(),
+            ...cobrancas.map(c => c.mes),
+            ...despesas.map(d => d.mes),
+            ...receitas.map(r => r.mes),
+            ...cobrancasExtras.map(e => e.mes),
+          ])].filter(Boolean).sort();
+          // Saldo acumulado até o fim de cada mês
+          let acumulado = 0;
+          const linhas = mesesComMov.map(mes => {
+            const f = fluxoDoMes(mes);
+            acumulado += f.resultado;
+            return { mes, ...f, saldoAcumulado: acumulado };
+          });
+          const saldoAtual = acumulado;
+          const fMes = fluxoDoMes(mesSel);
+          const receitasMes = receitas.filter(r => r.mes === mesSel);
+          const fmt = (v) => `R$ ${v.toFixed(2).replace(".",",")}`;
+
+          return (
+          <div>
+            <TopBar title="Fluxo de Caixa" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
+
+              {/* Saldo atual */}
+              <div style={{ background:`linear-gradient(135deg, ${D.primary}, ${D.sidebar})`, borderRadius:D.radius, padding: isMobile?"20px":"26px 28px", marginBottom:16, color:"#fff", boxShadow:D.shadowMd }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:13, opacity:.85 }}>Saldo acumulado em caixa</div>
+                <div style={{ fontFamily:D.fontDisplay, fontSize:32, fontWeight:700, letterSpacing:"-0.03em", marginTop:4, color: saldoAtual<0?"#FECACA":"#fff" }}>{fmt(saldoAtual)}</div>
+                <div style={{ fontFamily:D.fontBody, fontSize:12, opacity:.8, marginTop:4 }}>Considerando taxas, extras, receitas, despesas e serviços de todos os meses.</div>
+              </div>
+
+              {/* Resumo do mês selecionado */}
+              <div style={{ display:"grid", gridTemplateColumns: isMobile?"minmax(0,1fr) minmax(0,1fr)":"repeat(3, minmax(0,1fr))", gap:12, marginBottom:16 }}>
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Entradas — {mesLabel(mesSel)}</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:700, color:D.success, marginTop:4 }}>{fmt(fMes.entradas)}</div>
+                </div>
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Saídas — {mesLabel(mesSel)}</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:700, color:D.danger, marginTop:4 }}>{fmt(fMes.saidas)}</div>
+                </div>
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0, gridColumn: isMobile?"1 / -1":"auto" }}>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Resultado do mês</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:700, color: fMes.resultado>=0?D.success:D.danger, marginTop:4 }}>{fMes.resultado>=0?"+":""}{fmt(fMes.resultado)}</div>
+                </div>
+              </div>
+
+              {/* Detalhamento do mês */}
+              <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?16:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:16 }}>
+                <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em", marginBottom:14 }}>Detalhamento — {mesLabel(mesSel)}</div>
+                {[
+                  { label:"💰 Taxas pagas", valor:fMes.taxas, cor:D.success },
+                  { label:"➕ Cobranças extras pagas", valor:fMes.extras, cor:D.success },
+                  { label:"💵 Receitas avulsas", valor:fMes.recAvulsas, cor:D.success },
+                  { label:"💧 Despesas pagas", valor:-fMes.despesasPagas, cor:D.danger },
+                  { label:"🔧 Serviços concluídos", valor:-fMes.servConcluidos, cor:D.danger },
+                ].map((it,idx) => (
+                  <div key={idx} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"9px 0", borderBottom: idx<4?`1px solid ${D.border}`:"none" }}>
+                    <span style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{it.label}</span>
+                    <span style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:600, color: it.valor===0?D.textMut:it.cor }}>{it.valor>=0?"+":"−"} {fmt(Math.abs(it.valor))}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Receitas avulsas do mês */}
+              <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?16:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:16 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: receitasMes.length?14:0, flexWrap:"wrap", gap:10 }}>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>💵 Receitas avulsas — {mesLabel(mesSel)}</div>
+                  {!readOnly && <button onClick={() => { setNovaReceita({ descricao:"", valor:"", categoria:"Outra", mes: mesSel }); setModal({ type:"novaReceita" }); }} style={{ padding:"8px 14px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>+ Nova receita</button>}
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {receitasMes.map(r => (
+                    <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background:D.successBg, borderRadius:D.radiusSm, borderLeft:`4px solid ${D.success}` }}>
+                      <div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>{r.descricao}</div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{r.categoria}</div>
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                        <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:700, color:D.success }}>+ {fmt(r.valor)}</div>
+                        {!readOnly && <button onClick={() => { if(window.confirm("Remover esta receita?")) removerReceita(r.id); }} style={{ background:"none", border:"none", color:D.textMut, cursor:"pointer", fontSize:15 }}>🗑️</button>}
+                      </div>
+                    </div>
+                  ))}
+                  {receitasMes.length === 0 && <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut, textAlign:"center", padding:"8px 0" }}>Nenhuma receita avulsa neste mês. Ex: aluguel do salão, rendimento, multa recebida.</div>}
+                </div>
+              </div>
+
+              {/* Histórico mês a mês */}
+              <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
+                <div style={{ padding: isMobile?"16px 16px 12px":"18px 24px 14px", borderBottom:`1px solid ${D.border}`, fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>Saldo mês a mês</div>
+                <div>
+                  {[...linhas].reverse().map((l,idx) => (
+                    <div key={l.mes} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding: isMobile?"12px 16px":"14px 24px", borderBottom: idx<linhas.length-1?`1px solid ${D.border}`:"none", background: l.mes===mesSel?D.muted:"transparent" }}>
+                      <div style={{ minWidth:0 }}>
+                        <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text, textTransform:"capitalize" }}>{mesLabel(l.mes)}</div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textSec, marginTop:2 }}>+{fmt(l.entradas)} · −{fmt(l.saidas)}</div>
+                      </div>
+                      <div style={{ textAlign:"right", flexShrink:0 }}>
+                        <div style={{ fontFamily:D.fontBody, fontSize:11, color: l.resultado>=0?D.success:D.danger }}>{l.resultado>=0?"+":""}{fmt(l.resultado)} no mês</div>
+                        <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:700, color: l.saldoAcumulado>=0?D.text:D.danger, marginTop:2 }}>{fmt(l.saldoAcumulado)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          </div>
+          );
+        })()}
+
         {/* ── Agenda ── */}
         {aba === "agenda" && podeUsar("agenda") && (() => {
           const hoje = new Date(); hoje.setHours(0,0,0,0);
@@ -4534,6 +4700,41 @@ export default function App() {
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
             <button onClick={registrarEntrega} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>📦 Registrar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "novaReceita" && (
+        <Modal title="Nova Receita Avulsa" onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Descrição *</label>
+              <input value={novaReceita.descricao} onChange={e=>setNovaReceita(p=>({...p,descricao:e.target.value}))} placeholder="Ex: Aluguel do salão de festas" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Categoria</label>
+              <select value={novaReceita.categoria} onChange={e=>setNovaReceita(p=>({...p,categoria:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", background:"#fff", fontFamily:D.fontBody, color:D.text }}>
+                <option>Aluguel de espaço</option>
+                <option>Rendimento / Aplicação</option>
+                <option>Multa recebida</option>
+                <option>Doação</option>
+                <option>Outra</option>
+              </select>
+            </div>
+            <div style={{ display:"flex", gap:12 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Valor *</label>
+                <input type="number" value={novaReceita.valor} onChange={e=>setNovaReceita(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Mês *</label>
+                <input type="month" value={novaReceita.mes} onChange={e=>setNovaReceita(p=>({...p,mes:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              </div>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+            <button onClick={adicionarReceita} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>💵 Registrar</button>
           </div>
         </Modal>
       )}

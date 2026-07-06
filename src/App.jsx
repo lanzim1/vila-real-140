@@ -65,6 +65,7 @@ const RECURSO_PLANO = {
   cobrancaExtra: "padrao",
   fluxoCaixa: "padrao",
   ocorrencias: "avancado",
+  enquetes: "avancado",
   // Avançado (premium — a construir)
   comunicados:"avancado",
   entregas:   "avancado",
@@ -231,6 +232,7 @@ const UpgradeCard = ({ recurso, planoNecessario, isMobile }) => {
     cobrancaExtra:"Crie cobranças extras e rateios além da taxa mensal (obras, contas, fundos).",
     fluxoCaixa:  "Acompanhe o saldo real do condomínio mês a mês, com entradas e saídas.",
     ocorrencias: "Receba e acompanhe reclamações e solicitações dos moradores pelo portal.",
+    enquetes:    "Crie votações e enquetes para os moradores decidirem pelo portal.",
   };
   return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"60vh", padding: isMobile?"20px":"40px" }}>
@@ -1134,6 +1136,8 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const [formOcorrencia, setFormOcorrencia] = useState({ titulo:"", categoria:"Manutenção", descricao:"" });
   const [enviandoOcorrencia, setEnviandoOcorrencia] = useState(false);
   const [msgOcorrencia, setMsgOcorrencia] = useState("");
+  const [enquetesMor, setEnquetesMor] = useState([]);
+  const [votosMor, setVotosMor] = useState([]);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -1177,7 +1181,16 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
       query(collection(db, "ocorrencias"), where("moradorId","==",moradorId)),
       s => setOcorrenciasMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
     );
-    return () => { u(); u2(); u3e(); u4e(); u5e(); };
+    // Enquetes do condomínio e votos deste morador
+    const u6e = onSnapshot(
+      query(collection(db, "enquetes"), where("condominioId","==",morador.condominioId)),
+      s => setEnquetesMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
+    );
+    const u7e = onSnapshot(
+      query(collection(db, "votos"), where("moradorId","==",moradorId)),
+      s => setVotosMor(s.docs.map(d => ({ id:d.id, ...d.data() })))
+    );
+    return () => { u(); u2(); u3e(); u4e(); u5e(); u6e(); u7e(); };
   }, [morador?.condominioId]);
 
   const fazerReserva = async () => {
@@ -1225,6 +1238,17 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     } finally {
       setEnviandoOcorrencia(false);
     }
+  };
+
+  const votarEnquete = async (enquete, opcao) => {
+    if (enquete.status !== "aberta") return;
+    try {
+      await setDoc(doc(db, "votos", `${enquete.id}_${moradorId}`), {
+        condominioId: morador.condominioId || null,
+        enqueteId: enquete.id, moradorId, nome: morador.nome, unidade: morador.unidade,
+        opcao, timestamp: Date.now(),
+      });
+    } catch(e) {}
   };
 
   if (!morador) return (
@@ -1506,6 +1530,52 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
           )}
         </div>
 
+        {/* Enquetes / Votações */}
+        {enquetesMor.length > 0 && (
+          <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginTop:20 }}>
+            <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>🗳️ Enquetes</div>
+            <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginBottom:16 }}>Participe das votações do condomínio.</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+              {enquetesMor.map(enq => {
+                const meuVoto = votosMor.find(v => v.enqueteId === enq.id);
+                const aberta = enq.status === "aberta";
+                return (
+                  <div key={enq.id} style={{ border:`1px solid ${D.border}`, borderRadius:D.radius, padding:16 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, flexWrap:"wrap" }}>
+                      <div style={{ minWidth:0 }}>
+                        <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:600, color:D.text }}>{enq.titulo}</div>
+                        {enq.descricao && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>{enq.descricao}</div>}
+                      </div>
+                      <span style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:600, color: aberta?D.success:D.textSec, background: aberta?D.successBg:D.muted, padding:"3px 10px", borderRadius:10, whiteSpace:"nowrap" }}>{aberta?"Aberta":"Encerrada"}</span>
+                    </div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:8, marginTop:14 }}>
+                      {enq.opcoes.map((op,idx) => {
+                        const escolhida = meuVoto?.opcao === op;
+                        return (
+                          <button key={idx} onClick={() => aberta && votarEnquete(enq, op)} disabled={!aberta} style={{
+                            display:"flex", justifyContent:"space-between", alignItems:"center",
+                            padding:"12px 14px", borderRadius:D.radiusSm, cursor: aberta?"pointer":"default",
+                            border:`1.5px solid ${escolhida?D.primary:D.border}`,
+                            background: escolhida?D.secondary:"#fff",
+                            fontFamily:D.fontBody, fontSize:14, color:D.text, fontWeight: escolhida?600:400, textAlign:"left",
+                          }}>
+                            <span>{op}</span>
+                            {escolhida && <span style={{ color:D.primary, fontWeight:700 }}>✓ Seu voto</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {aberta
+                      ? <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:8 }}>{meuVoto ? "Você pode trocar seu voto enquanto estiver aberta." : "Toque em uma opção para votar."}</div>
+                      : <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:8 }}>Votação encerrada.{meuVoto?` Seu voto: ${meuVoto.opcao}.`:" Você não votou."}</div>
+                    }
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
@@ -1560,6 +1630,9 @@ export default function App() {
   const [ocorrencias, setOcorrencias] = useState([]);
   const [filtroOcorrencia, setFiltroOcorrencia] = useState("todas");
   const [respostaOcorr, setRespostaOcorr] = useState("");
+  const [enquetes, setEnquetes] = useState([]);
+  const [votos, setVotos] = useState([]);
+  const [novaEnquete, setNovaEnquete] = useState({ titulo:"", descricao:"", opcoes:["",""] });
   const [entregas, setEntregas] = useState([]);
   const [novaEntrega, setNovaEntrega] = useState({ moradorId:"", remetente:"", descricao:"", obs:"" });
   const [eventos, setEventos] = useState([]);
@@ -1672,6 +1745,8 @@ export default function App() {
     const u16 = onSnapshot(byCond("pag_extras"), s => setPagExtras(s.docs.map(d => ({ id:d.id, ...d.data() }))));
     const u17 = onSnapshot(byCond("receitas"), s => setReceitas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
     const u18 = onSnapshot(byCond("ocorrencias"), s => setOcorrencias(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u19 = onSnapshot(byCond("enquetes"), s => setEnquetes(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u20 = onSnapshot(byCond("votos"), s => setVotos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
 
     // Config (taxa/dia de vencimento) vem do próprio documento do condomínio
     const u3 = onSnapshot(doc(db, "condominios", condominioId), d => {
@@ -1691,7 +1766,7 @@ export default function App() {
       setObsMes(texto); setObsSalva(texto);
     });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); u15(); u16(); u17(); u18(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); u15(); u16(); u17(); u18(); u19(); u20(); };
   }, [user, condominioId, mesSel]);
 
   // (Removido o auto-popular com MOCK_MORADORES — no multi-tenant cada
@@ -2298,6 +2373,43 @@ export default function App() {
     showToast("Ocorrência removida.", "error");
   };
 
+  // ── Enquetes / votações ──
+  const criarEnquete = async () => {
+    if (!novaEnquete.titulo.trim()) { showToast("Informe a pergunta da enquete.", "error"); return; }
+    const opcoes = novaEnquete.opcoes.map(o => o.trim()).filter(Boolean);
+    if (opcoes.length < 2) { showToast("Informe pelo menos 2 opções de voto.", "error"); return; }
+    await addDoc(collection(db, "enquetes"), {
+      condominioId,
+      titulo: novaEnquete.titulo.trim(),
+      descricao: novaEnquete.descricao.trim(),
+      opcoes,
+      status: "aberta",
+      criadoEm: new Date().toLocaleDateString("pt-BR"),
+      timestamp: Date.now(),
+    });
+    registrarLog("🗳️", `Enquete criada: ${novaEnquete.titulo.trim()}`);
+    setNovaEnquete({ titulo:"", descricao:"", opcoes:["",""] });
+    setModal(null);
+    showToast("Enquete criada!");
+  };
+
+  const encerrarEnquete = async (id, encerrar) => {
+    await setDoc(doc(db, "enquetes", id), {
+      status: encerrar ? "encerrada" : "aberta",
+      encerradaEm: encerrar ? new Date().toLocaleDateString("pt-BR") : null,
+    }, { merge:true });
+    showToast(encerrar ? "Enquete encerrada." : "Enquete reaberta.");
+  };
+
+  const removerEnquete = async (enquete) => {
+    // Remove a enquete e todos os votos associados
+    const vs = votos.filter(v => v.enqueteId === enquete.id);
+    for (const v of vs) { try { await deleteDoc(doc(db, "votos", v.id)); } catch(e){} }
+    await deleteDoc(doc(db, "enquetes", enquete.id));
+    registrarLog("🗑️", `Enquete removida: ${enquete.titulo}`);
+    showToast("Enquete removida.", "error");
+  };
+
   // Calcula o fluxo de caixa de um mês (entradas − saídas)
   const fluxoDoMes = (mes) => {
     const taxas = somaCobrancas(cobrancas.filter(c => c.mes === mes && c.status === "pago"));
@@ -2792,6 +2904,7 @@ export default function App() {
     { id:"entregas",    icon:"📦", label:"Entregas"    },
     { id:"comunicados", icon:"📢", label:"Comunicados" },
     { id:"ocorrencias", icon:"🛎️", label:"Ocorrências" },
+    { id:"enquetes",    icon:"🗳️", label:"Enquetes"    },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
     { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
     { id:"fluxoCaixa",  icon:"📈", label:"Fluxo de Caixa" },
@@ -2811,6 +2924,7 @@ export default function App() {
     { id:"entregas",    icon:"📦", label:"Entregas"    },
     { id:"comunicados", icon:"📢", label:"Comunicados" },
     { id:"ocorrencias", icon:"🛎️", label:"Ocorrências" },
+    { id:"enquetes",    icon:"🗳️", label:"Enquetes"    },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
     { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
     { id:"fluxoCaixa",  icon:"📈", label:"Fluxo de Caixa" },
@@ -3581,9 +3695,9 @@ export default function App() {
 
         {/* ── Serviços ── */}
         {/* Trava de plano: abas bloqueadas para planos inferiores */}
-        {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas","agenda","fluxoCaixa","ocorrencias"].includes(aba) && !podeUsar(aba) && (
+        {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas","agenda","fluxoCaixa","ocorrencias","enquetes"].includes(aba) && !podeUsar(aba) && (
           <div>
-            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa",ocorrencias:"Ocorrências"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa",ocorrencias:"Ocorrências",enquetes:"Enquetes"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
             <UpgradeCard recurso={aba} planoNecessario={RECURSO_PLANO[aba]} isMobile={isMobile} />
           </div>
         )}
@@ -4155,6 +4269,94 @@ export default function App() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          </div>
+          );
+        })()}
+
+        {/* ── Enquetes (síndico) ── */}
+        {aba === "enquetes" && podeUsar("enquetes") && (() => {
+          const votosDaEnquete = (enqId) => votos.filter(v => v.enqueteId === enqId);
+          return (
+          <div>
+            <TopBar title="Enquetes" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
+
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>Crie votações para os moradores decidirem pelo portal</div>
+                {!readOnly && (
+                  <button onClick={() => { setNovaEnquete({ titulo:"", descricao:"", opcoes:["",""] }); setModal({ type:"novaEnquete" }); }} style={{ padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>+ Nova enquete</button>
+                )}
+              </div>
+
+              {enquetes.length === 0 ? (
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>🗳️</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhuma enquete ainda</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Crie uma votação para os moradores decidirem juntos (obras, cores, datas de assembleia, etc.).</div>
+                </div>
+              ) : (
+                <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                  {enquetes.map(enq => {
+                    const vs = votosDaEnquete(enq.id);
+                    const total = vs.length;
+                    const aberta = enq.status === "aberta";
+                    return (
+                      <div key={enq.id} style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?16:"20px 22px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${aberta?D.success:D.textMut}` }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, flexWrap:"wrap" }}>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{enq.titulo}</div>
+                            {enq.descricao && <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, marginTop:3 }}>{enq.descricao}</div>}
+                            <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:4 }}>{total} voto{total!==1?"s":""} · {enq.criadoEm}</div>
+                          </div>
+                          <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color: aberta?D.success:D.textSec, background: aberta?D.successBg:D.muted, padding:"4px 12px", borderRadius:12, whiteSpace:"nowrap" }}>{aberta?"🟢 Aberta":"🔒 Encerrada"}</span>
+                        </div>
+
+                        {/* Resultados */}
+                        <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
+                          {enq.opcoes.map((op,idx) => {
+                            const nOp = vs.filter(v => v.opcao === op).length;
+                            const pct = total > 0 ? Math.round((nOp/total)*100) : 0;
+                            return (
+                              <div key={idx}>
+                                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                                  <span style={{ fontFamily:D.fontBody, fontSize:13, color:D.text, fontWeight:500 }}>{op}</span>
+                                  <span style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, fontWeight:600 }}>{nOp} · {pct}%</span>
+                                </div>
+                                <div style={{ height:8, background:D.muted, borderRadius:4, overflow:"hidden" }}>
+                                  <div style={{ height:"100%", width:`${pct}%`, background:D.accent, borderRadius:4, transition:"width .3s" }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Quem votou (voto identificado) */}
+                        {total > 0 && (
+                          <details style={{ marginTop:14 }}>
+                            <summary style={{ fontFamily:D.fontBody, fontSize:12, color:D.accent, cursor:"pointer", fontWeight:600 }}>Ver quem votou</summary>
+                            <div style={{ marginTop:8, display:"flex", flexDirection:"column", gap:4 }}>
+                              {vs.map((v,i) => (
+                                <div key={i} style={{ display:"flex", justifyContent:"space-between", fontFamily:D.fontBody, fontSize:12, color:D.textSec, padding:"4px 0", borderBottom:`1px solid ${D.border}` }}>
+                                  <span>{v.unidade} · {v.nome}</span>
+                                  <span style={{ fontWeight:600, color:D.text }}>{v.opcao}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+
+                        {!readOnly && (
+                          <div style={{ display:"flex", gap:8, marginTop:14, flexWrap:"wrap" }}>
+                            <button onClick={() => encerrarEnquete(enq.id, aberta)} style={{ padding:"7px 14px", background: aberta?D.warningBg:D.successBg, color: aberta?"#92400E":D.success, border:`1px solid ${aberta?"#FDE68A":"#86EFAC"}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>{aberta?"🔒 Encerrar":"🔓 Reabrir"}</button>
+                            <button onClick={() => { if(window.confirm(`Remover a enquete "${enq.titulo}"? Os votos serão apagados.`)) removerEnquete(enq); }} style={{ padding:"7px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -4888,6 +5090,41 @@ export default function App() {
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
             <button onClick={registrarEntrega} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>📦 Registrar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "novaEnquete" && (
+        <Modal title="Nova Enquete" onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Pergunta *</label>
+              <input value={novaEnquete.titulo} onChange={e=>setNovaEnquete(p=>({...p,titulo:e.target.value}))} placeholder="Ex: Aprova a troca do portão?" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Descrição (opcional)</label>
+              <textarea value={novaEnquete.descricao} onChange={e=>setNovaEnquete(p=>({...p,descricao:e.target.value}))} rows={2} placeholder="Detalhes ou contexto da votação" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text, resize:"vertical", lineHeight:1.5 }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Opções de voto *</label>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {novaEnquete.opcoes.map((op,idx) => (
+                  <div key={idx} style={{ display:"flex", gap:8, alignItems:"center" }}>
+                    <input value={op} onChange={e=>setNovaEnquete(p=>{ const o=[...p.opcoes]; o[idx]=e.target.value; return {...p,opcoes:o}; })} placeholder={`Opção ${idx+1}`} style={{ flex:1, padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+                    {novaEnquete.opcoes.length > 2 && (
+                      <button onClick={()=>setNovaEnquete(p=>({...p,opcoes:p.opcoes.filter((_,i)=>i!==idx)}))} style={{ background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, padding:"8px 11px", cursor:"pointer", fontSize:14 }}>✕</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {novaEnquete.opcoes.length < 6 && (
+                <button onClick={()=>setNovaEnquete(p=>({...p,opcoes:[...p.opcoes,""]}))} style={{ marginTop:8, background:"none", border:`1.5px dashed ${D.border}`, color:D.accent, borderRadius:D.radiusSm, padding:"8px 14px", cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:D.fontBody, width:"100%" }}>+ Adicionar opção</button>
+              )}
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+            <button onClick={criarEnquete} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>🗳️ Criar</button>
           </div>
         </Modal>
       )}

@@ -61,6 +61,9 @@ const RECURSO_PLANO = {
   emailAuto:  "padrao",
   dashAnual:  "padrao",
   prestacao:  "padrao",
+  multaJuros: "padrao",
+  cobrancaExtra: "padrao",
+  fluxoCaixa: "padrao",
   // Avançado (premium — a construir)
   comunicados:"avancado",
   entregas:   "avancado",
@@ -1115,6 +1118,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const [cobrancas, setCobrancas] = useState([]);
   const [reservasMor, setReservasMor] = useState([]);
   const [comunicadosMor, setComunicadosMor] = useState([]);
+  const [condoConfig, setCondoConfig] = useState(null);
   const [mesSel, setMesSel]       = useState(mesAtual());
   const [formReserva, setFormReserva] = useState({ area:"Churrasqueira", data:"", horario:"", observacao:"" });
   const [enviandoReserva, setEnviandoReserva] = useState(false);
@@ -1144,7 +1148,11 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
       query(collection(db, "comunicados"), where("condominioId","==",morador.condominioId)),
       s => setComunicadosMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (b.fixado?1:0)-(a.fixado?1:0) || b.timestamp - a.timestamp))
     );
-    return () => u();
+    // Config do condomínio (dia de vencimento, multa/juros) para calcular encargos
+    const u2 = onSnapshot(doc(db, "condominios", morador.condominioId), d => {
+      if (d.exists()) setCondoConfig(d.data());
+    });
+    return () => { u(); u2(); };
   }, [morador?.condominioId]);
 
   const fazerReserva = async () => {
@@ -1181,6 +1189,24 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const meses     = [...new Set(cobrancas.map(c => c.mes))].sort().reverse();
   const statusCor = cobMes?.status === "pago" ? "#2E7D32" : cobMes?.status === "atrasado" ? "#B03A2E" : "#F57F17";
 
+  // Taxa individual do morador (ou a padrão do condomínio)
+  const taxaBase = (morador && morador.taxaCustom != null && !isNaN(morador.taxaCustom)) ? morador.taxaCustom : taxa;
+  // Cálculo de encargos (mesma regra do sistema do síndico)
+  const encargosPortal = (c) => {
+    const semEnc = { valorBase: taxaBase, multa:0, juros:0, diasAtraso:0, valorTotal: taxaBase };
+    if (!c || c.status !== "atrasado") return semEnc;
+    if (!condoConfig?.cobrarMultaJuros) return semEnc;
+    const dia = condoConfig.diaVencimento ?? 10;
+    const [y,m] = c.mes.split("-").map(Number);
+    const venc = new Date(y, m-1, dia); venc.setHours(0,0,0,0);
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const diasAtraso = Math.max(0, Math.floor((hoje - venc)/(1000*60*60*24)));
+    if (diasAtraso <= 0) return semEnc;
+    const multa = taxaBase * ((condoConfig.multaPercent ?? 2)/100);
+    const juros = taxaBase * ((condoConfig.jurosPercentMes ?? 1)/100) * (diasAtraso/30);
+    return { valorBase: taxaBase, multa, juros, diasAtraso, valorTotal: taxaBase + multa + juros };
+  };
+
   return (
     <div style={{ minHeight:"100vh", background:"#F0F4F8", fontFamily:D.fontBody }}>
       {/* Cabeçalho */}
@@ -1205,7 +1231,18 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:D.muted, borderRadius:D.radius, padding:16, borderLeft:`4px solid ${statusCor}` }}>
               <div>
                 <div style={{ fontSize:22, fontWeight:800, color:statusCor, textTransform:"capitalize" }}>{cobMes.status}</div>
-                <div style={{ fontSize:13, color:"#6B7A8D", marginTop:4 }}>Taxa: R$ {taxa.toFixed(2).replace(".",",")}</div>
+                {(() => {
+                  const enc = encargosPortal(cobMes);
+                  if (enc.multa > 0 || enc.juros > 0) {
+                    return (
+                      <>
+                        <div style={{ fontSize:13, color:"#6B7A8D", marginTop:4 }}>Taxa: R$ {enc.valorBase.toFixed(2).replace(".",",")} + multa R$ {enc.multa.toFixed(2).replace(".",",")} + juros R$ {enc.juros.toFixed(2).replace(".",",")} ({enc.diasAtraso} dias)</div>
+                        <div style={{ fontSize:16, fontWeight:800, color:"#B03A2E", marginTop:4 }}>Total: R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
+                      </>
+                    );
+                  }
+                  return <div style={{ fontSize:13, color:"#6B7A8D", marginTop:4 }}>Taxa: R$ {enc.valorBase.toFixed(2).replace(".",",")}</div>;
+                })()}
                 {cobMes.dataPagamento && <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>Pago em {cobMes.dataPagamento}</div>}
                 {cobMes.obs && <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>📝 {cobMes.obs}</div>}
               </div>
@@ -1237,15 +1274,17 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             {cobrancas.map((c,i) => {
               const cor = c.status==="pago"?D.success:c.status==="atrasado"?D.danger:D.warning;
+              const enc = encargosPortal(c);
               return (
                 <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background: c.status==="pago"?D.successBg:c.status==="atrasado"?D.dangerBg:D.warningBg, borderRadius:D.radiusSm, borderLeft:`4px solid ${cor}` }}>
                   <div>
                     <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:13 }}>{mesLabel(c.mes)}</div>
                     {c.dataPagamento && <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>Pago em {c.dataPagamento}</div>}
+                    {(enc.multa > 0 || enc.juros > 0) && <div style={{ fontSize:11, color:"#B03A2E", marginTop:2 }}>+ multa/juros ({enc.diasAtraso}d)</div>}
                   </div>
                   <div style={{ textAlign:"right" }}>
                     <div style={{ fontSize:13, fontWeight:700, color:cor, textTransform:"capitalize" }}>{c.status}</div>
-                    <div style={{ fontSize:12, color:"#1E3A5F" }}>R$ {taxa.toFixed(2).replace(".",",")}</div>
+                    <div style={{ fontSize:12, color:"#1E3A5F" }}>R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
                   </div>
                 </div>
               );
@@ -1355,6 +1394,9 @@ export default function App() {
   const [cobrancas, setCobrancas]   = useState([]);
   const [taxa, setTaxa]             = useState(180);
   const [diaVencimento, setDiaVencimento] = useState(10);
+  const [cobrarMultaJuros, setCobrarMultaJuros] = useState(false);
+  const [multaPercent, setMultaPercent]         = useState(2);
+  const [jurosPercentMes, setJurosPercentMes]   = useState(1);
   const [enviandoEmails, setEnviandoEmails] = useState(false);
   const [mesSel, setMesSel]         = useState(mesAtual);
   const [toast, setToast]           = useState(null);
@@ -1496,6 +1538,9 @@ export default function App() {
         setCondominio({ id:d.id, ...data });
         setTaxa(data.taxa ?? 180);
         setDiaVencimento(data.diaVencimento ?? 10);
+        setCobrarMultaJuros(data.cobrarMultaJuros ?? false);
+        setMultaPercent(data.multaPercent ?? 2);
+        setJurosPercentMes(data.jurosPercentMes ?? 1);
       }
     });
     // Observações: doc com id composto condominioId_mes
@@ -1539,6 +1584,24 @@ export default function App() {
   };
   // Soma o valor de um conjunto de cobranças respeitando a taxa de cada morador
   const somaCobrancas = (lista) => lista.reduce((s,c) => s + taxaDoMorador(c.moradorId), 0);
+
+  // ── Multa e juros por atraso ──
+  // Retorna { valorBase, multa, juros, diasAtraso, valorTotal }.
+  // Só aplica encargos se: o plano permite, o síndico ativou, e a cobrança está atrasada.
+  const encargosCobranca = (cob) => {
+    const valorBase = taxaDoMorador(cob.moradorId);
+    const semEncargos = { valorBase, multa:0, juros:0, diasAtraso:0, valorTotal: valorBase };
+    if (!cob || cob.status !== "atrasado") return semEncargos;
+    if (!podeUsar("multaJuros") || !cobrarMultaJuros) return semEncargos;
+    const venc = dataVencimentoMes(cob.mes); venc.setHours(0,0,0,0);
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const diasAtraso = Math.max(0, Math.floor((hoje - venc) / (1000*60*60*24)));
+    if (diasAtraso <= 0) return semEncargos;
+    const multa = valorBase * (multaPercent/100);                       // multa única
+    const juros = valorBase * (jurosPercentMes/100) * (diasAtraso/30);  // juros proporcional aos dias
+    const valorTotal = valorBase + multa + juros;
+    return { valorBase, multa, juros, diasAtraso, valorTotal };
+  };
 
   // Categorias de despesa (ícone + rótulo)
   const CATS_DESPESA = {
@@ -2111,6 +2174,15 @@ export default function App() {
     showToast("Dia de vencimento salvo!");
   };
 
+  const salvarConfigMultaJuros = async (ativo, multa, juros) => {
+    await setDoc(doc(db,"condominios",condominioId), {
+      cobrarMultaJuros: ativo,
+      multaPercent: parseFloat(multa) || 0,
+      jurosPercentMes: parseFloat(juros) || 0,
+    }, { merge:true });
+    showToast("Configuração de multa/juros salva!");
+  };
+
   // ── Envio de e-mails ──
   const dataVencimentoMes = (mes) => {
     const [y, m] = mes.split("-");
@@ -2127,11 +2199,20 @@ export default function App() {
   };
 
   const enviarEmailMorador = async (morador, assunto, mensagem) => {
+    // Valor individual do morador + encargos se a cobrança do mês estiver atrasada
+    const cob = cobrancas.find(c => c.moradorId === morador.id && c.mes === mesSel);
+    const enc = cob ? encargosCobranca(cob) : { valorBase: taxaDoMorador(morador.id), multa:0, juros:0, valorTotal: taxaDoMorador(morador.id) };
+    let linhaValor;
+    if (enc.multa > 0 || enc.juros > 0) {
+      linhaValor = `Valor: R$ ${enc.valorBase.toFixed(2).replace(".",",")}\nMulta + juros: R$ ${(enc.multa+enc.juros).toFixed(2).replace(".",",")}\nTotal a pagar: R$ ${enc.valorTotal.toFixed(2).replace(".",",")}`;
+    } else {
+      linhaValor = `Valor: R$ ${enc.valorBase.toFixed(2).replace(".",",")}`;
+    }
     await emailjs.send(EJS_SERVICE, EJS_TEMPLATE, {
       nome_morador:    morador.nome,
       unidade:         morador.unidade,
       mensagem,
-      detalhes:        `Unidade: ${morador.unidade}\nValor: R$ ${taxa.toFixed(2).replace(".",",")}\nVencimento: ${formatarDataBR(dataVencimentoMes(mesSel))}`,
+      detalhes:        `Unidade: ${morador.unidade}\n${linhaValor}\nVencimento: ${formatarDataBR(dataVencimentoMes(mesSel))}`,
       nome_condominio: condominio?.nome || "Condomínio",
       assunto,
       email_destino:   morador.email,
@@ -2583,6 +2664,7 @@ export default function App() {
   const CobCard = ({ cob }) => {
     const m = moradores.find(x => x.id === cob.moradorId);
     if (!m) return null;
+    const enc = encargosCobranca(cob);
     return (
       <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${cob.status==="pago"?D.success:cob.status==="atrasado"?D.danger:D.warning}`, marginBottom:10 }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
@@ -2591,6 +2673,17 @@ export default function App() {
             <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>{m.email}</div>
           </div>
           <Badge status={cob.status} />
+        </div>
+        {/* Valor da cobrança (com encargos se houver) */}
+        <div style={{ marginBottom:8 }}>
+          {enc.multa > 0 || enc.juros > 0 ? (
+            <div style={{ background:D.dangerBg, borderRadius:D.radiusSm, padding:"8px 12px" }}>
+              <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Taxa: R$ {enc.valorBase.toFixed(2).replace(".",",")} · multa R$ {enc.multa.toFixed(2).replace(".",",")} · juros R$ {enc.juros.toFixed(2).replace(".",",")} ({enc.diasAtraso}d)</div>
+              <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:700, color:D.danger }}>Total: R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
+            </div>
+          ) : (
+            <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text }}>R$ {enc.valorBase.toFixed(2).replace(".",",")}</div>
+          )}
         </div>
         {cob.dataPagamento && <div style={{ fontSize:12, color:"#9aa6b5", marginBottom:8 }}>Pago em {cob.dataPagamento}</div>}
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
@@ -2942,7 +3035,7 @@ export default function App() {
                 <table style={{ width:"100%", borderCollapse:"collapse" }}>
                   <thead>
                     <tr style={{ background:"#F8FAFC" }}>
-                      {["Unidade","Morador","E-mail","Status","Data Pgto","Ações"].map(h => (
+                      {["Unidade","Morador","Valor","Status","Data Pgto","Ações"].map(h => (
                         <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, borderBottom:`1px solid ${D.border}` }}>{h}</th>
                       ))}
                     </tr>
@@ -2951,11 +3044,21 @@ export default function App() {
                     {cobMes.map((cob,i) => {
                       const m = moradores.find(x => x.id === cob.moradorId);
                       if (!m) return null;
+                      const enc = encargosCobranca(cob);
                       return (
                         <tr key={i} style={{ borderBottom:`1px solid ${D.border}` }}>
                           <td style={{ padding:"13px 16px", fontWeight:600, color:D.text, fontSize:13 }}>{m.unidade}</td>
                           <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>{m.nome}</td>
-                          <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec, fontFamily:D.fontBody }}>{m.email}</td>
+                          <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>
+                            {enc.multa > 0 || enc.juros > 0 ? (
+                              <div>
+                                <div style={{ fontWeight:700, color:D.danger }}>R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
+                                <div style={{ fontSize:11, color:D.textMut }}>base {enc.valorBase.toFixed(2).replace(".",",")} + enc. {(enc.multa+enc.juros).toFixed(2).replace(".",",")}</div>
+                              </div>
+                            ) : (
+                              <span>R$ {enc.valorBase.toFixed(2).replace(".",",")}</span>
+                            )}
+                          </td>
                           <td style={{ padding:"13px 16px" }}><Badge status={cob.status} /></td>
                           <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec, fontFamily:D.fontBody }}>{cob.dataPagamento || "—"}</td>
                           <td style={{ padding:"13px 16px" }}>
@@ -3905,6 +4008,45 @@ export default function App() {
                 <input type="number" min={1} max={28} value={diaVencimento} onChange={e=>setDiaVencimento(parseInt(e.target.value)||10)} style={{ width:100, padding:"12px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:16, color:"#1E3A5F", boxSizing:"border-box" }} />
                 <button onClick={() => salvarDiaVencimento(diaVencimento)} style={{ padding:"12px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer" }}>Salvar</button>
               </div>
+
+              <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
+
+              {/* Multa e juros por atraso (Padrão) */}
+              <h3 style={{ color:"#1E3A5F", margin:"0 0 6px", fontSize:15, fontWeight:700 }}>⚖️ Multa e juros por atraso</h3>
+              {podeUsar("multaJuros") ? (
+                <>
+                  <p style={{ color:"#6B7A8D", fontSize:12, margin:"0 0 14px" }}>Quando ativo, cobranças em atraso recebem multa (uma vez) e juros proporcionais aos dias de atraso. Padrão legal: 2% de multa + 1% de juros ao mês.</p>
+                  <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", background:D.muted, padding:"12px 14px", borderRadius:D.radiusSm, marginBottom:14 }}>
+                    <input type="checkbox" checked={cobrarMultaJuros} onChange={e=>setCobrarMultaJuros(e.target.checked)} style={{ width:18, height:18, cursor:"pointer" }} />
+                    <div style={{ fontFamily:D.fontBody, fontSize:14, color:D.text, fontWeight:600 }}>Cobrar multa e juros automaticamente</div>
+                  </label>
+                  <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"flex-end" }}>
+                    <div>
+                      <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Multa (%)</label>
+                      <input type="number" step="0.1" min={0} value={multaPercent} onChange={e=>setMultaPercent(e.target.value)} disabled={!cobrarMultaJuros} style={{ width:90, padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:15, color:D.text, boxSizing:"border-box", opacity: cobrarMultaJuros?1:.5 }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Juros ao mês (%)</label>
+                      <input type="number" step="0.1" min={0} value={jurosPercentMes} onChange={e=>setJurosPercentMes(e.target.value)} disabled={!cobrarMultaJuros} style={{ width:110, padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:15, color:D.text, boxSizing:"border-box", opacity: cobrarMultaJuros?1:.5 }} />
+                    </div>
+                    <button onClick={() => salvarConfigMultaJuros(cobrarMultaJuros, multaPercent, jurosPercentMes)} style={{ padding:"11px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer" }}>Salvar</button>
+                  </div>
+                  {cobrarMultaJuros && (
+                    <div style={{ marginTop:14, background:D.secondary, borderRadius:D.radiusSm, padding:"12px 14px", fontFamily:D.fontBody, fontSize:12, color:D.text }}>
+                      <b>Exemplo:</b> uma taxa de R$ {taxa.toFixed(2).replace(".",",")} com 15 dias de atraso ficaria: R$ {taxa.toFixed(2).replace(".",",")} + multa R$ {(taxa*(parseFloat(multaPercent)||0)/100).toFixed(2).replace(".",",")} + juros R$ {(taxa*(parseFloat(jurosPercentMes)||0)/100*(15/30)).toFixed(2).replace(".",",")} = <b>R$ {(taxa + taxa*(parseFloat(multaPercent)||0)/100 + taxa*(parseFloat(jurosPercentMes)||0)/100*(15/30)).toFixed(2).replace(".",",")}</b>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ background:D.muted, borderRadius:D.radiusSm, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                  <span style={{ fontSize:20 }}>🔒</span>
+                  <div style={{ flex:1, minWidth:180 }}>
+                    <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>Multa e juros — plano Padrão</div>
+                    <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Cobre automaticamente multa e juros sobre atrasos.</div>
+                  </div>
+                  <a href="mailto:comercial.mysindi@gmail.com?subject=Upgrade de plano — MySindi" style={{ padding:"8px 16px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>Fazer upgrade</a>
+                </div>
+              )}
 
               <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
 

@@ -3084,14 +3084,14 @@ export default function App() {
                       const m = moradores.find(x=>x.id===cob.moradorId);
                       if (!m) return null;
                       return (
-                        <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", borderBottom: i<Math.min(cobMes.length,5)-1?`1px solid ${D.border}`:"none", gap:12 }}>
-                          <div style={{ minWidth:0, flex:1 }}>
-                            <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{m.unidade}</div>
-                            <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{m.nome}</div>
+                        <div key={i} style={{ padding:"14px 16px", borderBottom: i<Math.min(cobMes.length,5)-1?`1px solid ${D.border}`:"none" }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+                            <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", minWidth:0 }}>{m.unidade}</div>
+                            <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:700, color:D.text, flexShrink:0 }}>R$ {taxaDoMorador(cob.moradorId).toFixed(2).replace(".",",")}</div>
                           </div>
-                          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", justifyContent:"center", gap:6, flexShrink:0 }}>
-                            <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:700, color:D.text }}>R$ {taxaDoMorador(cob.moradorId).toFixed(2).replace(".",",")}</div>
-                            <Badge status={cob.status} />
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, marginTop:5 }}>
+                            <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", minWidth:0 }}>{m.nome}</div>
+                            <div style={{ flexShrink:0 }}><Badge status={cob.status} /></div>
                           </div>
                         </div>
                       );

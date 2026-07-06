@@ -3089,8 +3089,8 @@ export default function App() {
                             <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{m.unidade}</div>
                             <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{m.nome}</div>
                           </div>
-                          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 }}>
-                            <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>R$ {taxaDoMorador(cob.moradorId).toFixed(2).replace(".",",")}</div>
+                          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", justifyContent:"center", gap:6, flexShrink:0 }}>
+                            <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:700, color:D.text }}>R$ {taxaDoMorador(cob.moradorId).toFixed(2).replace(".",",")}</div>
                             <Badge status={cob.status} />
                           </div>
                         </div>

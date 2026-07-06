@@ -64,6 +64,7 @@ const RECURSO_PLANO = {
   multaJuros: "padrao",
   cobrancaExtra: "padrao",
   fluxoCaixa: "padrao",
+  ocorrencias: "avancado",
   // Avançado (premium — a construir)
   comunicados:"avancado",
   entregas:   "avancado",
@@ -229,6 +230,7 @@ const UpgradeCard = ({ recurso, planoNecessario, isMobile }) => {
     multaJuros:  "Cobre automaticamente multa e juros sobre cobranças em atraso.",
     cobrancaExtra:"Crie cobranças extras e rateios além da taxa mensal (obras, contas, fundos).",
     fluxoCaixa:  "Acompanhe o saldo real do condomínio mês a mês, com entradas e saídas.",
+    ocorrencias: "Receba e acompanhe reclamações e solicitações dos moradores pelo portal.",
   };
   return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"60vh", padding: isMobile?"20px":"40px" }}>
@@ -1128,6 +1130,10 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const [formReserva, setFormReserva] = useState({ area:"Churrasqueira", data:"", horario:"", observacao:"" });
   const [enviandoReserva, setEnviandoReserva] = useState(false);
   const [msgReserva, setMsgReserva] = useState("");
+  const [ocorrenciasMor, setOcorrenciasMor] = useState([]);
+  const [formOcorrencia, setFormOcorrencia] = useState({ titulo:"", categoria:"Manutenção", descricao:"" });
+  const [enviandoOcorrencia, setEnviandoOcorrencia] = useState(false);
+  const [msgOcorrencia, setMsgOcorrencia] = useState("");
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -1166,7 +1172,12 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
       query(collection(db, "pag_extras"), where("condominioId","==",morador.condominioId)),
       s => setPagExtrasMor(s.docs.map(d => ({ id:d.id, ...d.data() })))
     );
-    return () => { u(); u2(); u3e(); u4e(); };
+    // Ocorrências deste morador
+    const u5e = onSnapshot(
+      query(collection(db, "ocorrencias"), where("moradorId","==",moradorId)),
+      s => setOcorrenciasMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
+    );
+    return () => { u(); u2(); u3e(); u4e(); u5e(); };
   }, [morador?.condominioId]);
 
   const fazerReserva = async () => {
@@ -1192,13 +1203,35 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     }
   };
 
+  const abrirOcorrencia = async () => {
+    if (!formOcorrencia.titulo.trim() || !formOcorrencia.descricao.trim()) { setMsgOcorrencia("Preencha o título e a descrição."); return; }
+    setEnviandoOcorrencia(true);
+    try {
+      await addDoc(collection(db, "ocorrencias"), {
+        condominioId: morador.condominioId || null,
+        moradorId, nome: morador.nome, unidade: morador.unidade,
+        titulo: formOcorrencia.titulo.trim(),
+        categoria: formOcorrencia.categoria,
+        descricao: formOcorrencia.descricao.trim(),
+        status: "aberta",
+        respostaSindico: "",
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
+        timestamp: Date.now(),
+      });
+      setFormOcorrencia({ titulo:"", categoria:"Manutenção", descricao:"" });
+      setMsgOcorrencia("✅ Ocorrência registrada! O síndico irá avaliar.");
+    } catch(e) {
+      setMsgOcorrencia("Erro ao registrar. Tente novamente.");
+    } finally {
+      setEnviandoOcorrencia(false);
+    }
+  };
+
   if (!morador) return (
     <div style={{ minHeight:"100vh", background:"#1E3A5F", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontFamily:D.fontBody }}>
       Carregando...
     </div>
-  );
-
-  const cobMes    = cobrancas.find(c => c.mes === mesSel);
+  );  const cobMes    = cobrancas.find(c => c.mes === mesSel);
   const totalPago = cobrancas.filter(c => c.status === "pago").length;
   const meses     = [...new Set([mesAtual(), ...cobrancas.map(c => c.mes)])].sort().reverse();
   const statusCor = cobMes?.status === "pago" ? "#2E7D32" : cobMes?.status === "atrasado" ? "#B03A2E" : "#F57F17";
@@ -1415,9 +1448,64 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
           )}
         </div>
 
-        <div style={{ textAlign:"center", marginTop:24, fontSize:11, color:D.textMut, fontFamily:D.fontBody }}>
-          {morador.condominioNome || "Condomínio"} · Portal do Morador
+        {/* Ocorrências / Reclamações */}
+        <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginTop:20 }}>
+          <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>🛎️ Abrir ocorrência</div>
+          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginBottom:16 }}>Relate um problema ou solicitação ao síndico (vazamento, barulho, manutenção, etc.).</div>
+
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Título *</label>
+          <input value={formOcorrencia.titulo} onChange={e=>setFormOcorrencia(p=>({...p,titulo:e.target.value}))} placeholder="Ex: Vazamento na garagem" style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text, marginBottom:14 }} />
+
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Categoria</label>
+          <select value={formOcorrencia.categoria} onChange={e=>setFormOcorrencia(p=>({...p,categoria:e.target.value}))} style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", background:"#fff", fontFamily:D.fontBody, color:D.text, marginBottom:14 }}>
+            <option>Manutenção</option>
+            <option>Barulho / Perturbação</option>
+            <option>Limpeza</option>
+            <option>Segurança</option>
+            <option>Área comum</option>
+            <option>Outra</option>
+          </select>
+
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Descrição *</label>
+          <textarea value={formOcorrencia.descricao} onChange={e=>setFormOcorrencia(p=>({...p,descricao:e.target.value}))} rows={3} placeholder="Descreva o que está acontecendo..." style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text, resize:"vertical", lineHeight:1.5, marginBottom:14 }} />
+
+          {msgOcorrencia && <div style={{ fontFamily:D.fontBody, fontSize:13, color: msgOcorrencia.startsWith("✅")?D.success:D.danger, marginBottom:12 }}>{msgOcorrencia}</div>}
+
+          <button onClick={abrirOcorrencia} disabled={enviandoOcorrencia} style={{ width:"100%", padding:"12px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:700, cursor: enviandoOcorrencia?"default":"pointer", opacity: enviandoOcorrencia?.7:1, fontFamily:D.fontBody }}>
+            {enviandoOcorrencia ? "Enviando..." : "🛎️ Registrar ocorrência"}
+          </button>
+
+          {/* Minhas ocorrências */}
+          {ocorrenciasMor.length > 0 && (
+            <div style={{ marginTop:20 }}>
+              <div style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", marginBottom:10 }}>Minhas ocorrências</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {ocorrenciasMor.map((o,i) => {
+                  const cor = o.status==="resolvida"?D.success:o.status==="em_andamento"?D.accent:D.warning;
+                  const bg  = o.status==="resolvida"?D.successBg:o.status==="em_andamento"?D.secondary:D.warningBg;
+                  const rotulo = o.status==="resolvida"?"✅ Resolvida":o.status==="em_andamento"?"🔧 Em andamento":"🕒 Aberta";
+                  return (
+                    <div key={i} style={{ background:bg, borderRadius:D.radiusSm, padding:"12px 14px", borderLeft:`3px solid ${cor}` }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10 }}>
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>{o.titulo}</div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>{o.categoria} · {o.criadoEm}</div>
+                        </div>
+                        <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:cor, whiteSpace:"nowrap" }}>{rotulo}</span>
+                      </div>
+                      {o.respostaSindico && (
+                        <div style={{ marginTop:8, background:"#fff", borderRadius:D.radiusSm, padding:"8px 10px", fontFamily:D.fontBody, fontSize:12, color:D.text }}>
+                          <b>Resposta do síndico:</b> {o.respostaSindico}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
+
       </div>
     </div>
   );
@@ -1469,6 +1557,9 @@ export default function App() {
   const [novaCobExtra, setNovaCobExtra] = useState({ descricao:"", modo:"unidade", valor:"", mes: mesAtual() });
   const [receitas, setReceitas] = useState([]);
   const [novaReceita, setNovaReceita] = useState({ descricao:"", valor:"", categoria:"Outra", mes: mesAtual() });
+  const [ocorrencias, setOcorrencias] = useState([]);
+  const [filtroOcorrencia, setFiltroOcorrencia] = useState("todas");
+  const [respostaOcorr, setRespostaOcorr] = useState("");
   const [entregas, setEntregas] = useState([]);
   const [novaEntrega, setNovaEntrega] = useState({ moradorId:"", remetente:"", descricao:"", obs:"" });
   const [eventos, setEventos] = useState([]);
@@ -1580,6 +1671,7 @@ export default function App() {
     const u15 = onSnapshot(byCond("cobrancas_extras"), s => setCobrancasExtras(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
     const u16 = onSnapshot(byCond("pag_extras"), s => setPagExtras(s.docs.map(d => ({ id:d.id, ...d.data() }))));
     const u17 = onSnapshot(byCond("receitas"), s => setReceitas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u18 = onSnapshot(byCond("ocorrencias"), s => setOcorrencias(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
 
     // Config (taxa/dia de vencimento) vem do próprio documento do condomínio
     const u3 = onSnapshot(doc(db, "condominios", condominioId), d => {
@@ -1599,7 +1691,7 @@ export default function App() {
       setObsMes(texto); setObsSalva(texto);
     });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); u15(); u16(); u17(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); u15(); u16(); u17(); u18(); };
   }, [user, condominioId, mesSel]);
 
   // (Removido o auto-popular com MOCK_MORADORES — no multi-tenant cada
@@ -2189,6 +2281,23 @@ export default function App() {
     showToast("Receita removida.", "error");
   };
 
+  // ── Ocorrências / reclamações ──
+  const responderOcorrencia = async (id, resposta, novoStatus) => {
+    await setDoc(doc(db, "ocorrencias", id), {
+      respostaSindico: resposta || "",
+      status: novoStatus,
+      atualizadoEm: new Date().toLocaleString("pt-BR"),
+    }, { merge:true });
+    registrarLog("🛎️", `Ocorrência atualizada: ${novoStatus === "resolvida" ? "resolvida" : novoStatus === "em_andamento" ? "em andamento" : "reaberta"}`);
+    setModal(null);
+    showToast("Ocorrência atualizada!");
+  };
+
+  const removerOcorrencia = async (id) => {
+    await deleteDoc(doc(db, "ocorrencias", id));
+    showToast("Ocorrência removida.", "error");
+  };
+
   // Calcula o fluxo de caixa de um mês (entradas − saídas)
   const fluxoDoMes = (mes) => {
     const taxas = somaCobrancas(cobrancas.filter(c => c.mes === mes && c.status === "pago"));
@@ -2682,6 +2791,7 @@ export default function App() {
     { id:"acessos",     icon:"🚪", label:"Acessos"     },
     { id:"entregas",    icon:"📦", label:"Entregas"    },
     { id:"comunicados", icon:"📢", label:"Comunicados" },
+    { id:"ocorrencias", icon:"🛎️", label:"Ocorrências" },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
     { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
     { id:"fluxoCaixa",  icon:"📈", label:"Fluxo de Caixa" },
@@ -2700,6 +2810,7 @@ export default function App() {
     { id:"acessos",     icon:"🚪", label:"Acessos"     },
     { id:"entregas",    icon:"📦", label:"Entregas"    },
     { id:"comunicados", icon:"📢", label:"Comunicados" },
+    { id:"ocorrencias", icon:"🛎️", label:"Ocorrências" },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
     { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
     { id:"fluxoCaixa",  icon:"📈", label:"Fluxo de Caixa" },
@@ -3470,9 +3581,9 @@ export default function App() {
 
         {/* ── Serviços ── */}
         {/* Trava de plano: abas bloqueadas para planos inferiores */}
-        {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas","agenda","fluxoCaixa"].includes(aba) && !podeUsar(aba) && (
+        {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas","agenda","fluxoCaixa","ocorrencias"].includes(aba) && !podeUsar(aba) && (
           <div>
-            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa",ocorrencias:"Ocorrências"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
             <UpgradeCard recurso={aba} planoNecessario={RECURSO_PLANO[aba]} isMobile={isMobile} />
           </div>
         )}
@@ -4044,6 +4155,83 @@ export default function App() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          </div>
+          );
+        })()}
+
+        {/* ── Ocorrências (síndico) ── */}
+        {aba === "ocorrencias" && podeUsar("ocorrencias") && (() => {
+          const statusInfo = {
+            aberta:       { rotulo:"Aberta",       icon:"🕒", cor:D.warning, bg:D.warningBg },
+            em_andamento: { rotulo:"Em andamento", icon:"🔧", cor:D.accent,  bg:D.secondary },
+            resolvida:    { rotulo:"Resolvida",    icon:"✅", cor:D.success,  bg:D.successBg },
+          };
+          const filtradas = filtroOcorrencia === "todas" ? ocorrencias : ocorrencias.filter(o => o.status === filtroOcorrencia);
+          const cont = {
+            todas: ocorrencias.length,
+            aberta: ocorrencias.filter(o=>o.status==="aberta").length,
+            em_andamento: ocorrencias.filter(o=>o.status==="em_andamento").length,
+            resolvida: ocorrencias.filter(o=>o.status==="resolvida").length,
+          };
+          const filtros = [
+            { id:"todas", label:`Todas (${cont.todas})` },
+            { id:"aberta", label:`Abertas (${cont.aberta})` },
+            { id:"em_andamento", label:`Em andamento (${cont.em_andamento})` },
+            { id:"resolvida", label:`Resolvidas (${cont.resolvida})` },
+          ];
+          return (
+          <div>
+            <TopBar title="Ocorrências" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
+
+              {/* Filtros */}
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:16 }}>
+                {filtros.map(f => (
+                  <button key={f.id} onClick={()=>setFiltroOcorrencia(f.id)} style={{ padding:"7px 14px", background: filtroOcorrencia===f.id?D.primary:D.bgCard, color: filtroOcorrencia===f.id?"#fff":D.textSec, border:`1px solid ${filtroOcorrencia===f.id?D.primary:D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>{f.label}</button>
+                ))}
+              </div>
+
+              {filtradas.length === 0 ? (
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>🛎️</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhuma ocorrência {filtroOcorrencia!=="todas"?"nesse status":""}</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>As ocorrências abertas pelos moradores no portal aparecem aqui.</div>
+                </div>
+              ) : (
+                <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                  {filtradas.map(o => {
+                    const si = statusInfo[o.status] || statusInfo.aberta;
+                    return (
+                      <div key={o.id} style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?16:"18px 20px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${si.cor}` }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, flexWrap:"wrap" }}>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{o.titulo}</div>
+                            <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:3 }}>
+                              {o.unidade} · {o.nome} · {o.categoria} · {o.criadoEm}
+                            </div>
+                          </div>
+                          <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:si.cor, background:si.bg, padding:"4px 12px", borderRadius:12, whiteSpace:"nowrap" }}>{si.icon} {si.rotulo}</span>
+                        </div>
+                        <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.text, lineHeight:1.55, margin:"12px 0 0", background:D.muted, padding:"10px 12px", borderRadius:D.radiusSm }}>{o.descricao}</p>
+                        {o.respostaSindico && (
+                          <div style={{ marginTop:10, fontFamily:D.fontBody, fontSize:13, color:D.text, background:D.secondary, padding:"10px 12px", borderRadius:D.radiusSm }}>
+                            <b>Sua resposta:</b> {o.respostaSindico}
+                          </div>
+                        )}
+                        {!readOnly && (
+                          <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
+                            <button onClick={() => { setRespostaOcorr(o.respostaSindico || ""); setModal({ type:"responderOcorrencia", data:{ id:o.id, titulo:o.titulo } }); }} style={{ padding:"7px 14px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Responder</button>
+                            {o.status !== "em_andamento" && <button onClick={() => responderOcorrencia(o.id, o.respostaSindico || "", "em_andamento")} style={{ padding:"7px 14px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>🔧 Em andamento</button>}
+                            {o.status !== "resolvida" && <button onClick={() => responderOcorrencia(o.id, o.respostaSindico || "", "resolvida")} style={{ padding:"7px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>✅ Resolver</button>}
+                            <button onClick={() => { if(window.confirm("Remover esta ocorrência?")) removerOcorrencia(o.id); }} style={{ padding:"7px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -4700,6 +4888,20 @@ export default function App() {
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
             <button onClick={registrarEntrega} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>📦 Registrar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "responderOcorrencia" && (
+        <Modal title="Responder Ocorrência" onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, marginBottom:14 }}>{modal.data.titulo}</div>
+          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Resposta ao morador</label>
+          <textarea value={respostaOcorr} onChange={e=>setRespostaOcorr(e.target.value)} rows={4} placeholder="Ex: Equipe de manutenção agendada para amanhã de manhã." style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text, resize:"vertical", lineHeight:1.5 }} />
+          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:8 }}>A resposta fica visível para o morador no portal.</div>
+          <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end", flexWrap:"wrap" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+            <button onClick={() => responderOcorrencia(modal.data.id, respostaOcorr, "em_andamento")} style={{ padding:"10px 18px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>Salvar (em andamento)</button>
+            <button onClick={() => responderOcorrencia(modal.data.id, respostaOcorr, "resolvida")} style={{ padding:"10px 18px", background:D.success, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>Salvar e resolver</button>
           </div>
         </Modal>
       )}

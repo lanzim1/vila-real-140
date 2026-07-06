@@ -1119,6 +1119,8 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const [reservasMor, setReservasMor] = useState([]);
   const [comunicadosMor, setComunicadosMor] = useState([]);
   const [condoConfig, setCondoConfig] = useState(null);
+  const [extrasMor, setExtrasMor] = useState([]);
+  const [pagExtrasMor, setPagExtrasMor] = useState([]);
   const [mesSel, setMesSel]       = useState(mesAtual());
   const [formReserva, setFormReserva] = useState({ area:"Churrasqueira", data:"", horario:"", observacao:"" });
   const [enviandoReserva, setEnviandoReserva] = useState(false);
@@ -1152,7 +1154,16 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     const u2 = onSnapshot(doc(db, "condominios", morador.condominioId), d => {
       if (d.exists()) setCondoConfig(d.data());
     });
-    return () => { u(); u2(); };
+    // Cobranças extras do condomínio e os pagamentos deste morador
+    const u3e = onSnapshot(
+      query(collection(db, "cobrancas_extras"), where("condominioId","==",morador.condominioId)),
+      s => setExtrasMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
+    );
+    const u4e = onSnapshot(
+      query(collection(db, "pag_extras"), where("condominioId","==",morador.condominioId)),
+      s => setPagExtrasMor(s.docs.map(d => ({ id:d.id, ...d.data() })))
+    );
+    return () => { u(); u2(); u3e(); u4e(); };
   }, [morador?.condominioId]);
 
   const fazerReserva = async () => {
@@ -1252,6 +1263,34 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
             <div style={{ color:"#9aa6b5", fontSize:13, textAlign:"center", padding:16 }}>Nenhum registro para este mês.</div>
           )}
         </div>
+
+        {/* Cobranças extras do morador */}
+        {(() => {
+          const extraPagaMor = (extraId) => pagExtrasMor.some(p => p.extraId === extraId && p.moradorId === moradorId);
+          if (extrasMor.length === 0) return null;
+          return (
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
+              <div style={{ fontSize:14, fontWeight:700, color:"#1E3A5F", marginBottom:14 }}>➕ Cobranças extras</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {extrasMor.map(extra => {
+                  const pago = extraPagaMor(extra.id);
+                  return (
+                    <div key={extra.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background: pago?D.successBg:D.warningBg, borderRadius:D.radiusSm, borderLeft:`4px solid ${pago?D.success:D.warning}` }}>
+                      <div>
+                        <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:13 }}>{extra.descricao}</div>
+                        <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{mesLabel(extra.mes)}</div>
+                      </div>
+                      <div style={{ textAlign:"right" }}>
+                        <div style={{ fontSize:13, fontWeight:700, color: pago?D.success:"#B45309", textTransform:"capitalize" }}>{pago?"Pago":"Pendente"}</div>
+                        <div style={{ fontSize:12, color:"#1E3A5F" }}>R$ {extra.valorUnitario.toFixed(2).replace(".",",")}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Resumo geral */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:20 }}>
@@ -1422,6 +1461,9 @@ export default function App() {
   const [novoDocumento, setNovoDocumento] = useState({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"" });
   const [fundoMovs, setFundoMovs] = useState([]);
   const [novaMovFundo, setNovaMovFundo] = useState({ tipo:"aporte", valor:"", descricao:"", data:"" });
+  const [cobrancasExtras, setCobrancasExtras] = useState([]);
+  const [pagExtras, setPagExtras] = useState([]);
+  const [novaCobExtra, setNovaCobExtra] = useState({ descricao:"", modo:"unidade", valor:"", mes: mesAtual() });
   const [entregas, setEntregas] = useState([]);
   const [novaEntrega, setNovaEntrega] = useState({ moradorId:"", remetente:"", descricao:"", obs:"" });
   const [eventos, setEventos] = useState([]);
@@ -1530,6 +1572,8 @@ export default function App() {
     const u12 = onSnapshot(byCond("fundo_movs"), s => setFundoMovs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
     const u13 = onSnapshot(byCond("entregas"), s => setEntregas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
     const u14 = onSnapshot(byCond("eventos"), s => setEventos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const u15 = onSnapshot(byCond("cobrancas_extras"), s => setCobrancasExtras(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u16 = onSnapshot(byCond("pag_extras"), s => setPagExtras(s.docs.map(d => ({ id:d.id, ...d.data() }))));
 
     // Config (taxa/dia de vencimento) vem do próprio documento do condomínio
     const u3 = onSnapshot(doc(db, "condominios", condominioId), d => {
@@ -1549,7 +1593,7 @@ export default function App() {
       setObsMes(texto); setObsSalva(texto);
     });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); u15(); u16(); };
   }, [user, condominioId, mesSel]);
 
   // (Removido o auto-popular com MOCK_MORADORES — no multi-tenant cada
@@ -2059,6 +2103,59 @@ export default function App() {
   const salvarPercentualFundo = async (pct) => {
     await setDoc(doc(db, "condominios", condominioId), { percentualFundo: pct }, { merge:true });
     showToast("Percentual do fundo atualizado!");
+  };
+
+  // ── Cobranças extras / rateios ──
+  const criarCobrancaExtra = async () => {
+    if (!novaCobExtra.descricao.trim()) { showToast("Informe a descrição da cobrança.", "error"); return; }
+    const valorInformado = parseFloat(novaCobExtra.valor) || 0;
+    if (valorInformado <= 0) { showToast("Informe um valor válido.", "error"); return; }
+    const nUnidades = moradores.length;
+    if (nUnidades === 0) { showToast("Cadastre moradores antes de criar uma cobrança.", "error"); return; }
+    // modo "unidade": cada um paga o valor informado. modo "rateio": divide o total pelas unidades.
+    const valorUnitario = novaCobExtra.modo === "rateio" ? (valorInformado / nUnidades) : valorInformado;
+    await addDoc(collection(db, "cobrancas_extras"), {
+      condominioId,
+      descricao: novaCobExtra.descricao.trim(),
+      modo: novaCobExtra.modo,
+      valorInformado,
+      valorUnitario,
+      valorTotal: novaCobExtra.modo === "rateio" ? valorInformado : valorInformado * nUnidades,
+      nUnidades,
+      mes: novaCobExtra.mes,
+      criadoEm: new Date().toLocaleDateString("pt-BR"),
+      timestamp: Date.now(),
+    });
+    registrarLog("➕", `Cobrança extra criada: ${novaCobExtra.descricao.trim()} — R$ ${valorUnitario.toFixed(2).replace(".",",")}/unidade`);
+    setNovaCobExtra({ descricao:"", modo:"unidade", valor:"", mes: mesAtual() });
+    setModal(null);
+    showToast("Cobrança extra criada!");
+  };
+
+  const removerCobrancaExtra = async (extra) => {
+    // Remove a campanha e todos os registros de pagamento associados
+    const pagos = pagExtras.filter(p => p.extraId === extra.id);
+    for (const p of pagos) { try { await deleteDoc(doc(db, "pag_extras", p.id)); } catch(e){} }
+    await deleteDoc(doc(db, "cobrancas_extras", extra.id));
+    registrarLog("🗑️", `Cobrança extra removida: ${extra.descricao}`);
+    showToast("Cobrança extra removida.", "error");
+  };
+
+  const extraPaga = (extraId, moradorId) => pagExtras.some(p => p.extraId === extraId && p.moradorId === moradorId);
+
+  const marcarExtraPaga = async (extra, moradorId) => {
+    await setDoc(doc(db, "pag_extras", `${extra.id}_${moradorId}`), {
+      condominioId, extraId: extra.id, moradorId, status:"pago",
+      dataPagamento: new Date().toLocaleDateString("pt-BR"), timestamp: Date.now(),
+    });
+    const m = moradores.find(x => x.id === moradorId);
+    registrarLog("✅", `Pagou extra "${extra.descricao}": ${m?.nome || ""} (${m?.unidade || ""})`);
+    showToast("Pagamento registrado!");
+  };
+
+  const estornarExtra = async (extra, moradorId) => {
+    try { await deleteDoc(doc(db, "pag_extras", `${extra.id}_${moradorId}`)); } catch(e){}
+    showToast("Pagamento estornado.", "error");
   };
 
   // ── Entregas / Encomendas ──
@@ -3027,6 +3124,53 @@ export default function App() {
                 {!readOnly && !isMobile && <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"9px 16px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>{enviandoEmails?"📧 Enviando...":"📧 Cobrar pendentes"}</button>}
               </div>
             </div>
+
+            {/* ── Cobranças extras / rateios ── */}
+            {podeUsar("cobrancaExtra") ? (
+              <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, padding: isMobile?16:20, marginBottom:16 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: (cobrancasExtras.filter(e=>e.mes===mesSel).length ? 14 : 0), flexWrap:"wrap", gap:10 }}>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>➕ Cobranças extras — {mesLabel(mesSel)}</div>
+                  {!readOnly && (
+                    <button onClick={() => { setNovaCobExtra({ descricao:"", modo:"unidade", valor:"", mes: mesSel }); setModal({ type:"novaCobExtra" }); }} style={{ padding:"8px 14px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>+ Nova cobrança extra</button>
+                  )}
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                  {cobrancasExtras.filter(e => e.mes === mesSel).map(extra => {
+                    const pagosCount = moradores.filter(m => extraPaga(extra.id, m.id)).length;
+                    return (
+                      <div key={extra.id} style={{ background:D.muted, borderRadius:D.radiusSm, padding:"14px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                        <div style={{ flex:1, minWidth:180 }}>
+                          <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:600, color:D.text }}>{extra.descricao}</div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>
+                            R$ {extra.valorUnitario.toFixed(2).replace(".",",")}/unidade
+                            {extra.modo === "rateio" && ` · rateio de R$ ${extra.valorInformado.toFixed(2).replace(".",",")} ÷ ${extra.nUnidades}`}
+                          </div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:12, color: pagosCount===moradores.length?D.success:D.textMut, marginTop:4, fontWeight:600 }}>
+                            {pagosCount} de {moradores.length} pagaram
+                          </div>
+                        </div>
+                        <div style={{ display:"flex", gap:8 }}>
+                          {!readOnly && <button onClick={() => setModal({ type:"gerenciarExtra", data:{ extraId: extra.id } })} style={{ padding:"7px 14px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Gerenciar</button>}
+                          {!readOnly && <button onClick={() => { if(window.confirm(`Remover a cobrança extra "${extra.descricao}"? Isso apaga os registros de pagamento dela.`)) removerCobrancaExtra(extra); }} style={{ padding:"7px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {cobrancasExtras.filter(e => e.mes === mesSel).length === 0 && (
+                    <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut, textAlign:"center", padding:"12px 0" }}>Nenhuma cobrança extra neste mês.</div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={{ background:D.muted, borderRadius:D.radius, padding:"14px 16px", marginBottom:16, display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                <span style={{ fontSize:20 }}>🔒</span>
+                <div style={{ flex:1, minWidth:180 }}>
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>Cobranças extras e rateios — plano Padrão</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Cobre taxas de obra, rateios de contas e fundos aprovados em assembleia.</div>
+                </div>
+                <a href="mailto:comercial.mysindi@gmail.com?subject=Upgrade de plano — MySindi" style={{ padding:"8px 16px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>Fazer upgrade</a>
+              </div>
+            )}
 
             {isMobile ? (
               <div>{cobMes.map((cob,i) => <CobCard key={i} cob={cob} />)}</div>
@@ -4371,6 +4515,87 @@ export default function App() {
           </div>
         </Modal>
       )}
+
+      {modal?.type === "novaCobExtra" && (() => {
+        const valorInf = parseFloat(novaCobExtra.valor) || 0;
+        const nUn = moradores.length || 1;
+        const previa = novaCobExtra.modo === "rateio" ? (valorInf / nUn) : valorInf;
+        return (
+        <Modal title="Nova Cobrança Extra" onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Descrição *</label>
+              <input value={novaCobExtra.descricao} onChange={e=>setNovaCobExtra(p=>({...p,descricao:e.target.value}))} placeholder="Ex: Pintura da fachada" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Como cobrar</label>
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={()=>setNovaCobExtra(p=>({...p,modo:"unidade"}))} style={{ flex:1, padding:"10px", background: novaCobExtra.modo==="unidade"?D.primary:D.muted, color: novaCobExtra.modo==="unidade"?"#fff":D.text, border:`1px solid ${novaCobExtra.modo==="unidade"?D.primary:D.border}`, borderRadius:D.radiusSm, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, textAlign:"left" }}>
+                  Valor por unidade<br/><span style={{ fontSize:10, opacity:.8, fontWeight:400 }}>cada um paga o valor informado</span>
+                </button>
+                <button onClick={()=>setNovaCobExtra(p=>({...p,modo:"rateio"}))} style={{ flex:1, padding:"10px", background: novaCobExtra.modo==="rateio"?D.primary:D.muted, color: novaCobExtra.modo==="rateio"?"#fff":D.text, border:`1px solid ${novaCobExtra.modo==="rateio"?D.primary:D.border}`, borderRadius:D.radiusSm, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, textAlign:"left" }}>
+                  Ratear valor total<br/><span style={{ fontSize:10, opacity:.8, fontWeight:400 }}>divide o total entre as unidades</span>
+                </button>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:12 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>{novaCobExtra.modo==="rateio"?"Valor total *":"Valor por unidade *"}</label>
+                <input type="number" value={novaCobExtra.valor} onChange={e=>setNovaCobExtra(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Mês *</label>
+                <input type="month" value={novaCobExtra.mes} onChange={e=>setNovaCobExtra(p=>({...p,mes:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              </div>
+            </div>
+            {valorInf > 0 && (
+              <div style={{ background:D.secondary, borderRadius:D.radiusSm, padding:"12px 14px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>
+                {novaCobExtra.modo==="rateio"
+                  ? <>Rateio de <b>R$ {valorInf.toFixed(2).replace(".",",")}</b> entre <b>{nUn}</b> unidades = <b>R$ {previa.toFixed(2).replace(".",",")}</b> por unidade</>
+                  : <>Cada uma das <b>{nUn}</b> unidades pagará <b>R$ {previa.toFixed(2).replace(".",",")}</b> (total R$ {(previa*nUn).toFixed(2).replace(".",",")})</>}
+              </div>
+            )}
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+            <button onClick={criarCobrancaExtra} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>Criar</button>
+          </div>
+        </Modal>
+        );
+      })()}
+
+      {modal?.type === "gerenciarExtra" && (() => {
+        const extra = cobrancasExtras.find(e => e.id === modal.data.extraId);
+        if (!extra) return null;
+        return (
+        <Modal title={extra.descricao} onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, marginBottom:14 }}>
+            R$ {extra.valorUnitario.toFixed(2).replace(".",",")} por unidade · {mesLabel(extra.mes)}
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:8, maxHeight:"50vh", overflowY:"auto" }}>
+            {[...moradores].sort((a,b)=>a.unidade.localeCompare(b.unidade)).map(m => {
+              const pago = extraPaga(extra.id, m.id);
+              return (
+                <div key={m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 12px", background: pago?D.successBg:D.muted, borderRadius:D.radiusSm }}>
+                  <div>
+                    <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>{m.unidade}</div>
+                    <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.nome}</div>
+                  </div>
+                  {pago ? (
+                    <button onClick={() => estornarExtra(extra, m.id)} style={{ padding:"6px 12px", background:"#fff", color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>✓ Pago · estornar</button>
+                  ) : (
+                    <button onClick={() => marcarExtraPaga(extra, m.id)} style={{ padding:"6px 12px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Marcar pago</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display:"flex", justifyContent:"flex-end", marginTop:16 }}>
+            <button onClick={() => setModal(null)} style={{ padding:"10px 20px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Fechar</button>
+          </div>
+        </Modal>
+        );
+      })()}
 
       {modal?.type === "novaMovFundo" && (
         <Modal title={novaMovFundo.tipo === "aporte" ? "Aporte ao Fundo" : "Retirada do Fundo"} onClose={() => setModal(null)} isMobile={isMobile}>

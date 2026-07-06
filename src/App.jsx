@@ -1197,7 +1197,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
 
   const cobMes    = cobrancas.find(c => c.mes === mesSel);
   const totalPago = cobrancas.filter(c => c.status === "pago").length;
-  const meses     = [...new Set(cobrancas.map(c => c.mes))].sort().reverse();
+  const meses     = [...new Set([mesAtual(), ...cobrancas.map(c => c.mes)])].sort().reverse();
   const statusCor = cobMes?.status === "pago" ? "#2E7D32" : cobMes?.status === "atrasado" ? "#B03A2E" : "#F57F17";
 
   // Taxa individual do morador (ou a padrão do condomínio)
@@ -1260,7 +1260,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
               <div style={{ fontSize:40, opacity:.3 }}>{cobMes.status==="pago"?"✅":cobMes.status==="atrasado"?"🚨":"⏳"}</div>
             </div>
           ) : (
-            <div style={{ color:"#9aa6b5", fontSize:13, textAlign:"center", padding:16 }}>Nenhum registro para este mês.</div>
+            <div style={{ color:"#9aa6b5", fontSize:13, textAlign:"center", padding:16 }}>Ainda não há cobranças lançadas para você neste mês.</div>
           )}
         </div>
 
@@ -3073,33 +3073,55 @@ export default function App() {
 
               {/* Cobranças Recentes */}
               <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
-                <div style={{ padding:"18px 24px 14px", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:`1px solid ${D.border}` }}>
+                <div style={{ padding: isMobile?"16px 16px 12px":"18px 24px 14px", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:`1px solid ${D.border}` }}>
                   <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>Cobranças recentes</div>
                   <button onClick={() => setAba("cobrancas")} style={{ fontFamily:D.fontBody, fontSize:13, color:D.accent, background:"none", border:"none", cursor:"pointer", fontWeight:500 }}>Ver todas →</button>
                 </div>
-                <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                  <thead>
-                    <tr style={{ background:D.muted }}>
-                      {["Unidade","Morador","Valor","Status"].map(h => (
-                        <th key={h} style={{ padding: isMobile?"10px 14px":"10px 24px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
+                {isMobile ? (
+                  /* Mobile: lista de itens (sem tabela, para não cortar o status) */
+                  <div>
                     {cobMes.slice(0,5).map((cob,i) => {
                       const m = moradores.find(x=>x.id===cob.moradorId);
                       if (!m) return null;
                       return (
-                        <tr key={i} style={{ borderBottom:`1px solid ${D.border}` }}>
-                          <td style={{ padding: isMobile?"14px 14px":"14px 24px", fontFamily:D.fontDisplay, fontSize:13, fontWeight:600, color:D.text }}>{m.unidade}</td>
-                          <td style={{ padding: isMobile?"14px 14px":"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{m.nome}</td>
-                          <td style={{ padding: isMobile?"14px 14px":"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>R$ {taxaDoMorador(cob.moradorId).toFixed(2).replace(".",",")}</td>
-                          <td style={{ padding: isMobile?"14px 14px":"14px 24px" }}><Badge status={cob.status} /></td>
-                        </tr>
+                        <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", borderBottom: i<Math.min(cobMes.length,5)-1?`1px solid ${D.border}`:"none", gap:12 }}>
+                          <div style={{ minWidth:0, flex:1 }}>
+                            <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{m.unidade}</div>
+                            <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{m.nome}</div>
+                          </div>
+                          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 }}>
+                            <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>R$ {taxaDoMorador(cob.moradorId).toFixed(2).replace(".",",")}</div>
+                            <Badge status={cob.status} />
+                          </div>
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                ) : (
+                  <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                    <thead>
+                      <tr style={{ background:D.muted }}>
+                        {["Unidade","Morador","Valor","Status"].map(h => (
+                          <th key={h} style={{ padding:"10px 24px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cobMes.slice(0,5).map((cob,i) => {
+                        const m = moradores.find(x=>x.id===cob.moradorId);
+                        if (!m) return null;
+                        return (
+                          <tr key={i} style={{ borderBottom:`1px solid ${D.border}` }}>
+                            <td style={{ padding:"14px 24px", fontFamily:D.fontDisplay, fontSize:13, fontWeight:600, color:D.text }}>{m.unidade}</td>
+                            <td style={{ padding:"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{m.nome}</td>
+                            <td style={{ padding:"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>R$ {taxaDoMorador(cob.moradorId).toFixed(2).replace(".",",")}</td>
+                            <td style={{ padding:"14px 24px" }}><Badge status={cob.status} /></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
 
             </div>

@@ -3318,7 +3318,7 @@ export default function App() {
                 const fmt = (v) => `R$ ${v.toFixed(2).replace(".",",")}`;
                 const pctInadimpl = moradores.length ? Math.round((nPagos/moradores.length)*100) : 0;
                 return (
-                <div style={{ display:"grid", gridTemplateColumns: isMobile?"minmax(0,1fr)":"minmax(0,2fr) minmax(0,1fr)", gap:isMobile?12:16, marginBottom:isMobile?12:16 }}>
+                <div style={{ display:"grid", gridTemplateColumns: isMobile?"minmax(0,1fr)":"minmax(0,2fr) minmax(0,1fr)", gap:isMobile?12:16, marginBottom:isMobile?12:16, alignItems:"start" }}>
 
                   {/* Visão Geral Financeira */}
                   <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
@@ -3357,7 +3357,7 @@ export default function App() {
                     </div>
 
                     {/* Card — Inadimplência */}
-                    <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"20px 22px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0, flex:1 }}>
+                    <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"20px 22px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:14, gap:8, flexWrap:"wrap" }}>
                         <div style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Inadimplência</div>
                         <div style={{ fontFamily:D.fontBody, fontSize:12, color: nPagos>0?D.danger:D.success, fontWeight:600 }}>{pctInadimpl}% · {fmt(totalPendente)} a receber</div>

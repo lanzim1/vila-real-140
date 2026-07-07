@@ -1601,7 +1601,7 @@ export default function App() {
   const [mesSel, setMesSel]         = useState(mesAtual);
   const [toast, setToast]           = useState(null);
   const [modal, setModal]           = useState(null);
-  const [novoMorador, setNovoMorador] = useState({ nome:"", unidade:"", email:"", telefone:"", tipo:"Proprietário", veiculos:"", pets:"", taxaCustom:"" });
+  const [novoMorador, setNovoMorador] = useState({ nome:"", unidade:"", proprietario:"", email:"", telefone:"", tipo:"Proprietário", veiculos:"", pets:"", taxaCustom:"" });
   const [editMorador, setEditMorador] = useState(null); // { id, nome, unidade, email, telefone }
   const [pagForm, setPagForm]         = useState({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
   const [despesas, setDespesas]       = useState([]);
@@ -2084,7 +2084,7 @@ export default function App() {
     const ref = await addDoc(collection(db, "moradores"), dados);
     await setDoc(doc(db, "cobrancas", `${condominioId}_${ref.id}_${mesSel}`), { condominioId, moradorId:ref.id, mes:mesSel, status:"pendente", comprovante:null, dataPagamento:null, obs:"" });
     registrarLog("👤", `Morador cadastrado: ${novoMorador.nome} (${novoMorador.unidade})`);
-    setNovoMorador({ nome:"", unidade:"", email:"", telefone:"", tipo:"Proprietário", veiculos:"", pets:"", taxaCustom:"" }); setModal(null); showToast("Morador cadastrado!");
+    setNovoMorador({ nome:"", unidade:"", proprietario:"", email:"", telefone:"", tipo:"Proprietário", veiculos:"", pets:"", taxaCustom:"" }); setModal(null); showToast("Morador cadastrado!");
   };
 
   const removerMorador = async (id) => {
@@ -3630,6 +3630,7 @@ export default function App() {
                           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
                             <div>
                               <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>{m.unidade}</div>
+                              {m.proprietario && <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:1 }}>Prop: {m.proprietario}</div>}
                               <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>{m.nome}</div>
                             </div>
                             {cob && <Badge status={cob.status} />}
@@ -3639,7 +3640,7 @@ export default function App() {
                             <button onClick={() => { setModal({ type:"historico", data:m }); }} style={{ padding:"5px 12px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>📋 Histórico</button>
                             <button onClick={() => { const link=`${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}`; navigator.clipboard.writeText(link); showToast(`Link do ${m.unidade} copiado!`); }} style={{ padding:"5px 12px", background:"#F0FDFA", color:D.success, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🔗 Link</button>
                             {!readOnly && <>
-                              <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,email:m.email,telefone:m.telefone||"",tipo:m.tipo||"Proprietário",veiculos:m.veiculos||"",pets:m.pets||"",taxaCustom:m.taxaCustom!=null?String(m.taxaCustom):""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 12px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
+                              <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,proprietario:m.proprietario||"",email:m.email,telefone:m.telefone||"",tipo:m.tipo||"Proprietário",veiculos:m.veiculos||"",pets:m.pets||"",taxaCustom:m.taxaCustom!=null?String(m.taxaCustom):""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 12px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
                               <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"5px 12px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
                             </>}
                           </div>
@@ -3677,7 +3678,7 @@ export default function App() {
                                 <button onClick={() => setModal({ type:"historico", data:m })} style={{ padding:"5px 10px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>📋</button>
                                 <button onClick={() => { const link=`${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}`; navigator.clipboard.writeText(link); showToast(`Link do ${m.unidade} copiado!`); }} style={{ padding:"5px 10px", background:"#F0FDFA", color:D.success, border:`1px solid #BBF7D0`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🔗</button>
                                 {!readOnly && <>
-                                  <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,email:m.email,telefone:m.telefone||"",tipo:m.tipo||"Proprietário",veiculos:m.veiculos||"",pets:m.pets||"",taxaCustom:m.taxaCustom!=null?String(m.taxaCustom):""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 10px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
+                                  <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,proprietario:m.proprietario||"",email:m.email,telefone:m.telefone||"",tipo:m.tipo||"Proprietário",veiculos:m.veiculos||"",pets:m.pets||"",taxaCustom:m.taxaCustom!=null?String(m.taxaCustom):""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 10px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
                                   <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"5px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
                                 </>}
                               </div>
@@ -4948,6 +4949,10 @@ export default function App() {
               </div>
             </div>
             <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Proprietário / Dono do apartamento</label>
+              <input value={novoMorador.proprietario} onChange={e=>setNovoMorador(p=>({...p,proprietario:e.target.value}))} placeholder="Ex: Dona Maísa (deixe vazio se for o próprio morador)" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+            </div>
+            <div>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>E-mail *</label>
               <input type="email" value={novoMorador.email} onChange={e=>setNovoMorador(p=>({...p,email:e.target.value}))} placeholder="joao@email.com" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
             </div>
@@ -5056,6 +5061,10 @@ export default function App() {
                   <option>Inquilino</option>
                 </select>
               </div>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Proprietário / Dono do apartamento</label>
+              <input value={editMorador.proprietario} onChange={e=>setEditMorador(p=>({...p,proprietario:e.target.value}))} placeholder="Ex: Dona Maísa (deixe vazio se for o próprio morador)" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
             </div>
             <div>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>E-mail *</label>

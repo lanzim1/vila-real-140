@@ -119,48 +119,48 @@ function useIsMobile() {
 // OKLCH convertido para HEX; Space Grotesk + DM Sans
 const D = {
   // Backgrounds
-  bgApp:       "#F4F6FB",   // --background oklch(0.985 0.004 250)
-  bgCard:      "#FFFFFF",   // --card
+  bgApp:       "#FAFAFA",   // fundo neutro e clean
+  bgCard:      "#FFFFFF",   // cards
 
   // Text
-  text:        "#1A2744",   // --foreground oklch(0.22 0.05 260)
-  textSec:     "#6B7A9E",   // --muted-foreground oklch(0.52 0.04 256)
-  textMut:     "#9AA5C0",
+  text:        "#0F172A",   // texto principal (slate-900)
+  textSec:     "#64748B",   // texto secundário (slate-500)
+  textMut:     "#94A3B8",   // texto mais suave (slate-400)
 
   // Brand
-  primary:     "#1E3A72",   // --primary oklch(0.32 0.09 258) — botões primários
-  primaryFg:   "#F8F9FC",   // --primary-foreground
-  accent:      "#4B72C4",   // --accent oklch(0.6 0.11 250) — ativo, gráficos
-  secondary:   "#E8EDF7",   // --secondary
-  muted:       "#EEF1F8",   // --muted
+  primary:     "#1A2E40",   // navy — botões primários, títulos
+  primaryFg:   "#F8FAFC",   // texto sobre o primary
+  accent:      "#1A2E40",   // ativo, gráficos, links (mesmo navy do design)
+  secondary:   "#F1F5F9",   // fundo claro para selos/tints (slate-100)
+  muted:       "#F8FAFC",   // fundo claro (slate-50)
 
   // Semantic
-  success:     "#22A26B",   // --success oklch(0.62 0.14 155)
-  successBg:   "#DCFDF0",
-  warning:     "#B87200",   // --warning-foreground oklch(0.28 0.06 70)
-  warningBg:   "#FEF3C7",   // --warning oklch(0.78 0.15 75) bg
-  danger:      "#E03A22",   // --destructive oklch(0.58 0.21 25)
-  dangerBg:    "#FEE8E4",
+  success:     "#10B981",   // verde (emerald-500)
+  successBg:   "#ECFDF5",   // emerald-50
+  warning:     "#D97706",   // âmbar (amber-600)
+  warningBg:   "#FFFBEB",   // amber-50
+  danger:      "#DC2626",   // vermelho (red-600)
+  dangerBg:    "#FEF2F2",   // red-50
 
   // UI
-  border:      "#DDE3EF",   // --border oklch(0.9 0.015 252)
-  ring:        "#4B72C4",   // --ring
+  border:      "#E2E8F0",   // slate-200
+  ring:        "#1A2E40",
 
-  // Sidebar (oklch values conforme design system)
-  sidebar:     "#1C2D5E",   // --sidebar oklch(0.27 0.07 260)
-  sidebarHov:  "#253875",   // --sidebar-accent oklch(0.33 0.07 260)
-  sidebarAct:  "rgba(75,114,196,0.2)",
-  sidebarActBdr:"#4B72C4",  // --sidebar-primary
-  sidebarFg:   "#E2E8F5",   // --sidebar-foreground
-  sidebarBdr:  "#2E4380",   // --sidebar-border
+  // Sidebar (retonalizada para o novo navy, mantendo estrutura escura)
+  sidebar:     "#1A2E40",   // navy do design
+  sidebarHov:  "#24384D",   // navy um pouco mais claro
+  sidebarAct:  "rgba(148,163,184,0.18)",
+  sidebarActBdr:"#CBD5E1",  // indicador de ativo (slate-300)
+  sidebarFg:   "#E2E8F0",   // texto claro na sidebar
+  sidebarBdr:  "#2A3A4A",   // borda da sidebar
 
   // Deprecated (mantidos para compatibilidade de código legado)
-  gold:        "#B87200",
-  primaryDk:   "#162E5C",
+  gold:        "#D97706",
+  primaryDk:   "#12212E",
 
-  // Shadows
-  shadow:    "0 1px 3px rgba(30,42,100,.06), 0 2px 8px rgba(30,42,100,.05)",
-  shadowMd:  "0 4px 16px rgba(30,42,100,.1), 0 8px 32px rgba(30,42,100,.07)",
+  // Shadows (neutras, mais suaves — estilo do design novo)
+  shadow:    "0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06)",
+  shadowMd:  "0 4px 6px -1px rgba(15,23,42,.1), 0 2px 4px -1px rgba(15,23,42,.06)",
 
   // Radius (--radius: 0.75rem = 12px)
   radius:    12,

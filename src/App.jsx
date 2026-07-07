@@ -1915,7 +1915,7 @@ export default function App() {
     if (mudou) await batch.commit();
   };
 
-  // ── Marcar cobranças vencidas como "atrasado" ──
+  // ── Marcar vencidas como "atrasado" e corrigir as anteriores ao marco zero ──
   const atualizarAtrasados = async () => {
     if (!condominioId) return;
     const hoje = new Date();
@@ -1924,14 +1924,17 @@ export default function App() {
     const batch = writeBatch(db);
     let mudou = false;
     cobrancas.forEach(c => {
-      if (c.status !== "pendente") return;
+      if (c.status === "pago") return;
       const venc = dataVencimentoMes(c.mes);
       venc.setHours(0,0,0,0);
-      // Não marca como atrasado se venceu antes do marco zero (início da contagem)
-      if (mz && venc < mz) return;
-      if (hoje > venc) {
-        batch.set(doc(db, "cobrancas", `${condominioId}_${c.moradorId}_${c.mes}`), { status:"atrasado" }, { merge:true });
-        mudou = true;
+      const antesDoMarco = mz && venc < mz; // venceu antes do início da contagem
+      const ref = doc(db, "cobrancas", c.id);
+      if (antesDoMarco) {
+        // Antes do marco zero não conta como atraso: garante "pendente"
+        if (c.status === "atrasado") { batch.set(ref, { status:"pendente" }, { merge:true }); mudou = true; }
+      } else if (c.status === "pendente" && hoje > venc) {
+        // A partir do marco zero, marca atraso normalmente
+        batch.set(ref, { status:"atrasado" }, { merge:true }); mudou = true;
       }
     });
     if (mudou) await batch.commit();
@@ -1941,32 +1944,31 @@ export default function App() {
   const zerarAtrasados = async () => {
     if (!condominioId) return;
     const hoje = new Date();
-    // Marco zero = primeiro dia do PRÓXIMO mês (este mês inteiro fica limpo)
     const proxMesData = new Date(hoje.getFullYear(), hoje.getMonth()+1, 1);
     const marcoStr = `${proxMesData.getFullYear()}-${String(proxMesData.getMonth()+1).padStart(2,"0")}-01`;
     const proxMesYM = `${proxMesData.getFullYear()}-${String(proxMesData.getMonth()+1).padStart(2,"0")}`;
     const mesAtualYM = mesAtual();
     // 1. Define o marco zero (NÃO altera o dia de vencimento)
-    await setDoc(doc(db, "condominios", condominioId), { marcoZero: marcoStr }, { merge:true });
-    // 2. Converte todos os atrasados atuais de volta para pendente (não marca como pago)
-    const batch = writeBatch(db);
-    let mudou = false;
-    cobrancas.forEach(c => {
-      if (c.status === "atrasado") {
-        batch.set(doc(db, "cobrancas", `${condominioId}_${c.moradorId}_${c.mes}`), { status:"pendente" }, { merge:true });
-        mudou = true;
-      }
-    });
-    if (mudou) await batch.commit();
-    // 3. Registra uma observação para o mês atual
-    await setDoc(doc(db, "observacoes", `${condominioId}_${mesAtualYM}`), {
-      condominioId,
-      mes: mesAtualYM,
-      texto: `Mês inicial de operação: cobranças deste mês zeradas (sem marcação de atraso). A contagem de inadimplência começa em ${mesLabel(proxMesYM)}.`,
-      atualizadoEm: new Date().toLocaleString("pt-BR"),
-    }, { merge:true });
-    registrarLog("🔄", `Atrasos zerados — contagem de inadimplência inicia em ${mesLabel(proxMesYM)}`);
-    showToast("Pronto! Este mês limpo e a contagem começa mês que vem.");
+    try { await setDoc(doc(db, "condominios", condominioId), { marcoZero: marcoStr }, { merge:true }); } catch(e) {}
+    // 2. Converte cada atrasado de volta para pendente (individual, resiliente)
+    let n = 0;
+    for (const c of cobrancas) {
+      if (c.status !== "atrasado") continue;
+      try {
+        await setDoc(doc(db, "cobrancas", c.id), { status:"pendente" }, { merge:true });
+        n++;
+      } catch(e) {}
+    }
+    // 3. Observação do mês atual
+    try {
+      await setDoc(doc(db, "observacoes", `${condominioId}_${mesAtualYM}`), {
+        condominioId, mes: mesAtualYM,
+        texto: `Mês inicial de operação: cobranças deste mês zeradas (sem marcação de atraso). A contagem de inadimplência começa em ${mesLabel(proxMesYM)}.`,
+        atualizadoEm: new Date().toLocaleString("pt-BR"),
+      }, { merge:true });
+    } catch(e) {}
+    registrarLog("🔄", `Atrasos zerados (${n}) — contagem inicia em ${mesLabel(proxMesYM)}`);
+    showToast(`Pronto! ${n} cobrança(s) zerada(s). A contagem começa mês que vem.`);
   };
 
   useEffect(() => {

@@ -3318,7 +3318,7 @@ export default function App() {
                 const fmt = (v) => `R$ ${v.toFixed(2).replace(".",",")}`;
                 const pctInadimpl = moradores.length ? Math.round((nPagos/moradores.length)*100) : 0;
                 return (
-                <div style={{ display:"grid", gridTemplateColumns: isMobile?"minmax(0,1fr)":"minmax(0,2fr) minmax(0,1fr)", gap:isMobile?12:16, marginBottom:isMobile?12:16, alignItems:"start" }}>
+                <div style={{ display:"grid", gridTemplateColumns: isMobile?"minmax(0,1fr)":"minmax(0,2fr) minmax(0,1fr)", gap:isMobile?12:16, marginBottom:isMobile?12:16 }}>
 
                   {/* Visão Geral Financeira */}
                   <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
@@ -3376,29 +3376,29 @@ export default function App() {
                       </div>
                     </div>
 
+                    {/* Atividade recente — preenche o espaço à direita */}
+                    <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"20px 22px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0, flex:1, display:"flex", flexDirection:"column", minHeight: isMobile?"auto":160 }}>
+                      <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em", marginBottom:16 }}>Atividade recente</div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:14, flex:1, minHeight:0, overflowY:"auto" }}>
+                        {logs.slice(0,8).map((log,i) => (
+                          <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
+                            <div style={{ width:34, height:34, borderRadius:9, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, flexShrink:0 }}>{log.icone}</div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:500, color:D.text, lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{log.descricao}</div>
+                              <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:2 }}>{log.dataHora}</div>
+                            </div>
+                          </div>
+                        ))}
+                        {logs.length === 0 && (
+                          <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut, textAlign:"center", padding:"20px 0" }}>Nenhuma atividade ainda.</div>
+                        )}
+                      </div>
+                    </div>
+
                   </div>
                 </div>
                 );
               })()}
-
-              {/* Atividade Recente (largura total) */}
-              <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0, marginBottom:isMobile?12:16 }}>
-                <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em", marginBottom:18 }}>Atividade recente</div>
-                <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"1fr 1fr", gap:isMobile?12:"10px 32px" }}>
-                  {logs.slice(0,6).map((log,i) => (
-                    <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
-                      <div style={{ width:34, height:34, borderRadius:9, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, flexShrink:0 }}>{log.icone}</div>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:500, color:D.text, lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{log.descricao}</div>
-                        <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:2 }}>{log.dataHora}</div>
-                      </div>
-                    </div>
-                  ))}
-                  {logs.length === 0 && (
-                    <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut, textAlign:"center", padding:"20px 0" }}>Nenhuma atividade ainda.</div>
-                  )}
-                </div>
-              </div>
 
               {/* Cobranças Recentes */}
               <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>

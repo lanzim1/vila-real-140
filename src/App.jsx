@@ -1907,6 +1907,9 @@ export default function App() {
 
   const garantirMes = async (mes) => {
     if (!condominioId) return;
+    // Não gera cobranças para meses anteriores ao início da cobrança (marco zero)
+    const mesInicio = marcoZero ? marcoZero.slice(0,7) : null; // ex: "2026-08"
+    if (mesInicio && mes < mesInicio) return;
     const existentes = new Set(cobrancas.filter(c => c.mes === mes).map(c => c.moradorId));
     const batch = writeBatch(db); let mudou = false;
     moradores.forEach(m => {
@@ -1950,25 +1953,31 @@ export default function App() {
     const mesAtualYM = mesAtual();
     // 1. Define o marco zero (NÃO altera o dia de vencimento)
     try { await setDoc(doc(db, "condominios", condominioId), { marcoZero: marcoStr }, { merge:true }); } catch(e) {}
-    // 2. Converte cada atrasado de volta para pendente (individual, resiliente)
+    const mesInicio = marcoStr.slice(0,7); // ex: "2026-08" — 1º mês que será cobrado
+    // 2. Remove cobranças NÃO pagas de meses anteriores ao início (junho, julho, etc.)
+    let removidas = 0;
+    for (const c of cobrancas) {
+      if (c.mes < mesInicio && c.status !== "pago") {
+        try { await deleteDoc(doc(db, "cobrancas", c.id)); removidas++; } catch(e) {}
+      }
+    }
+    // 3. Qualquer atrasado remanescente (de agosto em diante, se houver) volta a pendente
     let n = 0;
     for (const c of cobrancas) {
-      if (c.status !== "atrasado") continue;
-      try {
-        await setDoc(doc(db, "cobrancas", c.id), { status:"pendente" }, { merge:true });
-        n++;
-      } catch(e) {}
+      if (c.mes >= mesInicio && c.status === "atrasado") {
+        try { await setDoc(doc(db, "cobrancas", c.id), { status:"pendente" }, { merge:true }); n++; } catch(e) {}
+      }
     }
-    // 3. Observação do mês atual
+    // 4. Observação do mês atual
     try {
       await setDoc(doc(db, "observacoes", `${condominioId}_${mesAtualYM}`), {
         condominioId, mes: mesAtualYM,
-        texto: `Mês inicial de operação: cobranças deste mês zeradas (sem marcação de atraso). A contagem de inadimplência começa em ${mesLabel(proxMesYM)}.`,
+        texto: `Início de operação: as cobranças começam em ${mesLabel(proxMesYM)}. Meses anteriores não são cobrados.`,
         atualizadoEm: new Date().toLocaleString("pt-BR"),
       }, { merge:true });
     } catch(e) {}
-    registrarLog("🔄", `Atrasos zerados (${n}) — contagem inicia em ${mesLabel(proxMesYM)}`);
-    showToast(`Pronto! ${n} cobrança(s) zerada(s). A contagem começa mês que vem.`);
+    registrarLog("🔄", `Cobranças anteriores removidas (${removidas}) — cobrança inicia em ${mesLabel(proxMesYM)}`);
+    showToast(`Pronto! ${removidas} cobrança(s) anterior(es) removida(s). A cobrança começa em ${mesLabel(proxMesYM)}.`);
   };
 
   useEffect(() => {
@@ -4883,19 +4892,19 @@ export default function App() {
 
               <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
 
-              {/* Zerar atrasos — marco zero */}
-              <h3 style={{ color:"#1E3A5F", margin:"0 0 6px", fontSize:15, fontWeight:700 }}>🔄 Zerar atrasos</h3>
+              {/* Zerar atrasos / início de cobrança — marco zero */}
+              <h3 style={{ color:"#1E3A5F", margin:"0 0 6px", fontSize:15, fontWeight:700 }}>🔄 Iniciar cobrança a partir do próximo mês</h3>
               <p style={{ color:"#6B7A8D", fontSize:12, margin:"0 0 12px" }}>
-                Deixa <b>este mês todo limpo</b>: as cobranças que estão como "atrasado" voltam para "pendente" (não são marcadas como pagas), e o sistema só começa a marcar atraso <b>a partir do mês que vem</b>. Registra uma observação no mês atual e <b>não altera o dia de vencimento</b>. Ideal para o início da operação.
+                Define o <b>mês que vem</b> como o primeiro mês de cobrança. As cobranças pendentes de meses anteriores (deste mês pra trás) são <b>removidas</b>, e o sistema passa a gerar e cobrar somente a partir do próximo mês. Não mexe no dia de vencimento nem em pagamentos já registrados. Ideal para o início da operação.
               </p>
               {marcoZero && (
                 <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginBottom:12, background:D.muted, padding:"10px 12px", borderRadius:D.radiusSm }}>
-                  Contagem de atrasos ativa a partir de: <b>{(() => { const [y,m,d]=marcoZero.split("-"); return `${d}/${m}/${y}`; })()}</b>
+                  Cobrança ativa a partir de: <b>{(() => { const [y,m]=marcoZero.split("-"); return mesLabel(`${y}-${m}`); })()}</b>
                 </div>
               )}
               {!readOnly && (
-                <button onClick={() => { if(window.confirm("Zerar todos os atrasos deste mês?\n\n• As cobranças atrasadas voltam para 'pendente' (não viram 'pago')\n• A contagem de atraso só começa no mês que vem\n• Uma observação é registrada neste mês\n• O dia de vencimento NÃO é alterado")) zerarAtrasados(); }} style={{ padding:"11px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
-                  🔄 Zerar atrasos deste mês
+                <button onClick={() => { if(window.confirm("Iniciar a cobrança só a partir do mês que vem?\n\n• As cobranças pendentes deste mês e anteriores serão REMOVIDAS\n• O sistema passa a cobrar a partir do próximo mês\n• Pagamentos já registrados e o dia de vencimento NÃO são afetados")) zerarAtrasados(); }} style={{ padding:"11px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                  🔄 Iniciar cobrança no próximo mês
                 </button>
               )}
 

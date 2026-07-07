@@ -3306,109 +3306,97 @@ export default function App() {
                 </div>
               )}
 
-              {/* Stat Cards */}
-              <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(4,1fr)", gap:isMobile?10:16, marginBottom:20 }}>
-                {[
-                  {
-                    icon:"💰", iconBg:"#DCFDF0", iconColor:D.success,
-                    label:"Receita do mês", valor:`R$ ${totalArrecadado.toFixed(2).replace(".",",")}`,
-                    change: moradores.length ? `↑ ${Math.round((pagos/moradores.length)*100)}% adimpl.` : "—",
-                    changeColor: D.success,
-                  },
-                  {
-                    icon:"⚠️", iconBg:"#FEF3C7", iconColor:D.warning,
-                    label:"Inadimplência", valor: moradores.length ? `${Math.round((nPagos/moradores.length)*100)}%` : "0%",
-                    change: nPagos > 0 ? `↓ ${nPagos} unid.` : "✓ Em dia",
-                    changeColor: nPagos > 0 ? D.danger : D.success,
-                  },
-                  {
-                    icon:"👥", iconBg:D.secondary, iconColor:D.accent,
-                    label:"Unidades ativas", valor:`${pagos} / ${moradores.length}`,
-                    change:`${atrasados} atrasada${atrasados!==1?"s":""}`,
-                    changeColor: atrasados > 0 ? D.danger : D.success,
-                  },
-                  {
-                    icon:"💼", iconBg: saldoCaixa>=0 ? "#DCFDF0" : "#FEE8E4", iconColor: saldoCaixa>=0 ? D.success : D.danger,
-                    label:"Saldo de caixa", valor:`R$ ${saldoCaixa.toFixed(2).replace(".",",")}`,
-                    change: saldoCaixa>=0 ? "↑ Positivo" : "↓ Negativo",
-                    changeColor: saldoCaixa>=0 ? D.success : D.danger,
-                  },
-                ].map((c,i) => (
-                  <div key={i} style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"14px 12px":"20px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom: isMobile?8:14 }}>
-                      <div style={{ width:isMobile?32:40, height:isMobile?32:40, borderRadius:isMobile?8:10, background:c.iconBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:isMobile?15:18, flexShrink:0 }}>
-                        {c.icon}
+              {/* ── Bloco A: Visão financeira + Saldo em caixa + Inadimplência ── */}
+              {(() => {
+                const mesesAno = Array.from({length:6}, (_,i) => { const d=new Date(); d.setMonth(d.getMonth()-5+i); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; });
+                const labels6 = mesesAno.map(m => { const [,mo]=m.split("-"); return ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][parseInt(mo)-1]; });
+                const dados6 = mesesAno.map(m => { const f=fluxoDoMes(m); return { entrada:f.entradas, saida:f.saidas }; });
+                // Saldo do caixa acumulado (mesma lógica da aba Fluxo de Caixa)
+                const mesesCaixa = [...new Set([...cobrancas.map(c=>c.mes), ...despesas.map(d=>d.mes), ...receitas.map(r=>r.mes), ...cobrancasExtras.map(e=>e.mes)])].filter(Boolean);
+                const saldoCaixaTotal = mesesCaixa.reduce((s,m)=> s + fluxoDoMes(m).resultado, 0);
+                const fMes = fluxoDoMes(mesSel);
+                const fmt = (v) => `R$ ${v.toFixed(2).replace(".",",")}`;
+                const pctInadimpl = moradores.length ? Math.round((nPagos/moradores.length)*100) : 0;
+                return (
+                <div style={{ display:"grid", gridTemplateColumns: isMobile?"minmax(0,1fr)":"minmax(0,2fr) minmax(0,1fr)", gap:isMobile?12:16, marginBottom:isMobile?12:16 }}>
+
+                  {/* Visão Geral Financeira */}
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12, flexWrap:"wrap", gap:8 }}>
+                      <div style={{ minWidth:0 }}>
+                        <div style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Visão Geral Financeira</div>
+                        <div style={{ display:"flex", alignItems:"baseline", gap:8, marginTop:6, flexWrap:"wrap" }}>
+                          <span style={{ fontFamily:D.fontDisplay, fontSize: isMobile?24:28, fontWeight:700, color:D.text, letterSpacing:"-0.03em" }}>{fmt(fMes.entradas)}</span>
+                          <span style={{ fontFamily:D.fontBody, fontSize:14, color:D.textMut }}>/ {fmt(fMes.saidas)}</span>
+                        </div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>Entradas / Saídas · {mesLabel(mesSel)}</div>
                       </div>
-                      <span style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:600, color:c.changeColor, textAlign:"right", lineHeight:1.3 }}>{c.change}</span>
+                      <div style={{ display:"flex", gap:12, alignItems:"center", flexWrap:"wrap" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:5, fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>
+                          <div style={{ width:8, height:8, borderRadius:"50%", background:D.accent }} />Receita
+                        </div>
+                        <div style={{ display:"flex", alignItems:"center", gap:5, fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>
+                          <div style={{ width:8, height:8, borderRadius:"50%", background:D.warning }} />Despesa
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ fontFamily:D.fontDisplay, fontSize: isMobile?16:24, fontWeight:700, color:D.text, letterSpacing:"-0.02em", marginBottom:3, lineHeight:1.1 }}>{c.valor}</div>
-                    <div style={{ fontFamily:D.fontBody, fontSize: isMobile?11:13, color:D.textSec }}>{c.label}</div>
+                    <AreaChart dadosMes={dados6} mesesLabel={labels6} />
                   </div>
-                ))}
-              </div>
 
-              {/* Linha: Gráfico + Atividade Recente */}
-              <div style={{ display:"grid", gridTemplateColumns: isMobile?"minmax(0,1fr)":"minmax(0,2fr) minmax(0,1fr)", gap:isMobile?12:16, marginBottom:isMobile?12:24 }}>
+                  {/* Coluna direita: saldo em caixa (escuro) + inadimplência */}
+                  <div style={{ display:"flex", flexDirection:"column", gap:isMobile?12:16, minWidth:0 }}>
 
-                {/* Fluxo Financeiro */}
-                {(() => {
-                  const anoAtual = new Date().getFullYear();
-                  const mesesAno = Array.from({length:6}, (_,i) => {
-                    const d = new Date(); d.setMonth(d.getMonth()-5+i);
-                    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-                  });
-                  const labels6 = mesesAno.map(m => {
-                    const [,mo] = m.split("-");
-                    return ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][parseInt(mo)-1];
-                  });
-                  const dados6 = mesesAno.map(m => {
-                    const entrada = somaCobrancas(cobrancas.filter(c=>c.mes===m&&c.status==="pago"));
-                    const saida   = despesas.filter(d=>d.mes===m&&d.status==="pago").reduce((s,d)=>s+d.valor,0)
-                                  + servicos.filter(s=>{
-                                      if(!s.dataFim) return false;
-                                      const p=s.dataFim.split("/");
-                                      return p.length===3&&`${p[2]}-${p[1]}`===m;
-                                    }).reduce((s,sv)=>(sv.valorMaterial||0)+(sv.valorMaoDeObra||0)+s, 0);
-                    return { entrada, saida };
-                  });
-                  return (
-                    <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:8 }}>
-                        <div>
-                          <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>Fluxo Financeiro</div>
-                          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>Receitas × Despesas (em R$)</div>
-                        </div>
-                        <div style={{ display:"flex", gap:14, alignItems:"center" }}>
-                          <div style={{ display:"flex", alignItems:"center", gap:5, fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>
-                            <div style={{ width:8, height:8, borderRadius:"50%", background:D.accent }} />Receita
-                          </div>
-                          <div style={{ display:"flex", alignItems:"center", gap:5, fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>
-                            <div style={{ width:8, height:8, borderRadius:"50%", background:"#F59E0B" }} />Despesa
-                          </div>
-                        </div>
+                    {/* Card escuro — Saldo em caixa */}
+                    <div style={{ background:D.primary, borderRadius:D.radius, padding: isMobile?"18px 20px":"22px 24px", boxShadow:D.shadowMd, color:"#fff", position:"relative", overflow:"hidden", minWidth:0 }}>
+                      <div style={{ position:"absolute", top:-30, right:-30, width:120, height:120, borderRadius:"50%", background:"rgba(16,185,129,0.18)" }} />
+                      <div style={{ position:"relative" }}>
+                        <div style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:".8px", opacity:.85 }}>Saldo em caixa</div>
+                        <div style={{ fontFamily:D.fontDisplay, fontSize: isMobile?26:30, fontWeight:700, letterSpacing:"-0.03em", marginTop:8, color: saldoCaixaTotal<0?"#FCA5A5":"#fff" }}>{fmt(saldoCaixaTotal)}</div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:12, opacity:.8, marginTop:4 }}>Acumulado de todos os meses</div>
                       </div>
-                      <AreaChart dadosMes={dados6} mesesLabel={labels6} />
                     </div>
-                  );
-                })()}
 
-                {/* Atividade Recente */}
-                <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
-                  <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em", marginBottom:18 }}>Atividade recente</div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-                    {logs.slice(0,6).map((log,i) => (
-                      <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
-                        <div style={{ width:34, height:34, borderRadius:9, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, flexShrink:0 }}>{log.icone}</div>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:500, color:D.text, lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{log.descricao}</div>
-                          <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:2 }}>{log.dataHora}</div>
-                        </div>
+                    {/* Card — Inadimplência */}
+                    <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"20px 22px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0, flex:1 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:14, gap:8, flexWrap:"wrap" }}>
+                        <div style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Inadimplência</div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:12, color: nPagos>0?D.danger:D.success, fontWeight:600 }}>{pctInadimpl}% · {fmt(totalPendente)} a receber</div>
                       </div>
-                    ))}
-                    {logs.length === 0 && (
-                      <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut, textAlign:"center", padding:"20px 0" }}>Nenhuma atividade ainda.</div>
-                    )}
+                      <div style={{ display:"flex", gap:8 }}>
+                        {[
+                          { n:pagos,      label:"Em dia",    cor:D.success },
+                          { n:pendentes,  label:"Pendentes", cor:D.warning },
+                          { n:atrasados,  label:"Atrasados", cor:D.danger  },
+                        ].map((s,i) => (
+                          <div key={i} style={{ flex:1, background:D.muted, borderRadius:D.radiusSm, padding:"12px 10px", textAlign:"center", minWidth:0 }}>
+                            <div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:s.cor, lineHeight:1 }}>{s.n}</div>
+                            <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textSec, marginTop:4 }}>{s.label}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                   </div>
+                </div>
+                );
+              })()}
+
+              {/* Atividade Recente (largura total) */}
+              <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"22px 24px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0, marginBottom:isMobile?12:16 }}>
+                <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em", marginBottom:18 }}>Atividade recente</div>
+                <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"1fr 1fr", gap:isMobile?12:"10px 32px" }}>
+                  {logs.slice(0,6).map((log,i) => (
+                    <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
+                      <div style={{ width:34, height:34, borderRadius:9, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, flexShrink:0 }}>{log.icone}</div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:500, color:D.text, lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{log.descricao}</div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:2 }}>{log.dataHora}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {logs.length === 0 && (
+                    <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut, textAlign:"center", padding:"20px 0" }}>Nenhuma atividade ainda.</div>
+                  )}
                 </div>
               </div>
 

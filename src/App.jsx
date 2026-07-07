@@ -1597,6 +1597,7 @@ export default function App() {
   const [cobrarMultaJuros, setCobrarMultaJuros] = useState(false);
   const [multaPercent, setMultaPercent]         = useState(2);
   const [jurosPercentMes, setJurosPercentMes]   = useState(1);
+  const [marcoZero, setMarcoZero]               = useState(null);
   const [enviandoEmails, setEnviandoEmails] = useState(false);
   const [mesSel, setMesSel]         = useState(mesAtual);
   const [toast, setToast]           = useState(null);
@@ -1758,6 +1759,7 @@ export default function App() {
         setCobrarMultaJuros(data.cobrarMultaJuros ?? false);
         setMultaPercent(data.multaPercent ?? 2);
         setJurosPercentMes(data.jurosPercentMes ?? 1);
+        setMarcoZero(data.marcoZero ?? null);
       }
     });
     // Observações: doc com id composto condominioId_mes
@@ -1918,12 +1920,15 @@ export default function App() {
     if (!condominioId) return;
     const hoje = new Date();
     hoje.setHours(0,0,0,0);
+    const mz = marcoZero ? new Date(marcoZero + "T00:00:00") : null;
     const batch = writeBatch(db);
     let mudou = false;
     cobrancas.forEach(c => {
       if (c.status !== "pendente") return;
       const venc = dataVencimentoMes(c.mes);
       venc.setHours(0,0,0,0);
+      // Não marca como atrasado se venceu antes do marco zero (início da contagem)
+      if (mz && venc < mz) return;
       if (hoje > venc) {
         batch.set(doc(db, "cobrancas", `${condominioId}_${c.moradorId}_${c.mes}`), { status:"atrasado" }, { merge:true });
         mudou = true;
@@ -1932,12 +1937,44 @@ export default function App() {
     if (mudou) await batch.commit();
   };
 
+  // ── Zerar atrasos: este mês limpo, contagem começa no mês que vem ──
+  const zerarAtrasados = async () => {
+    if (!condominioId) return;
+    const hoje = new Date();
+    // Marco zero = primeiro dia do PRÓXIMO mês (este mês inteiro fica limpo)
+    const proxMesData = new Date(hoje.getFullYear(), hoje.getMonth()+1, 1);
+    const marcoStr = `${proxMesData.getFullYear()}-${String(proxMesData.getMonth()+1).padStart(2,"0")}-01`;
+    const proxMesYM = `${proxMesData.getFullYear()}-${String(proxMesData.getMonth()+1).padStart(2,"0")}`;
+    const mesAtualYM = mesAtual();
+    // 1. Define o marco zero (NÃO altera o dia de vencimento)
+    await setDoc(doc(db, "condominios", condominioId), { marcoZero: marcoStr }, { merge:true });
+    // 2. Converte todos os atrasados atuais de volta para pendente (não marca como pago)
+    const batch = writeBatch(db);
+    let mudou = false;
+    cobrancas.forEach(c => {
+      if (c.status === "atrasado") {
+        batch.set(doc(db, "cobrancas", `${condominioId}_${c.moradorId}_${c.mes}`), { status:"pendente" }, { merge:true });
+        mudou = true;
+      }
+    });
+    if (mudou) await batch.commit();
+    // 3. Registra uma observação para o mês atual
+    await setDoc(doc(db, "observacoes", `${condominioId}_${mesAtualYM}`), {
+      condominioId,
+      mes: mesAtualYM,
+      texto: `Mês inicial de operação: cobranças deste mês zeradas (sem marcação de atraso). A contagem de inadimplência começa em ${mesLabel(proxMesYM)}.`,
+      atualizadoEm: new Date().toLocaleString("pt-BR"),
+    }, { merge:true });
+    registrarLog("🔄", `Atrasos zerados — contagem de inadimplência inicia em ${mesLabel(proxMesYM)}`);
+    showToast("Pronto! Este mês limpo e a contagem começa mês que vem.");
+  };
+
   useEffect(() => {
     if (user && condominioId && moradores.length > 0) {
       garantirMes(mesSel);
       atualizarAtrasados();
     }
-  }, [user, condominioId, moradores.length, cobrancas.length, diaVencimento]);
+  }, [user, condominioId, moradores.length, cobrancas.length, diaVencimento, marcoZero]);
 
   const mudarMes = async (m) => {
     setMesSel(m);
@@ -4840,6 +4877,24 @@ export default function App() {
                   </div>
                   <a href="mailto:comercial.mysindi@gmail.com?subject=Upgrade de plano — MySindi" style={{ padding:"8px 16px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>Fazer upgrade</a>
                 </div>
+              )}
+
+              <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
+
+              {/* Zerar atrasos — marco zero */}
+              <h3 style={{ color:"#1E3A5F", margin:"0 0 6px", fontSize:15, fontWeight:700 }}>🔄 Zerar atrasos</h3>
+              <p style={{ color:"#6B7A8D", fontSize:12, margin:"0 0 12px" }}>
+                Deixa <b>este mês todo limpo</b>: as cobranças que estão como "atrasado" voltam para "pendente" (não são marcadas como pagas), e o sistema só começa a marcar atraso <b>a partir do mês que vem</b>. Registra uma observação no mês atual e <b>não altera o dia de vencimento</b>. Ideal para o início da operação.
+              </p>
+              {marcoZero && (
+                <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginBottom:12, background:D.muted, padding:"10px 12px", borderRadius:D.radiusSm }}>
+                  Contagem de atrasos ativa a partir de: <b>{(() => { const [y,m,d]=marcoZero.split("-"); return `${d}/${m}/${y}`; })()}</b>
+                </div>
+              )}
+              {!readOnly && (
+                <button onClick={() => { if(window.confirm("Zerar todos os atrasos deste mês?\n\n• As cobranças atrasadas voltam para 'pendente' (não viram 'pago')\n• A contagem de atraso só começa no mês que vem\n• Uma observação é registrada neste mês\n• O dia de vencimento NÃO é alterado")) zerarAtrasados(); }} style={{ padding:"11px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                  🔄 Zerar atrasos deste mês
+                </button>
               )}
 
               <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />

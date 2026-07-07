@@ -1831,6 +1831,70 @@ export default function App() {
   };
   const despCat = (tipo) => CATS_DESPESA[tipo] || CATS_DESPESA.outro;
 
+  // ── Exportação CSV (abre no Excel / Google Sheets) ──
+  const exportarCSV = (nomeArquivo, colunas, linhas) => {
+    // Escapa cada célula: usa ; como separador (padrão Excel BR) e aspas quando necessário
+    const escapa = (v) => {
+      const s = v == null ? "" : String(v);
+      return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const linhasCSV = [colunas, ...linhas].map(l => l.map(escapa).join(";"));
+    // BOM (\uFEFF) garante que acentos apareçam certo no Excel
+    const conteudo = "\uFEFF" + linhasCSV.join("\r\n");
+    const blob = new Blob([conteudo], { type:"text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${nomeArquivo}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("Arquivo CSV baixado!");
+  };
+
+  const exportarMoradoresCSV = () => {
+    const colunas = ["Unidade","Nome","Tipo","E-mail","Telefone","Veículos","Pets","Taxa individual"];
+    const linhas = [...moradores]
+      .sort((a,b) => (a.unidade||"").localeCompare(b.unidade||""))
+      .map(m => [
+        m.unidade||"", m.nome||"", m.tipo||"", m.email||"", m.telefone||"",
+        m.veiculos||"", m.pets||"",
+        m.taxaCustom != null ? `R$ ${Number(m.taxaCustom).toFixed(2).replace(".",",")}` : "(padrão)",
+      ]);
+    exportarCSV(`moradores_${condominio?.nome||"condominio"}`.replace(/\s+/g,"_"), colunas, linhas);
+  };
+
+  const exportarCobrancasCSV = () => {
+    const colunas = ["Unidade","Morador","Mês","Valor base","Multa","Juros","Valor total","Status","Data pagamento"];
+    const linhas = cobMes.map(cob => {
+      const m = moradores.find(x => x.id === cob.moradorId);
+      if (!m) return null;
+      const enc = encargosCobranca(cob);
+      return [
+        m.unidade||"", m.nome||"", cob.mes||"",
+        `R$ ${enc.valorBase.toFixed(2).replace(".",",")}`,
+        `R$ ${enc.multa.toFixed(2).replace(".",",")}`,
+        `R$ ${enc.juros.toFixed(2).replace(".",",")}`,
+        `R$ ${enc.valorTotal.toFixed(2).replace(".",",")}`,
+        cob.status||"", cob.dataPagamento||"",
+      ];
+    }).filter(Boolean);
+    exportarCSV(`cobrancas_${mesSel}`, colunas, linhas);
+  };
+
+  const exportarDespesasCSV = () => {
+    const colunas = ["Mês","Categoria","Descrição","Valor","Status","Recorrente"];
+    const linhas = despesas
+      .filter(d => d.mes === mesSel)
+      .map(d => [
+        d.mes||"", despCat(d.tipo).label, d.descricao||"",
+        `R$ ${(d.valor||0).toFixed(2).replace(".",",")}`,
+        d.status||"", d.recorrente ? "Sim" : "Não",
+      ]);
+    exportarCSV(`despesas_${mesSel}`, colunas, linhas);
+  };
+
   const totalArrecadado = somaCobrancas(cobMes.filter(c => c.status === "pago"));
   const totalPendente   = somaCobrancas(cobMes.filter(c => c.status !== "pago"));
 
@@ -3420,6 +3484,7 @@ export default function App() {
                 <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard }}>
                   {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
                 </select>
+                <button onClick={exportarCobrancasCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>⬇ Exportar CSV</button>
                 {!readOnly && !isMobile && <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"9px 16px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>{enviandoEmails?"📧 Enviando...":"📧 Cobrar pendentes"}</button>}
               </div>
             </div>
@@ -3542,6 +3607,9 @@ export default function App() {
                   <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, fontFamily:D.fontBody }}>
                     {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
                   </select>
+                  <button onClick={exportarMoradoresCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                    ⬇ Exportar CSV
+                  </button>
                   {!readOnly && (
                     <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
                       + Adicionar morador
@@ -3634,7 +3702,10 @@ export default function App() {
                 <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Água &amp; Luz</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Contas e despesas fixas</p>
               </div>
-              {!readOnly && <button onClick={() => setModal({ type:"novaDespesa" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>+ Nova</button>}
+              <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+                <button onClick={exportarDespesasCSV} style={{ padding:"10px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody }}>⬇ Exportar CSV</button>
+                {!readOnly && <button onClick={() => setModal({ type:"novaDespesa" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>+ Nova</button>}
+              </div>
             </div>
 
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit,minmax(160px,1fr))", gap:12, marginBottom:16 }}>

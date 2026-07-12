@@ -266,12 +266,38 @@ const UpgradeCard = ({ recurso, planoNecessario, isMobile }) => {
 
 // ── Top Bar ──
 const TopBar = ({ title, user, readOnly, nPendentes }) => {
+  const isMobile = useIsMobile();
   const hoje = new Date().toLocaleDateString("pt-BR", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+  const prefixo = user?.email ? user.email.split("@")[0] : "Usuário";
+  const nome = prefixo.charAt(0).toUpperCase() + prefixo.slice(1);
+  const papel = readOnly ? "Visitante" : "Síndico";
+  const inicial = nome.charAt(0).toUpperCase();
   return (
-    <div style={{ background:D.bgCard, borderBottom:`1px solid ${D.border}`, padding:"14px 28px", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
-      <div>
-        <h1 style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:600, color:D.text, margin:0, letterSpacing:"-0.02em" }}>{title}</h1>
-        <p style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, margin:"2px 0 0", textTransform:"capitalize" }}>{hoje}</p>
+    <div style={{ background:D.bgCard, borderBottom:`1px solid ${D.border}`, padding: isMobile?"12px 16px":"14px 28px", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0, gap:12 }}>
+      <div style={{ minWidth:0 }}>
+        <h1 style={{ fontFamily:D.fontDisplay, fontSize: isMobile?17:20, fontWeight:600, color:D.text, margin:0, letterSpacing:"-0.02em", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{title}</h1>
+        {!isMobile && <p style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, margin:"2px 0 0", textTransform:"capitalize" }}>{hoje}</p>}
+      </div>
+
+      <div style={{ display:"flex", alignItems:"center", gap: isMobile?12:18, flexShrink:0 }}>
+        {/* Sino de notificações */}
+        <div style={{ position:"relative", display:"flex", alignItems:"center" }} title={`${nPendentes||0} cobrança(s) pendente(s)`}>
+          <span style={{ fontSize:19, opacity:.8 }}>🔔</span>
+          {nPendentes > 0 && (
+            <span style={{ position:"absolute", top:-6, right:-8, background:D.danger, color:"#fff", fontFamily:D.fontBody, fontSize:10, fontWeight:700, minWidth:16, height:16, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 4px", border:`2px solid ${D.bgCard}` }}>{nPendentes > 99 ? "99+" : nPendentes}</span>
+          )}
+        </div>
+
+        {/* Perfil */}
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ width:36, height:36, borderRadius:"50%", background:D.primary, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, flexShrink:0 }}>{inicial}</div>
+          {!isMobile && (
+            <div style={{ lineHeight:1.25 }}>
+              <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text, maxWidth:160, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{nome}</div>
+              <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textSec }}>{papel}</div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -3491,10 +3491,66 @@ export default function App() {
                   </div>
                 );
 
+                // Card de Ocorrências recentes (só para quem tem o recurso Avançado)
+                const statusOcorr = {
+                  aberta:       { rotulo:"Aberta",       cor:D.warning, bg:D.warningBg },
+                  em_andamento: { rotulo:"Em andamento", cor:D.accent,  bg:D.secondary },
+                  resolvida:    { rotulo:"Resolvida",    cor:D.success,  bg:D.successBg },
+                };
+                const ocorrenciasCard = podeUsar("ocorrencias") ? (
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden", minWidth:0 }}>
+                    <div style={{ padding: isMobile?"16px 16px 12px":"18px 24px 14px", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:`1px solid ${D.border}` }}>
+                      <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>Ocorrências recentes</div>
+                      <button onClick={() => setAba("ocorrencias")} style={{ fontFamily:D.fontBody, fontSize:13, color:D.accent, background:"none", border:"none", cursor:"pointer", fontWeight:500 }}>Ver todas →</button>
+                    </div>
+                    {ocorrencias.length === 0 ? (
+                      <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut, textAlign:"center", padding:"24px 16px" }}>Nenhuma ocorrência registrada.</div>
+                    ) : isMobile ? (
+                      <div>
+                        {ocorrencias.slice(0,5).map((o,i) => {
+                          const si = statusOcorr[o.status] || statusOcorr.aberta;
+                          return (
+                            <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", borderBottom: i<Math.min(ocorrencias.length,5)-1?`1px solid ${D.border}`:"none", gap:12 }}>
+                              <div style={{ minWidth:0, flex:1 }}>
+                                <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{o.titulo}</div>
+                                <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{o.unidade} · {o.categoria}</div>
+                              </div>
+                              <span style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:600, color:si.cor, background:si.bg, padding:"4px 10px", borderRadius:10, whiteSpace:"nowrap", flexShrink:0 }}>{si.rotulo}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                        <thead>
+                          <tr style={{ background:D.muted }}>
+                            {["Ocorrência","Unidade","Categoria","Status"].map(h => (
+                              <th key={h} style={{ padding:"10px 24px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ocorrencias.slice(0,5).map((o,i) => {
+                            const si = statusOcorr[o.status] || statusOcorr.aberta;
+                            return (
+                              <tr key={i} style={{ borderBottom:`1px solid ${D.border}` }}>
+                                <td style={{ padding:"14px 24px", fontFamily:D.fontDisplay, fontSize:13, fontWeight:600, color:D.text }}>{o.titulo}</td>
+                                <td style={{ padding:"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{o.unidade}</td>
+                                <td style={{ padding:"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{o.categoria}</td>
+                                <td style={{ padding:"14px 24px" }}><span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:si.cor, background:si.bg, padding:"4px 12px", borderRadius:12, whiteSpace:"nowrap" }}>{si.rotulo}</span></td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                ) : null;
+
                 if (isMobile) {
                   return (
                     <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                      {chartCard}{saldoCard}{inadimplCard}{cobrancasCard}{atividadeCard}
+                      {chartCard}{saldoCard}{inadimplCard}{cobrancasCard}{ocorrenciasCard}{atividadeCard}
                     </div>
                   );
                 }
@@ -3503,6 +3559,7 @@ export default function App() {
                     <div style={{ display:"flex", flexDirection:"column", gap:16, minWidth:0 }}>
                       {chartCard}
                       {cobrancasCard}
+                      {ocorrenciasCard}
                     </div>
                     <div style={{ display:"flex", flexDirection:"column", gap:16, minWidth:0 }}>
                       {saldoCard}

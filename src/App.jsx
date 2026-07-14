@@ -265,13 +265,22 @@ const UpgradeCard = ({ recurso, planoNecessario, isMobile }) => {
 };
 
 // ── Top Bar ──
-const TopBar = ({ title, user, readOnly, nPendentes }) => {
+const TopBar = ({ title, user, readOnly, nPendentes, moradores, onBuscar }) => {
   const isMobile = useIsMobile();
+  const [q, setQ] = useState("");
   const hoje = new Date().toLocaleDateString("pt-BR", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
   const prefixo = user?.email ? user.email.split("@")[0] : "Usuário";
   const nome = prefixo.charAt(0).toUpperCase() + prefixo.slice(1);
   const papel = readOnly ? "Visitante" : "Síndico";
   const inicial = nome.charAt(0).toUpperCase();
+
+  const termo = q.trim().toLowerCase();
+  const resultados = termo && moradores ? moradores.filter(m =>
+    (m.nome||"").toLowerCase().includes(termo) || (m.unidade||"").toLowerCase().includes(termo)
+  ).slice(0,6) : [];
+
+  const selecionar = (m) => { setQ(""); onBuscar && onBuscar(m); };
+
   return (
     <div style={{ background:D.bgCard, borderBottom:`1px solid ${D.border}`, padding: isMobile?"12px 16px":"14px 28px", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0, gap:12 }}>
       <div style={{ minWidth:0 }}>
@@ -280,6 +289,33 @@ const TopBar = ({ title, user, readOnly, nPendentes }) => {
       </div>
 
       <div style={{ display:"flex", alignItems:"center", gap: isMobile?12:18, flexShrink:0 }}>
+        {/* Busca de moradores (desktop) */}
+        {!isMobile && onBuscar && (
+          <div style={{ position:"relative" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, background:D.muted, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, padding:"8px 12px", width:230 }}>
+              <span style={{ fontSize:14, opacity:.6 }}>🔍</span>
+              <input
+                value={q}
+                onChange={e=>setQ(e.target.value)}
+                placeholder="Buscar morador ou unidade..."
+                style={{ border:"none", background:"transparent", outline:"none", fontFamily:D.fontBody, fontSize:13, color:D.text, width:"100%" }}
+              />
+            </div>
+            {termo && (
+              <div style={{ position:"absolute", top:"calc(100% + 6px)", left:0, right:0, background:D.bgCard, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, boxShadow:D.shadowMd, overflow:"hidden", zIndex:50 }}>
+                {resultados.length === 0 ? (
+                  <div style={{ padding:"12px 14px", fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhum morador encontrado.</div>
+                ) : resultados.map(m => (
+                  <button key={m.id} onMouseDown={()=>selecionar(m)} style={{ display:"flex", flexDirection:"column", alignItems:"flex-start", width:"100%", padding:"10px 14px", background:"transparent", border:"none", borderBottom:`1px solid ${D.border}`, cursor:"pointer", textAlign:"left" }}>
+                    <span style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>{m.unidade}</span>
+                    <span style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.nome}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Sino de notificações */}
         <div style={{ position:"relative", display:"flex", alignItems:"center" }} title={`${nPendentes||0} cobrança(s) pendente(s)`}>
           <span style={{ fontSize:19, opacity:.8 }}>🔔</span>
@@ -2170,6 +2206,12 @@ export default function App() {
     showToast("Morador removido.", "error");
   };
 
+  // Busca do topo: vai para a aba Moradores e abre o histórico do morador
+  const abrirMoradorBusca = (m) => {
+    setAba("moradores");
+    setModal({ type:"historico", data:m });
+  };
+
   const salvarEdicaoMorador = async () => {
     if (!editMorador.nome || !editMorador.unidade || !editMorador.email) {
       showToast("Preencha nome, unidade e e-mail.", "error"); return;
@@ -3348,7 +3390,7 @@ export default function App() {
         {/* ── Dashboard ── */}
         {aba === "dashboard" && (
           <div>
-            <TopBar title="Visão Geral" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Visão Geral" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile ? "16px 14px 80px" : "24px 28px 40px" }}>
 
               {/* Setup wizard — condomínio novo sem moradores */}
@@ -3604,7 +3646,7 @@ export default function App() {
         {/* ── Cobranças ── */}
         {aba === "cobrancas" && (
           <div>
-            <TopBar title="Cobranças" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Cobranças" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -3726,7 +3768,7 @@ export default function App() {
         {/* ── Moradores ── */}
         {aba === "moradores" && (
           <div>
-            <TopBar title="Moradores" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Moradores" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ações */}
@@ -3827,7 +3869,7 @@ export default function App() {
 
         {aba === "despesas" && (
           <div>
-            <TopBar title="Água & Luz" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Água & Luz" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -3900,14 +3942,14 @@ export default function App() {
         {/* Trava de plano: abas bloqueadas para planos inferiores */}
         {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas","agenda","fluxoCaixa","ocorrencias","enquetes"].includes(aba) && !podeUsar(aba) && (
           <div>
-            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa",ocorrencias:"Ocorrências",enquetes:"Enquetes"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa",ocorrencias:"Ocorrências",enquetes:"Enquetes"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <UpgradeCard recurso={aba} planoNecessario={RECURSO_PLANO[aba]} isMobile={isMobile} />
           </div>
         )}
 
         {aba === "servicos" && podeUsar("servicos") && (
           <div>
-            <TopBar title="Serviços & Manutenção" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Serviços & Manutenção" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -3965,7 +4007,7 @@ export default function App() {
         {/* ── Reservas ── */}
         {aba === "reservas" && podeUsar("reservas") && (
           <div>
-            <TopBar title="Reservas" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Reservas" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cards de resumo */}
@@ -4088,7 +4130,7 @@ export default function App() {
         {/* ── Acessos ── */}
         {aba === "acessos" && podeUsar("acessos") && (
           <div>
-            <TopBar title="Controle de Acessos" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Controle de Acessos" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -4166,7 +4208,7 @@ export default function App() {
         {/* ── Comunicados ── */}
         {aba === "comunicados" && podeUsar("comunicados") && (
           <div>
-            <TopBar title="Comunicados" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Comunicados" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ação */}
@@ -4217,7 +4259,7 @@ export default function App() {
         {/* ── Documentos ── */}
         {aba === "documentos" && podeUsar("documentos") && (
           <div>
-            <TopBar title="Documentos" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Documentos" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ação */}
@@ -4295,7 +4337,7 @@ export default function App() {
           const aporteSugerido= arrecadadoMes * (pctFundo/100);
           return (
           <div>
-            <TopBar title="Fundo de Reserva" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Fundo de Reserva" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Saldo do fundo — hero */}
@@ -4390,7 +4432,7 @@ export default function App() {
           const retiradas  = entregas.filter(e => e.status === "retirada");
           return (
           <div>
-            <TopBar title="Controle de Entregas" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Controle de Entregas" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ação */}
@@ -4484,7 +4526,7 @@ export default function App() {
           const votosDaEnquete = (enqId) => votos.filter(v => v.enqueteId === enqId);
           return (
           <div>
-            <TopBar title="Enquetes" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Enquetes" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
@@ -4589,7 +4631,7 @@ export default function App() {
           ];
           return (
           <div>
-            <TopBar title="Ocorrências" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Ocorrências" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Filtros */}
@@ -4668,7 +4710,7 @@ export default function App() {
 
           return (
           <div>
-            <TopBar title="Fluxo de Caixa" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Fluxo de Caixa" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Saldo atual */}
@@ -4796,7 +4838,7 @@ export default function App() {
 
           return (
           <div>
-            <TopBar title="Agenda" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Agenda" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
@@ -4842,7 +4884,7 @@ export default function App() {
         {/* ── Histórico ── */}
         {aba === "historico" && podeUsar("historico") && (
           <div>
-            <TopBar title="Histórico de Atividades" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Histórico de Atividades" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -4881,7 +4923,7 @@ export default function App() {
         {/* ── Configurações ── */}
         {aba === "config" && (
           <div>
-            <TopBar title="Configurações" user={user} readOnly={readOnly} nPendentes={nPagos} />
+            <TopBar title="Configurações" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Configurações</h2>
             <p style={{ color:"#6B7A8D", margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>

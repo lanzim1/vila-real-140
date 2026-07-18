@@ -265,9 +265,10 @@ const UpgradeCard = ({ recurso, planoNecessario, isMobile }) => {
 };
 
 // ── Top Bar ──
-const TopBar = ({ title, user, readOnly, nPendentes, moradores, onBuscar }) => {
+const TopBar = ({ title, user, readOnly, nPendentes, moradores, onBuscar, onConfig }) => {
   const isMobile = useIsMobile();
   const [q, setQ] = useState("");
+  const [menuAberto, setMenuAberto] = useState(false);
   const hoje = new Date().toLocaleDateString("pt-BR", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
   const prefixo = user?.email ? user.email.split("@")[0] : "Usuário";
   const nome = prefixo.charAt(0).toUpperCase() + prefixo.slice(1);
@@ -324,14 +325,46 @@ const TopBar = ({ title, user, readOnly, nPendentes, moradores, onBuscar }) => {
           )}
         </div>
 
-        {/* Perfil */}
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:36, height:36, borderRadius:"50%", background:D.primary, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, flexShrink:0 }}>{inicial}</div>
-          {!isMobile && (
-            <div style={{ lineHeight:1.25 }}>
-              <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text, maxWidth:160, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{nome}</div>
-              <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textSec }}>{papel}</div>
-            </div>
+        {/* Perfil + menu */}
+        <div style={{ position:"relative" }}>
+          <button onClick={()=>setMenuAberto(v=>!v)} style={{ display:"flex", alignItems:"center", gap:10, background:"none", border:"none", cursor:"pointer", padding:"4px 6px 4px 4px", borderRadius:D.radiusSm, fontFamily:D.fontBody }}>
+            <div style={{ width:36, height:36, borderRadius:"50%", background:D.primary, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, flexShrink:0 }}>{inicial}</div>
+            {!isMobile && (
+              <div style={{ lineHeight:1.25, textAlign:"left" }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text, maxWidth:140, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{nome}</div>
+                <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textSec }}>{papel}</div>
+              </div>
+            )}
+            {!isMobile && <span style={{ fontSize:10, color:D.textMut, transform: menuAberto?"rotate(180deg)":"none", transition:"transform .15s" }}>▼</span>}
+          </button>
+
+          {menuAberto && (
+            <>
+              {/* overlay para fechar ao clicar fora */}
+              <div onClick={()=>setMenuAberto(false)} style={{ position:"fixed", inset:0, zIndex:200 }} />
+              <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, width:250, background:D.bgCard, borderRadius:D.radius, border:`1px solid ${D.border}`, boxShadow:D.shadowMd, zIndex:201, overflow:"hidden" }}>
+                {/* Cabeçalho do menu */}
+                <div style={{ padding:"14px 16px", borderBottom:`1px solid ${D.border}`, display:"flex", alignItems:"center", gap:11 }}>
+                  <div style={{ width:38, height:38, borderRadius:"50%", background:D.primary, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, flexShrink:0 }}>{inicial}</div>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>{papel}</div>
+                    <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{user?.email}</div>
+                  </div>
+                </div>
+
+                {/* Opções */}
+                <div style={{ padding:6 }}>
+                  {!readOnly && onConfig && (
+                    <button onClick={()=>{ setMenuAberto(false); onConfig(); }} style={{ display:"flex", alignItems:"center", gap:11, width:"100%", padding:"10px 12px", background:"none", border:"none", borderRadius:D.radiusSm, cursor:"pointer", fontFamily:D.fontBody, fontSize:14, color:D.text, textAlign:"left" }}>
+                      <span style={{ fontSize:16 }}>⚙️</span> Configurações
+                    </button>
+                  )}
+                  <button onClick={async ()=>{ setMenuAberto(false); await signOut(auth); if (readOnly) window.location.href = window.location.origin + window.location.pathname; }} style={{ display:"flex", alignItems:"center", gap:11, width:"100%", padding:"10px 12px", background:"none", border:"none", borderRadius:D.radiusSm, cursor:"pointer", fontFamily:D.fontBody, fontSize:14, color:D.danger, textAlign:"left" }}>
+                    <span style={{ fontSize:16 }}>🚪</span> Sair
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -3543,16 +3576,14 @@ export default function App() {
           </nav>
           {/* Bottom */}
           <div style={{ padding:"10px 10px 18px", borderTop:`1px solid ${D.sidebarBdr}` }}>
-            <div style={{ background:"rgba(255,255,255,.05)", borderRadius:8, padding:"8px 11px", marginBottom:8 }}>
+            <div style={{ background:"rgba(255,255,255,.05)", borderRadius:8, padding:"8px 11px" }}>
               <div style={{ fontFamily:D.fontBody, fontSize:10, color:"rgba(226,232,245,0.35)", textTransform:"uppercase", letterSpacing:".8px", marginBottom:2 }}>Conta ativa</div>
               <div style={{ fontFamily:D.fontBody, fontSize:11, color:"rgba(226,232,245,0.6)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{user?.email}</div>
             </div>
-            {readOnly ? (
-              <button onClick={async () => { await signOut(auth); window.location.href = window.location.origin + window.location.pathname; }} style={{ width:"100%", padding:"8px 11px", background:"rgba(184,114,0,.15)", border:`1px solid rgba(184,114,0,.3)`, borderRadius:8, color:"#FCD34D", fontFamily:D.fontBody, fontSize:11.5, fontWeight:500, textAlign:"center", cursor:"pointer" }}>
+            {readOnly && (
+              <button onClick={async () => { await signOut(auth); window.location.href = window.location.origin + window.location.pathname; }} style={{ width:"100%", marginTop:8, padding:"8px 11px", background:"rgba(184,114,0,.15)", border:`1px solid rgba(184,114,0,.3)`, borderRadius:8, color:"#FCD34D", fontFamily:D.fontBody, fontSize:11.5, fontWeight:500, textAlign:"center", cursor:"pointer" }}>
                 👁️ Modo Visualização — Sair
               </button>
-            ) : (
-              <button onClick={() => signOut(auth)} style={{ width:"100%", padding:"8px 11px", background:"rgba(224,58,34,.12)", border:`1px solid rgba(224,58,34,.22)`, borderRadius:8, color:"#FCA5A5", cursor:"pointer", fontFamily:D.fontBody, fontSize:12, fontWeight:500 }}>Sair</button>
             )}
           </div>
         </aside>
@@ -3628,7 +3659,7 @@ export default function App() {
         {/* ── Dashboard ── */}
         {aba === "dashboard" && (
           <div>
-            <TopBar title="Visão Geral" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Visão Geral" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile ? "16px 14px 80px" : "24px 28px 40px" }}>
 
               {/* Setup wizard — condomínio novo sem moradores */}
@@ -3884,7 +3915,7 @@ export default function App() {
         {/* ── Cobranças ── */}
         {aba === "cobrancas" && (
           <div>
-            <TopBar title="Cobranças" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Cobranças" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -4006,7 +4037,7 @@ export default function App() {
         {/* ── Moradores ── */}
         {aba === "moradores" && (
           <div>
-            <TopBar title="Moradores" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Moradores" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ações */}
@@ -4107,7 +4138,7 @@ export default function App() {
 
         {aba === "despesas" && (
           <div>
-            <TopBar title="Água & Luz" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Água & Luz" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -4180,14 +4211,14 @@ export default function App() {
         {/* Trava de plano: abas bloqueadas para planos inferiores */}
         {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas","agenda","fluxoCaixa","ocorrencias","enquetes"].includes(aba) && !podeUsar(aba) && (
           <div>
-            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa",ocorrencias:"Ocorrências",enquetes:"Enquetes"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title={{servicos:"Serviços & Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa",ocorrencias:"Ocorrências",enquetes:"Enquetes"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <UpgradeCard recurso={aba} planoNecessario={RECURSO_PLANO[aba]} isMobile={isMobile} />
           </div>
         )}
 
         {aba === "servicos" && podeUsar("servicos") && (
           <div>
-            <TopBar title="Serviços & Manutenção" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Serviços & Manutenção" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -4245,7 +4276,7 @@ export default function App() {
         {/* ── Reservas ── */}
         {aba === "reservas" && podeUsar("reservas") && (
           <div>
-            <TopBar title="Reservas" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Reservas" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cards de resumo */}
@@ -4368,7 +4399,7 @@ export default function App() {
         {/* ── Acessos ── */}
         {aba === "acessos" && podeUsar("acessos") && (
           <div>
-            <TopBar title="Controle de Acessos" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Controle de Acessos" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -4446,7 +4477,7 @@ export default function App() {
         {/* ── Comunicados ── */}
         {aba === "comunicados" && podeUsar("comunicados") && (
           <div>
-            <TopBar title="Comunicados" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Comunicados" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ação */}
@@ -4497,7 +4528,7 @@ export default function App() {
         {/* ── Documentos ── */}
         {aba === "documentos" && podeUsar("documentos") && (
           <div>
-            <TopBar title="Documentos" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Documentos" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ação */}
@@ -4575,7 +4606,7 @@ export default function App() {
           const aporteSugerido= arrecadadoMes * (pctFundo/100);
           return (
           <div>
-            <TopBar title="Fundo de Reserva" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Fundo de Reserva" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Saldo do fundo — hero */}
@@ -4670,7 +4701,7 @@ export default function App() {
           const retiradas  = entregas.filter(e => e.status === "retirada");
           return (
           <div>
-            <TopBar title="Controle de Entregas" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Controle de Entregas" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ação */}
@@ -4764,7 +4795,7 @@ export default function App() {
           const votosDaEnquete = (enqId) => votos.filter(v => v.enqueteId === enqId);
           return (
           <div>
-            <TopBar title="Enquetes" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Enquetes" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
@@ -4869,7 +4900,7 @@ export default function App() {
           ];
           return (
           <div>
-            <TopBar title="Ocorrências" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Ocorrências" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Filtros */}
@@ -4948,7 +4979,7 @@ export default function App() {
 
           return (
           <div>
-            <TopBar title="Fluxo de Caixa" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Fluxo de Caixa" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Saldo atual */}
@@ -5076,7 +5107,7 @@ export default function App() {
 
           return (
           <div>
-            <TopBar title="Agenda" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Agenda" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
@@ -5122,7 +5153,7 @@ export default function App() {
         {/* ── Histórico ── */}
         {aba === "historico" && podeUsar("historico") && (
           <div>
-            <TopBar title="Histórico de Atividades" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Histórico de Atividades" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -5161,7 +5192,7 @@ export default function App() {
         {/* ── Configurações ── */}
         {aba === "config" && (
           <div>
-            <TopBar title="Configurações" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} />
+            <TopBar title="Configurações" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Configurações</h2>
             <p style={{ color:"#6B7A8D", margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { auth, db } from "./firebase";
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "firebase/auth";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import emailjs from "@emailjs/browser";
@@ -438,13 +438,111 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
   const [nomeCond, setNomeCond]       = useState("");
   const [numApt, setNumApt]           = useState("");
 
+  // Contagem de falhas — cortesia de UX (a proteção real contra força bruta é do Firebase)
+  const [falhas, setFalhas] = useState(0);
+  const [esperarAte, setEsperarAte] = useState(0);
+  const [agora, setAgora] = useState(Date.now());
+  useEffect(() => {
+    if (!esperarAte) return;
+    const t = setInterval(() => setAgora(Date.now()), 500);
+    return () => clearInterval(t);
+  }, [esperarAte]);
+  const segsRestantes = esperarAte > agora ? Math.ceil((esperarAte - agora) / 1000) : 0;
+
+  // Traduz o código de erro do Firebase para uma mensagem clara
+  const msgErroAuth = (e) => {
+    switch (e?.code) {
+      case "auth/too-many-requests":
+        return "Muitas tentativas. Por segurança, o Firebase bloqueou este acesso temporariamente. Aguarde alguns minutos ou redefina sua senha.";
+      case "auth/invalid-email":            return "E-mail inválido.";
+      case "auth/weak-password":            return "Senha muito fraca (mínimo 6 caracteres).";
+      case "auth/user-disabled":            return "Esta conta foi desativada. Fale com o suporte.";
+      case "auth/network-request-failed":   return "Sem conexão. Verifique sua internet.";
+      case "auth/invalid-credential":
+      case "auth/wrong-password":
+      case "auth/user-not-found":           return "E-mail ou senha incorretos.";
+      case "auth/popup-closed-by-user":
+      case "auth/cancelled-popup-request":  return "";
+      case "auth/popup-blocked":            return "O navegador bloqueou a janela do Google. Libere os pop-ups e tente de novo.";
+      case "auth/account-exists-with-different-credential":
+        return "Este e-mail já tem conta com senha. Entre com e-mail e senha.";
+      case "auth/unauthorized-domain":
+        return "Este domínio não está autorizado no Firebase (Authentication → Settings → Authorized domains).";
+      case "auth/operation-not-allowed":
+        return "Login com Google não está habilitado no Firebase.";
+      default: return "Não foi possível entrar. Tente novamente.";
+    }
+  };
+
   const handleLogin = async () => {
     setErr("");
+    if (segsRestantes > 0) return;
     if (!email || !pass) { setErr("Preencha e-mail e senha."); return; }
     setLoading(true);
-    try { await signInWithEmailAndPassword(auth, email.trim(), pass); }
-    catch (e) { setErr("E-mail ou senha incorretos."); }
-    finally { setLoading(false); }
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), pass);
+      setFalhas(0); setEsperarAte(0);
+    } catch (e) {
+      const n = falhas + 1;
+      setFalhas(n);
+      if (e?.code === "auth/too-many-requests") setErr(msgErroAuth(e));
+      else if (n >= 5) { setEsperarAte(Date.now() + 30000); setErr("5 tentativas sem sucesso. Aguarde 30 segundos antes de tentar novamente."); }
+      else setErr(msgErroAuth(e) + (n >= 3 ? ` (${n}ª tentativa)` : ""));
+    } finally { setLoading(false); }
+  };
+
+  // ── Entrar com Google ──
+  const handleGoogleLogin = async () => {
+    setErr("");
+    setLoading(true);
+    try {
+      const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+      const u = await getDoc(doc(db, "usuarios", cred.user.uid));
+      if (!u.exists()) {
+        // Conta Google sem condomínio vinculado — não deixa o app em estado quebrado
+        await signOut(auth);
+        setErr('Nenhuma conta MySindi vinculada a este Google. Se você já é cliente, entre com e-mail e senha. Para começar, use "Criar conta".');
+      }
+      // Se existe, o onAuthStateChanged assume daqui
+    } catch (e) {
+      const m = msgErroAuth(e);
+      if (m) setErr(m);
+    } finally { setLoading(false); }
+  };
+
+  // ── Criar conta com Google (precisa dos dados do condomínio antes) ──
+  const handleGoogleCadastro = async () => {
+    setErr("");
+    if (!nomeCond || !numApt) { setErr("Preencha o nome do condomínio e a quantidade de apartamentos antes de continuar com o Google."); return; }
+    setLoading(true);
+    try {
+      const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+      const uid = cred.user.uid;
+      const emailG = cred.user.email || "";
+      const nomeG = nomeSindico.trim() || cred.user.displayName || emailG.split("@")[0];
+      const jaExiste = await getDoc(doc(db, "usuarios", uid));
+      if (jaExiste.exists()) return; // já é cliente → entra normalmente
+
+      const condId = gerarCondId(nomeCond);
+      const plano = planoPorTamanho(numApt);
+      await setDoc(doc(db, "usuarios", uid), {
+        email: emailG, nome: nomeG, condominioId: condId, papel: "sindico",
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
+      });
+      await setDoc(doc(db, "condominios", condId), {
+        nome: nomeCond.trim(), plano, numApartamentos: parseInt(numApt) || 0,
+        taxa: 180, diaVencimento: 10,
+        sindicoEmail: emailG, sindicoNome: nomeG, sindicoUid: uid,
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
+        ativo: true,
+        trialAte: new Date(Date.now() + 14*24*60*60*1000).toLocaleDateString("pt-BR"),
+        statusAssinatura: "trial", cicloCobranca: "mensal",
+      });
+    } catch (e) {
+      const m = msgErroAuth(e);
+      if (m) setErr(m);
+      setLoading(false);
+    }
   };
 
   const handleCadastro = async () => {
@@ -489,9 +587,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
       // O onAuthStateChanged já vai detectar o login e carregar o condomínio
     } catch (e) {
       if (e.code === "auth/email-already-in-use") setErr("Este e-mail já está cadastrado. Faça login.");
-      else if (e.code === "auth/invalid-email") setErr("E-mail inválido.");
-      else if (e.code === "auth/weak-password") setErr("Senha muito fraca (mínimo 6 caracteres).");
-      else setErr("Erro ao criar conta. Tente novamente.");
+      else setErr(msgErroAuth(e));
       setLoading(false);
     }
   };
@@ -554,9 +650,32 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
 
         {err && <div style={{ background:D.dangerBg, color:"#991B1B", fontSize:13, padding:"10px 14px", borderRadius:8, marginBottom:16, textAlign:"center" }}>{err}</div>}
 
-        <button onClick={modo==="login"?handleLogin:handleCadastro} disabled={loading} style={{ width:"100%", padding:"14px", background:`linear-gradient(135deg, ${D.sidebarHov}, ${D.primaryDk})`, color:"#fff", border:"none", borderRadius:10, fontSize:15, fontWeight:700, cursor: loading?"default":"pointer", opacity: loading?.75:1, letterSpacing:".3px", boxShadow:`0 4px 16px rgba(30,58,114,0.35)`, fontFamily:D.fontBody }}>
-          {loading ? (modo==="login"?"Verificando...":"Criando conta...") : (modo==="login"?"Entrar":"Criar conta grátis")}
+        <button onClick={modo==="login"?handleLogin:handleCadastro} disabled={loading || segsRestantes>0} style={{ width:"100%", padding:"14px", background: segsRestantes>0 ? D.textMut : `linear-gradient(135deg, ${D.sidebarHov}, ${D.primaryDk})`, color:"#fff", border:"none", borderRadius:10, fontSize:15, fontWeight:700, cursor: (loading||segsRestantes>0)?"default":"pointer", opacity: loading?.75:1, letterSpacing:".3px", boxShadow: segsRestantes>0?"none":`0 4px 16px rgba(30,58,114,0.35)`, fontFamily:D.fontBody }}>
+          {segsRestantes > 0 ? `Aguarde ${segsRestantes}s...` : loading ? (modo==="login"?"Verificando...":"Criando conta...") : (modo==="login"?"Entrar":"Criar conta grátis")}
         </button>
+
+        {/* Separador */}
+        <div style={{ display:"flex", alignItems:"center", gap:12, margin:"18px 0" }}>
+          <div style={{ flex:1, height:1, background:D.border }} />
+          <span style={{ fontSize:12, color:D.textMut, fontFamily:D.fontBody }}>ou</span>
+          <div style={{ flex:1, height:1, background:D.border }} />
+        </div>
+
+        {/* Google */}
+        <button onClick={modo==="login"?handleGoogleLogin:handleGoogleCadastro} disabled={loading} style={{ width:"100%", padding:"13px", background:"#fff", color:"#3C4043", border:`1.5px solid ${D.border}`, borderRadius:10, fontSize:14.5, fontWeight:600, cursor: loading?"default":"pointer", opacity: loading?.75:1, fontFamily:D.fontBody, display:"flex", alignItems:"center", justifyContent:"center", gap:10 }}>
+          <svg width="18" height="18" viewBox="0 0 48 48" style={{ flexShrink:0 }}>
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          {modo==="login" ? "Entrar com Google" : "Criar conta com Google"}
+        </button>
+        {modo==="cadastro" && (
+          <p style={{ fontSize:11.5, color:D.textMut, textAlign:"center", margin:"8px 0 0", fontFamily:D.fontBody }}>
+            Preencha o condomínio e a quantidade de apartamentos antes de usar o Google.
+          </p>
+        )}
 
         <div style={{ textAlign:"center", marginTop:20, paddingTop:20, borderTop:`1px solid ${D.border}` }}>
           {modo === "login" ? (

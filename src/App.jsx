@@ -525,10 +525,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
 
       const condId = gerarCondId(nomeCond);
       const plano = planoPorTamanho(numApt);
-      await setDoc(doc(db, "usuarios", uid), {
-        email: emailG, nome: nomeG, condominioId: condId, papel: "sindico",
-        criadoEm: new Date().toLocaleDateString("pt-BR"),
-      });
+      // 1º o condomínio (a regra do vínculo exige que ele já exista e seja seu)
       await setDoc(doc(db, "condominios", condId), {
         nome: nomeCond.trim(), plano, numApartamentos: parseInt(numApt) || 0,
         taxa: 180, diaVencimento: 10,
@@ -537,6 +534,11 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
         ativo: true,
         trialAte: new Date(Date.now() + 14*24*60*60*1000).toLocaleDateString("pt-BR"),
         statusAssinatura: "trial", cicloCobranca: "mensal",
+      });
+      // 2º o vínculo usuário → condomínio
+      await setDoc(doc(db, "usuarios", uid), {
+        email: emailG, nome: nomeG, condominioId: condId, papel: "sindico",
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
       });
     } catch (e) {
       const m = msgErroAuth(e);
@@ -559,16 +561,8 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
       const condId = gerarCondId(nomeCond);
       const plano = planoPorTamanho(numApt);
 
-      // 2. Vincula usuário → condomínio PRIMEIRO (o app lê isto ao carregar)
-      await setDoc(doc(db, "usuarios", uid), {
-        email: email.trim(),
-        nome: nomeSindico.trim(),
-        condominioId: condId,
-        papel: "sindico",
-        criadoEm: new Date().toLocaleDateString("pt-BR"),
-      });
-
-      // 3. Cria o condomínio
+      // 2. Cria o condomínio PRIMEIRO (a regra do vínculo exige que ele já exista
+      //    e tenha sindicoUid == você — impede alguém se vincular a condomínio alheio)
       await setDoc(doc(db, "condominios", condId), {
         nome: nomeCond.trim(),
         plano,
@@ -583,6 +577,15 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
         trialAte: new Date(Date.now() + 14*24*60*60*1000).toLocaleDateString("pt-BR"),
         statusAssinatura: "trial",
         cicloCobranca: "mensal",
+      });
+
+      // 3. Vincula usuário → condomínio (o app relê com re-tentativa ao carregar)
+      await setDoc(doc(db, "usuarios", uid), {
+        email: email.trim(),
+        nome: nomeSindico.trim(),
+        condominioId: condId,
+        papel: "sindico",
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
       });
       // O onAuthStateChanged já vai detectar o login e carregar o condomínio
     } catch (e) {

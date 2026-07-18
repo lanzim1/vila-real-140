@@ -505,7 +505,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
       <div style={{ background:"#fff", borderRadius:20, padding:"40px 36px", width:"100%", maxWidth:430, boxShadow:"0 32px 80px rgba(0,0,0,0.4)", position:"relative", maxHeight:"94vh", overflowY:"auto" }}>
         {/* Logo */}
         <div style={{ textAlign:"center", marginBottom:28 }}>
-          <div style={{ width:60, height:60, borderRadius:16, background:`linear-gradient(135deg, ${D.accent}, ${D.primary})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", boxShadow:`0 8px 24px rgba(30,58,114,0.35)` }}>
+          <div style={{ width:60, height:60, borderRadius:16, background:`linear-gradient(135deg, ${D.sidebarHov}, ${D.primaryDk})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", boxShadow:`0 8px 24px rgba(30,58,114,0.35)` }}>
             <span style={{ color:"#fff", fontFamily:D.fontDisplay, fontSize:20, fontWeight:700 }}>🏢</span>
           </div>
           <h1 style={{ fontFamily:D.fontDisplay, fontSize:23, color:D.text, margin:0, fontWeight:700, letterSpacing:"-0.02em" }}>
@@ -554,7 +554,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
 
         {err && <div style={{ background:D.dangerBg, color:"#991B1B", fontSize:13, padding:"10px 14px", borderRadius:8, marginBottom:16, textAlign:"center" }}>{err}</div>}
 
-        <button onClick={modo==="login"?handleLogin:handleCadastro} disabled={loading} style={{ width:"100%", padding:"14px", background:`linear-gradient(135deg, ${D.accent}, ${D.primary})`, color:"#fff", border:"none", borderRadius:10, fontSize:15, fontWeight:700, cursor: loading?"default":"pointer", opacity: loading?.75:1, letterSpacing:".3px", boxShadow:`0 4px 16px rgba(30,58,114,0.35)`, fontFamily:D.fontBody }}>
+        <button onClick={modo==="login"?handleLogin:handleCadastro} disabled={loading} style={{ width:"100%", padding:"14px", background:`linear-gradient(135deg, ${D.sidebarHov}, ${D.primaryDk})`, color:"#fff", border:"none", borderRadius:10, fontSize:15, fontWeight:700, cursor: loading?"default":"pointer", opacity: loading?.75:1, letterSpacing:".3px", boxShadow:`0 4px 16px rgba(30,58,114,0.35)`, fontFamily:D.fontBody }}>
           {loading ? (modo==="login"?"Verificando...":"Criando conta...") : (modo==="login"?"Entrar":"Criar conta grátis")}
         </button>
 
@@ -591,7 +591,7 @@ const LandingPage = ({ onEntrar, onCadastrar }) => {
 
   const Logo = ({ light }) => (
     <div style={{ display:"flex", alignItems:"center", gap:9 }}>
-      <div style={{ width:34, height:34, borderRadius:9, background:`linear-gradient(135deg, ${D.accent}, ${D.primary})`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:`0 2px 8px rgba(26,46,64,0.3)` }}>
+      <div style={{ width:34, height:34, borderRadius:9, background:`linear-gradient(135deg, ${D.sidebarHov}, ${D.primaryDk})`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:`0 2px 8px rgba(26,46,64,0.3)` }}>
         <span style={{ color:"#fff", fontSize:17 }}>🏢</span>
       </div>
       <span style={{ fontFamily:D.fontDisplay, fontSize:19, fontWeight:700, letterSpacing:"-0.02em", color: light ? "#fff" : D.text }}>
@@ -1035,9 +1035,9 @@ const AdminPanel = ({ onSair }) => {
       {/* Header */}
       <header style={{ background:D.sidebar, color:"#fff", padding: isMobile?"16px 20px":"18px 40px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-          <div style={{ width:38, height:38, borderRadius:10, background:`linear-gradient(135deg, ${D.accent}, ${D.primary})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🏢</div>
+          <div style={{ width:38, height:38, borderRadius:10, background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.18)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🏢</div>
           <div>
-            <div style={{ fontFamily:D.fontDisplay, fontSize:17, fontWeight:700, letterSpacing:"-0.02em" }}>My<span style={{ color:D.accent }}>Sindi</span> · Admin</div>
+            <div style={{ fontFamily:D.fontDisplay, fontSize:17, fontWeight:700, letterSpacing:"-0.02em" }}>My<span style={{ color:"#93C5FD" }}>Sindi</span> · Admin</div>
             <div style={{ fontSize:11, color:"rgba(226,232,245,0.5)" }}>Painel do administrador</div>
           </div>
         </div>
@@ -3269,7 +3269,7 @@ export default function App() {
   if (!condominioId && !readOnly && user.email === ADMIN_EMAIL) return (
     <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:D.sidebar, color:"#fff", fontFamily:D.fontBody, padding:24 }}>
       <div style={{ background:"#fff", borderRadius:D.radius, padding:"36px 32px", maxWidth:440, textAlign:"center", boxShadow:D.shadowMd }}>
-        <div style={{ width:60, height:60, borderRadius:16, background:`linear-gradient(135deg, ${D.accent}, ${D.primary})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", fontSize:28 }}>🏢</div>
+        <div style={{ width:60, height:60, borderRadius:16, background:`linear-gradient(135deg, ${D.sidebarHov}, ${D.primaryDk})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", fontSize:28 }}>🏢</div>
         <h2 style={{ fontFamily:D.fontDisplay, color:D.text, fontSize:20, margin:"0 0 10px", letterSpacing:"-0.02em" }}>Bem-vindo, Admin</h2>
         <p style={{ fontFamily:D.fontBody, color:D.textSec, fontSize:14, lineHeight:1.6, margin:"0 0 20px" }}>
           Você está logado como administrador do MySindi. Acesse o painel para gerenciar todos os condomínios e ver as métricas do negócio.

@@ -4795,53 +4795,99 @@ export default function App() {
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
-                <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Serviços &amp; Manutenção</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:0, fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Serviços &amp; Manutenção</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Consertos e melhorias do condomínio</p>
               </div>
               {!readOnly && <button onClick={() => setModal({ type:"novoServico" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>+ Novo</button>}
             </div>
 
-            <h3 style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, fontWeight:700, margin:"20px 0 10px", textTransform:"uppercase", letterSpacing:".8px", fontFamily:D.fontBody }}>🟡 Pendentes ({servicos.filter(s=>s.status==="pendente").length})</h3>
-            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(280px,1fr))", gap:12, marginBottom:8 }}>
-              {servicos.filter(s=>s.status==="pendente").map(s => (
-                <div key={s.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.warning}` }}>
-                  <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14, marginBottom:4 }}>{s.titulo}</div>
-                  {s.descricao && <div style={{ fontSize:13, color:"#6B7A8D", marginBottom:8 }}>{s.descricao}</div>}
-                  <div style={{ fontSize:11, color:D.textMut, fontFamily:D.fontBody }}>Aberto em {s.dataAbertura}</div>
+            {(() => {
+              const pend = servicos.filter(s=>s.status==="pendente");
+              const conc = servicos.filter(s=>s.status==="concluido");
+              const custo = (s) => (s.valorMaterial||0) + (s.valorMaoDeObra||0);
+              const totalGasto = conc.reduce((soma,s)=> soma + custo(s), 0);
+              const brl = (v) => `R$ ${v.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
+              const cardPendente = (s) => (
+                <div key={s.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.warning}` }}>
+                  <div style={{ fontWeight:600, color:D.text, fontSize:14, marginBottom:4, fontFamily:D.fontDisplay }}>{s.titulo}</div>
+                  {s.descricao && <div style={{ fontSize:13, color:D.textSec, marginBottom:8, fontFamily:D.fontBody }}>{s.descricao}</div>}
+                  <div style={{ fontSize:11.5, color:D.textMut, fontFamily:D.fontBody }}>Aberto em {s.dataAbertura}</div>
                   {!readOnly && (
                     <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
-                      <button onClick={() => { setConcluirForm({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" }); setModal({ type:"concluirServico", data:s }); }} style={{ padding:"7px 14px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>✓ Concluir</button>
-                      <button onClick={() => { if(window.confirm(`Remover "${s.titulo}"?`)) removerServico(s.id); }} style={{ padding:"7px 14px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Remover</button>
+                      <button onClick={() => { setConcluirForm({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" }); setModal({ type:"concluirServico", data:s }); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Concluir</button>
+                      <button onClick={() => { if(window.confirm(`Remover "${s.titulo}"?`)) removerServico(s.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                     </div>
                   )}
                 </div>
-              ))}
-              {servicos.filter(s=>s.status==="pendente").length===0 && <div style={{ color:"#9aa6b5", fontSize:13, padding:"4px 0" }}>Nenhum serviço pendente. 🎉</div>}
-            </div>
+              );
 
-            <h3 style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, fontWeight:700, margin:"24px 0 10px", textTransform:"uppercase", letterSpacing:".8px", fontFamily:D.fontBody }}>✅ Concluídos ({servicos.filter(s=>s.status==="concluido").length})</h3>
-            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
-              {servicos.filter(s=>s.status==="concluido").map(s => (
-                <div key={s.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.success}` }}>
-                  <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14, marginBottom:4 }}>{s.titulo}</div>
-                  {s.descricao && <div style={{ fontSize:13, color:"#6B7A8D", marginBottom:8 }}>{s.descricao}</div>}
-                  <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, lineHeight:1.8, fontFamily:D.fontBody, background:"#F0F4F8", borderRadius:8, padding:"10px 12px" }}>
-                    <div>📅 Início: <b style={{color:"#1E3A5F"}}>{s.dataInicio||"—"}</b> · Fim: <b style={{color:"#1E3A5F"}}>{s.dataFim||"—"}</b></div>
-                    <div>🧱 Material: <b style={{color:"#1E3A5F"}}>R$ {(s.valorMaterial||0).toFixed(2).replace(".",",")}</b></div>
-                    <div>👷 Mão de obra: <b style={{color:"#1E3A5F"}}>R$ {(s.valorMaoDeObra||0).toFixed(2).replace(".",",")}</b></div>
-                    <div>💰 Total: <b style={{color:D.warning}}>R$ {((s.valorMaterial||0)+(s.valorMaoDeObra||0)).toFixed(2).replace(".",",")}</b></div>
-                    {s.obsConclusao && <div style={{marginTop:4}}>📝 {s.obsConclusao}</div>}
+              const cardConcluido = (s) => (
+                <div key={s.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.success}` }}>
+                  <div style={{ fontWeight:600, color:D.text, fontSize:14, marginBottom:4, fontFamily:D.fontDisplay }}>{s.titulo}</div>
+                  {s.descricao && <div style={{ fontSize:13, color:D.textSec, marginBottom:8, fontFamily:D.fontBody }}>{s.descricao}</div>}
+                  <div style={{ fontSize:12.5, color:D.textSec, fontFamily:D.fontBody, background:D.muted, borderRadius:D.radiusSm, padding:"10px 12px", display:"flex", flexDirection:"column", gap:5 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:7 }}><span style={{ color:D.accent, display:"flex" }}><NavIcon id="reservas" size={14} /></span> {s.dataInicio||"—"} → {s.dataFim||"—"}</div>
+                    <div style={{ display:"flex", justifyContent:"space-between" }}><span>Material</span><b style={{ color:D.text }}>{brl(s.valorMaterial||0)}</b></div>
+                    <div style={{ display:"flex", justifyContent:"space-between" }}><span>Mão de obra</span><b style={{ color:D.text }}>{brl(s.valorMaoDeObra||0)}</b></div>
+                    <div style={{ display:"flex", justifyContent:"space-between", paddingTop:5, borderTop:`1px solid ${D.border}` }}><span style={{ fontWeight:600, color:D.text }}>Total</span><b style={{ color:D.warning }}>{brl(custo(s))}</b></div>
+                    {s.obsConclusao && <div style={{ marginTop:2, fontStyle:"italic", color:D.textMut }}>{s.obsConclusao}</div>}
                   </div>
                   {!readOnly && (
                     <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
-                      <button onClick={() => reabrirServico(s.id)} style={{ padding:"7px 14px", background:"#FFFBEB", color:"#92400E", border:"1px solid #FDE68A", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>↩ Reabrir</button>
-                      <button onClick={() => { if(window.confirm(`Remover "${s.titulo}"?`)) removerServico(s.id); }} style={{ padding:"7px 14px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Remover</button>
+                      <button onClick={() => reabrirServico(s.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", background:D.warningBg, color:"#92400E", border:`1px solid #FDE68A`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logUndo" size={14} /> Reabrir</button>
+                      <button onClick={() => { if(window.confirm(`Remover "${s.titulo}"?`)) removerServico(s.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                     </div>
                   )}
                 </div>
-              ))}
-              {servicos.filter(s=>s.status==="concluido").length===0 && <div style={{ color:"#9aa6b5", fontSize:13, padding:"4px 0" }}>Nenhum serviço concluído ainda.</div>}
-            </div>
+              );
+
+              const colunaHeader = (cor, label, n) => (
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+                  <span style={{ width:8, height:8, borderRadius:"50%", background:cor }} />
+                  <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>{label}</span>
+                  <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:"#fff", background:cor, borderRadius:20, minWidth:20, height:20, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 6px" }}>{n}</span>
+                </div>
+              );
+
+              return (
+              <>
+                {/* Faixa de resumo */}
+                <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(3,1fr)", gap:12, marginBottom:20 }}>
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, display:"flex", alignItems:"center", gap:14 }}>
+                    <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.warning, flexShrink:0 }}><NavIcon id="clock" size={19} /></div>
+                    <div><div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:D.warning, lineHeight:1 }}>{pend.length}</div><div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:4 }}>Pendentes</div></div>
+                  </div>
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, display:"flex", alignItems:"center", gap:14 }}>
+                    <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.success, flexShrink:0 }}><NavIcon id="logCheck" size={19} /></div>
+                    <div><div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:D.success, lineHeight:1 }}>{conc.length}</div><div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:4 }}>Concluídos</div></div>
+                  </div>
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, display:"flex", alignItems:"center", gap:14, gridColumn: isMobile?"1 / -1":"auto" }}>
+                    <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.text, flexShrink:0 }}><NavIcon id="servicos" size={19} /></div>
+                    <div><div style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:700, color:D.text, lineHeight:1, letterSpacing:"-0.02em" }}>{brl(totalGasto)}</div><div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:4 }}>Gasto em manutenção</div></div>
+                  </div>
+                </div>
+
+                {/* Quadro (kanban) */}
+                <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"1fr 1fr", gap:16, alignItems:"start" }}>
+                  <div>
+                    {colunaHeader(D.warning, "Pendentes", pend.length)}
+                    <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                      {pend.map(cardPendente)}
+                      {pend.length===0 && <div style={{ background:D.bgCard, borderRadius:D.radius, border:`1px dashed ${D.border}`, padding:24, textAlign:"center", color:D.textMut, fontSize:13, fontFamily:D.fontBody }}>Nenhum serviço pendente.</div>}
+                    </div>
+                  </div>
+                  <div>
+                    {colunaHeader(D.success, "Concluídos", conc.length)}
+                    <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                      {conc.map(cardConcluido)}
+                      {conc.length===0 && <div style={{ background:D.bgCard, borderRadius:D.radius, border:`1px dashed ${D.border}`, padding:24, textAlign:"center", color:D.textMut, fontSize:13, fontFamily:D.fontBody }}>Nenhum serviço concluído ainda.</div>}
+                    </div>
+                  </div>
+                </div>
+              </>
+              );
+            })()}
           </div>
           </div>
         )}

@@ -2120,6 +2120,8 @@ const NAV_ICON_PATHS = {
   logUndo:     '<path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/>',
   logMail:     '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/>',
   logDot:      '<circle cx="12" cy="12" r="4"/>',
+  histDoc:     '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/>',
+  link:        '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
 };
 const NavIcon = ({ id, size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display:"block", flexShrink:0 }}
@@ -2203,6 +2205,7 @@ export default function App() {
   const [obsSalva, setObsSalva] = useState("");
   const [logs, setLogs]         = useState([]);
   const [filtroLog, setFiltroLog] = useState("tudo");
+  const [filtroMorador, setFiltroMorador] = useState("todos");
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -4354,78 +4357,133 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Tabela */}
-              <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
-                {isMobile ? (
-                  /* Mobile: cards */
-                  <div style={{ padding:12, display:"flex", flexDirection:"column", gap:10 }}>
-                    {moradores.sort((a,b)=>a.unidade.localeCompare(b.unidade)).map(m => {
-                      const cob = cobrancas.find(c=>c.moradorId===m.id&&c.mes===mesSel);
+              {/* Filtros por status + tabela */}
+              {(() => {
+                const statusDe = (m) => cobrancas.find(c=>c.moradorId===m.id&&c.mes===mesSel)?.status;
+                const ordenados = [...moradores].sort((a,b)=>a.unidade.localeCompare(b.unidade));
+                const cont = {
+                  todos: moradores.length,
+                  pago: ordenados.filter(m=>statusDe(m)==="pago").length,
+                  pendente: ordenados.filter(m=>statusDe(m)==="pendente").length,
+                  atrasado: ordenados.filter(m=>statusDe(m)==="atrasado").length,
+                };
+                const chips = [
+                  { id:"todos",    label:"Todos",     cor:D.primary },
+                  { id:"pago",     label:"Em dia",    cor:D.success },
+                  { id:"pendente", label:"Pendentes", cor:D.warning },
+                  { id:"atrasado", label:"Atrasados", cor:D.danger },
+                ];
+                const lista = ordenados.filter(m => filtroMorador==="todos" || statusDe(m)===filtroMorador);
+
+                const inicial = (m) => (m.nome || m.unidade || "?").trim().charAt(0).toUpperCase();
+                const linkMorador = (m) => `${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}`;
+                const abrirEditar = (m) => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,proprietario:m.proprietario||"",email:m.email,telefone:m.telefone||"",tipo:m.tipo||"Proprietário",veiculos:m.veiculos||"",pets:m.pets||"",taxaCustom:m.taxaCustom!=null?String(m.taxaCustom):""}); setModal({type:"editarMorador"}); };
+
+                // Botão de ação com ícone de traço (desktop)
+                const AcaoBtn = ({ icon, cor, titulo, onClick }) => (
+                  <button onClick={onClick} title={titulo} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color: cor||D.textSec, border:`1px solid ${D.border}`, borderRadius:8, cursor:"pointer" }}>
+                    <NavIcon id={icon} size={15} />
+                  </button>
+                );
+
+                return (
+                <>
+                  {/* Chips de status */}
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:16 }}>
+                    {chips.map(c => {
+                      if (c.id!=="todos" && cont[c.id]===0) return null;
+                      const ativo = filtroMorador===c.id;
                       return (
-                        <div key={m.id} style={{ background:D.muted, borderRadius:D.radiusSm, padding:14, borderLeft:`3px solid ${cob?.status==="pago"?D.success:cob?.status==="atrasado"?D.danger:D.warning}` }}>
-                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
-                            <div>
-                              <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>{m.unidade}</div>
-                              {m.proprietario && <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:1 }}>Prop: {m.proprietario}</div>}
-                              <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>{m.nome}</div>
-                            </div>
-                            {cob && <Badge status={cob.status} />}
-                          </div>
-                          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.email}</div>
-                          <div style={{ display:"flex", gap:8, marginTop:10, flexWrap:"wrap" }}>
-                            <button onClick={() => { setModal({ type:"historico", data:m }); }} style={{ padding:"5px 12px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>📋 Histórico</button>
-                            <button onClick={() => { const link=`${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}`; navigator.clipboard.writeText(link); showToast(`Link do ${m.unidade} copiado!`); }} style={{ padding:"5px 12px", background:"#F0FDFA", color:D.success, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🔗 Link</button>
-                            {!readOnly && <>
-                              <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,proprietario:m.proprietario||"",email:m.email,telefone:m.telefone||"",tipo:m.tipo||"Proprietário",veiculos:m.veiculos||"",pets:m.pets||"",taxaCustom:m.taxaCustom!=null?String(m.taxaCustom):""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 12px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
-                              <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"5px 12px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
-                            </>}
-                          </div>
-                        </div>
+                        <button key={c.id} onClick={()=>setFiltroMorador(c.id)} style={{ display:"flex", alignItems:"center", gap:7, padding:"6px 14px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                          {c.id!=="todos" && <span style={{ width:7, height:7, borderRadius:"50%", background: ativo?"#fff":c.cor }} />}
+                          {c.label} <span style={{ opacity:.6 }}>{cont[c.id]}</span>
+                        </button>
                       );
                     })}
                   </div>
-                ) : (
-                  /* Desktop: tabela */
-                  <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                    <thead>
-                      <tr style={{ background:D.muted }}>
-                        {["Unidade","Morador","Contato","Status","Ações"].map(h => (
-                          <th key={h} style={{ padding:"12px 20px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {moradores.sort((a,b)=>a.unidade.localeCompare(b.unidade)).map((m,i) => {
-                        const cob = cobrancas.find(c=>c.moradorId===m.id&&c.mes===mesSel);
-                        return (
-                          <tr key={m.id} style={{ borderBottom:`1px solid ${D.border}` }}>
-                            <td style={{ padding:"14px 20px" }}>
-                              <div style={{ fontFamily:D.fontDisplay, fontSize:13, fontWeight:600, color:D.text }}>{m.unidade}</div>
-                              {m.proprietario && <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:2 }}>Prop: {m.proprietario}</div>}
-                            </td>
-                            <td style={{ padding:"14px 20px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{m.nome}</td>
-                            <td style={{ padding:"14px 20px" }}>
-                              <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.email||"—"}</div>
-                              {m.telefone && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:2 }}>{m.telefone}</div>}
-                            </td>
-                            <td style={{ padding:"14px 20px" }}>{cob ? <Badge status={cob.status} /> : <span style={{ color:D.textMut, fontSize:12 }}>—</span>}</td>
-                            <td style={{ padding:"14px 20px" }}>
-                              <div style={{ display:"flex", gap:6 }}>
-                                <button onClick={() => setModal({ type:"historico", data:m })} style={{ padding:"5px 10px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>📋</button>
-                                <button onClick={() => { const link=`${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}`; navigator.clipboard.writeText(link); showToast(`Link do ${m.unidade} copiado!`); }} style={{ padding:"5px 10px", background:"#F0FDFA", color:D.success, border:`1px solid #BBF7D0`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🔗</button>
+
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
+                    {lista.length===0 ? (
+                      <div style={{ padding:32, textAlign:"center", color:D.textMut, fontSize:13, fontFamily:D.fontBody }}>Nenhum morador nesta categoria.</div>
+                    ) : isMobile ? (
+                      /* Mobile: cards */
+                      <div style={{ padding:12, display:"flex", flexDirection:"column", gap:10 }}>
+                        {lista.map(m => {
+                          const cob = cobrancas.find(c=>c.moradorId===m.id&&c.mes===mesSel);
+                          return (
+                            <div key={m.id} style={{ background:D.muted, borderRadius:D.radiusSm, padding:14, borderLeft:`3px solid ${cob?.status==="pago"?D.success:cob?.status==="atrasado"?D.danger:cob?.status==="pendente"?D.warning:D.border}` }}>
+                              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                                <div style={{ display:"flex", gap:10, alignItems:"center", minWidth:0 }}>
+                                  <div style={{ width:36, height:36, borderRadius:"50%", background:D.secondary, color:D.primary, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:15, fontWeight:700, flexShrink:0 }}>{inicial(m)}</div>
+                                  <div style={{ minWidth:0 }}>
+                                    <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>{m.nome}</div>
+                                    <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.unidade}{m.proprietario?` · Prop: ${m.proprietario}`:""}</div>
+                                  </div>
+                                </div>
+                                {cob && <Badge status={cob.status} />}
+                              </div>
+                              {m.email && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.email}</div>}
+                              <div style={{ display:"flex", gap:8, marginTop:10, flexWrap:"wrap" }}>
+                                <button onClick={() => setModal({ type:"historico", data:m })} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="histDoc" size={14} /> Histórico</button>
+                                <button onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="link" size={14} /> Link</button>
                                 {!readOnly && <>
-                                  <button onClick={() => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,proprietario:m.proprietario||"",email:m.email,telefone:m.telefone||"",tipo:m.tipo||"Proprietário",veiculos:m.veiculos||"",pets:m.pets||"",taxaCustom:m.taxaCustom!=null?String(m.taxaCustom):""}); setModal({type:"editarMorador"}); }} style={{ padding:"5px 10px", background:D.secondary, color:D.accent, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>✏️</button>
-                                  <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ padding:"5px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
+                                  <button onClick={() => abrirEditar(m)} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logPencil" size={14} /> Editar</button>
+                                  <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>
                                 </>}
                               </div>
-                            </td>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Desktop: tabela */
+                      <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                        <thead>
+                          <tr style={{ background:D.muted }}>
+                            {["Morador","Contato","Status","Ações"].map(h => (
+                              <th key={h} style={{ padding:"12px 20px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
+                            ))}
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+                        </thead>
+                        <tbody>
+                          {lista.map(m => {
+                            const cob = cobrancas.find(c=>c.moradorId===m.id&&c.mes===mesSel);
+                            return (
+                              <tr key={m.id} style={{ borderBottom:`1px solid ${D.border}` }}>
+                                <td style={{ padding:"12px 20px" }}>
+                                  <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                                    <div style={{ width:38, height:38, borderRadius:"50%", background:D.secondary, color:D.primary, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:15, fontWeight:700, flexShrink:0 }}>{inicial(m)}</div>
+                                    <div style={{ minWidth:0 }}>
+                                      <div style={{ fontFamily:D.fontDisplay, fontSize:13.5, fontWeight:600, color:D.text }}>{m.nome}</div>
+                                      <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.unidade}{m.proprietario?` · Prop: ${m.proprietario}`:""}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td style={{ padding:"12px 20px" }}>
+                                  <div style={{ fontFamily:D.fontBody, fontSize:12.5, color:D.textSec }}>{m.email||"—"}</div>
+                                  {m.telefone && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:2 }}>{m.telefone}</div>}
+                                </td>
+                                <td style={{ padding:"12px 20px" }}>{cob ? <Badge status={cob.status} /> : <span style={{ color:D.textMut, fontSize:12 }}>—</span>}</td>
+                                <td style={{ padding:"12px 20px" }}>
+                                  <div style={{ display:"flex", gap:6 }}>
+                                    <AcaoBtn icon="histDoc" titulo="Ver histórico" onClick={() => setModal({ type:"historico", data:m })} />
+                                    <AcaoBtn icon="link" titulo="Copiar link do portal" onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} />
+                                    {!readOnly && <>
+                                      <AcaoBtn icon="logPencil" titulo="Editar morador" onClick={() => abrirEditar(m)} />
+                                      <AcaoBtn icon="logTrash" cor={D.danger} titulo="Remover morador" onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} />
+                                    </>}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </>
+                );
+              })()}
             </div>
           </div>
         )}

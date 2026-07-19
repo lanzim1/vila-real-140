@@ -2113,11 +2113,62 @@ const NAV_ICON_PATHS = {
   multa:       '<path d="M19 5 5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
   iniciarCobranca: '<path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
   emails:      '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/>',
+  logPencil:   '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  logTrash:    '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  logPlus:     '<circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>',
+  logCheck:    '<path d="M20 6 9 17l-5-5"/>',
+  logUndo:     '<path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/>',
+  logMail:     '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/>',
+  logDot:      '<circle cx="12" cy="12" r="4"/>',
 };
 const NavIcon = ({ id, size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display:"block", flexShrink:0 }}
     dangerouslySetInnerHTML={{ __html: NAV_ICON_PATHS[id] || "" }} />
 );
+
+// ── Histórico: classificação por categoria, ícone e agrupamento por data ──
+const TIPOS_LOG = [
+  { id:"tudo",       label:"Tudo"       },
+  { id:"moradores",  label:"Moradores"  },
+  { id:"cobrancas",  label:"Cobranças"  },
+  { id:"pagamentos", label:"Pagamentos" },
+  { id:"outros",     label:"Outros"     },
+];
+const tipoLog = (log) => {
+  const d = (log.descricao || "").toLowerCase();
+  if (d.includes("pagamento")) return "pagamentos";
+  if (d.includes("morador")) return "moradores";
+  if (d.includes("cobrança") || d.includes("cobranças")) return "cobrancas";
+  return "outros";
+};
+// Retorna { icon, cor } para um log, a partir do texto da descrição
+const estiloLog = (log, D) => {
+  const s = (log.descricao || "").toLowerCase();
+  if (s.includes("inicia em") || s.includes("anteriores removidas")) return { icon:"iniciarCobranca", cor:D.accent };
+  if (s.includes("editad"))                                          return { icon:"logPencil", cor:D.warning };
+  if (s.includes("removid") || s.includes("excluíd") || s.includes("estornad")) {
+    if (s.includes("estornad")) return { icon:"logUndo", cor:D.warning };
+    return { icon:"logTrash", cor:D.danger };
+  }
+  if (s.includes("cadastrad") || s.includes("adicionad") || s.includes("criad") || s.includes("nova ") || s.includes("novo ") || s.includes("nível") || s.includes("registrad")) {
+    if (s.includes("pagamento")) return { icon:"logCheck", cor:D.success };
+    return { icon:"logPlus", cor:D.success };
+  }
+  if (s.includes("pago") || s.includes("pagamento"))                 return { icon:"logCheck", cor:D.success };
+  if (s.includes("e-mail") || s.includes("email"))                   return { icon:"logMail", cor:D.accent };
+  return { icon:"logDot", cor:D.textSec };
+};
+const mesmaData = (a, b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+const rotuloDataLog = (ts) => {
+  const d = new Date(ts), hoje = new Date(), ontem = new Date(Date.now() - 864e5);
+  if (mesmaData(d, hoje)) return "Hoje";
+  if (mesmaData(d, ontem)) return "Ontem";
+  return d.toLocaleDateString("pt-BR", { day:"2-digit", month:"long", year:"numeric" });
+};
+const horaLog = (log) => {
+  if (log.timestamp) return new Date(log.timestamp).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" });
+  return (log.dataHora || "").split(",")[1]?.trim() || "";
+};
 
 export default function App() {
   const isMobile = useIsMobile();
@@ -2151,6 +2202,7 @@ export default function App() {
   const [obsMes, setObsMes]     = useState("");
   const [obsSalva, setObsSalva] = useState("");
   const [logs, setLogs]         = useState([]);
+  const [filtroLog, setFiltroLog] = useState("tudo");
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -3997,15 +4049,18 @@ export default function App() {
                   <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"20px 22px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
                     <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em", marginBottom:16 }}>Atividade recente</div>
                     <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-                      {logs.slice(0,6).map((log,i) => (
+                      {logs.slice(0,6).map((log,i) => {
+                        const est = estiloLog(log, D);
+                        return (
                         <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
-                          <div style={{ width:34, height:34, borderRadius:9, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, flexShrink:0 }}>{log.icone}</div>
+                          <div style={{ width:34, height:34, borderRadius:9, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, color:est.cor }}><NavIcon id={est.icon} size={16} /></div>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:500, color:D.text, lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{log.descricao}</div>
                             <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:2 }}>{log.dataHora}</div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                       {logs.length === 0 && (
                         <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut, textAlign:"center", padding:"20px 0" }}>Nenhuma atividade ainda.</div>
                       )}
@@ -5396,34 +5451,78 @@ export default function App() {
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
-                <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Histórico de Atividades</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:0, fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Histórico de Atividades</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>{logs.length} registro{logs.length!==1?"s":""} no sistema</p>
               </div>
               {!readOnly && logs.length > 0 && (
-                <button onClick={async () => { if(window.confirm("Limpar todo o histórico?")) { const batch = writeBatch(db); logs.forEach(l => batch.delete(doc(db,"logs",l.id))); await batch.commit(); showToast("Histórico limpo."); }}} style={{ padding:"8px 16px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:D.radiusSm, fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                  🗑️ Limpar histórico
+                <button onClick={async () => { if(window.confirm("Limpar todo o histórico?")) { const batch = writeBatch(db); logs.forEach(l => batch.delete(doc(db,"logs",l.id))); await batch.commit(); showToast("Histórico limpo."); }}} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:D.dangerBg, color:"#991B1B", border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                  <NavIcon id="logTrash" size={14} /> Limpar histórico
                 </button>
               )}
             </div>
 
             {logs.length === 0 ? (
-              <div style={{ background:"#fff", borderRadius:12, padding:40, textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-                <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
+              <div style={{ background:D.bgCard, borderRadius:12, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="historico" size={36} /></div>
                 <div style={{ color:D.textMut, fontSize:14, fontFamily:D.fontBody }}>Nenhuma atividade registrada ainda.<br/>As ações realizadas no sistema aparecerão aqui.</div>
               </div>
-            ) : (
-              <div style={{ background:"#fff", borderRadius:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)", overflow:"hidden" }}>
-                {logs.map((log, i) => (
-                  <div key={log.id} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"14px 18px", borderBottom: i < logs.length-1 ? "1px solid #F0F4F8" : "none", background: i%2===0 ? D.bgCard : "#F8FAFC" }}>
-                    <div style={{ fontSize:22, flexShrink:0, marginTop:1 }}>{log.icone}</div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:13, color:D.text, lineHeight:1.5, fontFamily:D.fontBody }}>{log.descricao}</div>
-                      <div style={{ fontSize:11, color:D.textMut, fontFamily:D.fontBody, marginTop:3 }}>{log.dataHora}</div>
-                    </div>
+            ) : (() => {
+              // Filtro por tipo
+              const filtrados = logs.filter(l => filtroLog === "tudo" || tipoLog(l) === filtroLog);
+              // Agrupamento por data (logs já vêm ordenados por timestamp desc)
+              const grupos = [];
+              filtrados.forEach(l => {
+                const rot = rotuloDataLog(l.timestamp || Date.now());
+                const ultimo = grupos[grupos.length-1];
+                if (ultimo && ultimo.rotulo === rot) ultimo.itens.push(l);
+                else grupos.push({ rotulo: rot, itens: [l] });
+              });
+              return (
+                <>
+                  {/* Filtros por tipo */}
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:18 }}>
+                    {TIPOS_LOG.map(t => {
+                      const n = t.id === "tudo" ? logs.length : logs.filter(l => tipoLog(l) === t.id).length;
+                      const ativo = filtroLog === t.id;
+                      if (t.id !== "tudo" && n === 0) return null;
+                      return (
+                        <button key={t.id} onClick={() => setFiltroLog(t.id)} style={{ padding:"6px 14px", borderRadius:20, border: ativo ? "none" : `1px solid ${D.border}`, background: ativo ? D.primary : D.bgCard, color: ativo ? "#fff" : D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                          {t.label} <span style={{ opacity:.65 }}>{n}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
-            )}
+
+                  {filtrados.length === 0 ? (
+                    <div style={{ background:D.bgCard, borderRadius:12, padding:32, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}`, color:D.textMut, fontSize:13, fontFamily:D.fontBody }}>
+                      Nenhum registro nesta categoria.
+                    </div>
+                  ) : (
+                    <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+                      {grupos.map((g, gi) => (
+                        <div key={gi}>
+                          <div style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textMut, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:8, paddingLeft:2 }}>{g.rotulo}</div>
+                          <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
+                            {g.itens.map((log, i) => {
+                              const est = estiloLog(log, D);
+                              return (
+                                <div key={log.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 16px", borderBottom: i < g.itens.length-1 ? `1px solid ${D.border}` : "none" }}>
+                                  <div style={{ width:30, height:30, borderRadius:8, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, color:est.cor }}>
+                                    <NavIcon id={est.icon} size={16} />
+                                  </div>
+                                  <div style={{ flex:1, minWidth:0, fontSize:13, color:D.text, lineHeight:1.4, fontFamily:D.fontBody }}>{log.descricao}</div>
+                                  <div style={{ fontSize:11.5, color:D.textMut, fontFamily:D.fontBody, flexShrink:0 }}>{horaLog(log)}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
           </div>
         )}

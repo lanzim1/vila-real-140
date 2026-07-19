@@ -870,6 +870,30 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
 };
 
 // ── Landing Page (MySindi) ──
+// Número que "rola" suavemente ao mudar de valor (efeito estilo number-flow, sem libs)
+const NumeroAnimado = ({ valor }) => {
+  const [display, setDisplay] = useState(valor);
+  const anteriorRef = useRef(valor);
+  useEffect(() => {
+    const de = anteriorRef.current;
+    const para = valor;
+    if (de === para) return;
+    const dur = 480;
+    const t0 = performance.now();
+    let raf;
+    const tick = (now) => {
+      const p = Math.min((now - t0) / dur, 1);
+      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      setDisplay(Math.round(de + (para - de) * eased));
+      if (p < 1) { raf = requestAnimationFrame(tick); }
+      else { anteriorRef.current = para; }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [valor]);
+  return <span>{display.toLocaleString("pt-BR")}</span>;
+};
+
 const LandingPage = ({ onEntrar, onCadastrar }) => {
   const isMobile = useIsMobile();
   const [cicloAnual, setCicloAnual] = useState(false);
@@ -1068,20 +1092,20 @@ const LandingPage = ({ onEntrar, onCadastrar }) => {
                   <p style={{ fontSize:13, color: dest?"#93C5FD":D.accent, fontWeight:600, margin:"0 0 20px" }}>{p.resumo}</p>
 
                   <div style={{ marginBottom:22 }}>
-                    {cicloAnual ? (
-                      <>
-                        <div style={{ fontSize:13, color: dest?"rgba(255,255,255,0.5)":D.textMut, textDecoration:"line-through", marginBottom:2 }}>R$ {p.preco*12}/ano</div>
-                        <span style={{ fontFamily:D.fontDisplay, fontSize:40, fontWeight:700, color: dest?"#fff":D.text, letterSpacing:"-0.03em" }}>R$ {p.precoAnual}</span>
-                        <span style={{ fontSize:15, color: dest?"rgba(255,255,255,0.7)":D.textSec }}>/ano</span>
-                        <div style={{ fontSize:12, color: dest?"rgba(255,255,255,0.6)":D.textMut, marginTop:4 }}>equivale a R$ {Math.round(p.precoAnual/12)}/mês</div>
-                      </>
-                    ) : (
-                      <>
-                        <span style={{ fontFamily:D.fontDisplay, fontSize:40, fontWeight:700, color: dest?"#fff":D.text, letterSpacing:"-0.03em" }}>R$ {p.preco}</span>
-                        <span style={{ fontSize:15, color: dest?"rgba(255,255,255,0.7)":D.textSec }}>/mês</span>
-                        <div style={{ fontSize:12, color: dest?"rgba(255,255,255,0.6)":D.textMut, marginTop:4 }}>R$ {p.precoAnual} no plano anual · 2 meses grátis</div>
-                      </>
-                    )}
+                    <div style={{ height:19, marginBottom:2 }}>
+                      {cicloAnual && (
+                        <span style={{ fontSize:13, color: dest?"rgba(255,255,255,0.5)":D.textMut, textDecoration:"line-through" }}>R$ {(p.preco*12).toLocaleString("pt-BR")}/ano</span>
+                      )}
+                    </div>
+                    <span style={{ fontFamily:D.fontDisplay, fontSize:40, fontWeight:700, color: dest?"#fff":D.text, letterSpacing:"-0.03em" }}>
+                      R$ <NumeroAnimado valor={cicloAnual ? p.precoAnual : p.preco} />
+                    </span>
+                    <span style={{ fontSize:15, color: dest?"rgba(255,255,255,0.7)":D.textSec }}>{cicloAnual ? "/ano" : "/mês"}</span>
+                    <div style={{ fontSize:12, color: dest?"rgba(255,255,255,0.6)":D.textMut, marginTop:4 }}>
+                      {cicloAnual
+                        ? `equivale a R$ ${Math.round(p.precoAnual/12)}/mês`
+                        : `R$ ${p.precoAnual.toLocaleString("pt-BR")} no plano anual · 2 meses grátis`}
+                    </div>
                   </div>
 
                   <button onClick={onCadastrar} style={{ width:"100%", padding:"13px", background: dest?"#fff":D.primary, color: dest?D.primary:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody, marginBottom:8, boxShadow: dest?"0 6px 18px rgba(0,0,0,0.25)":"none" }}>

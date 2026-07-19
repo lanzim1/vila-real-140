@@ -4182,26 +4182,65 @@ export default function App() {
                   </div>
                 ) : null;
 
+                // ── Faixa de indicadores (KPIs) ──
+                const arrecadadoPct = cobMes.length ? Math.round((pagos/cobMes.length)*100) : 0;
+                const inadimplentes = pendentes + atrasados;
+                const kpiLight = (label, valor, sub, cor) => (
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"16px 16px":"18px 20px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
+                    <div style={{ fontFamily:D.fontBody, fontSize:10.5, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>{label}</div>
+                    <div style={{ fontFamily:D.fontDisplay, fontSize: isMobile?22:26, fontWeight:700, color: cor||D.text, letterSpacing:"-0.02em", marginTop:8, lineHeight:1 }}>{valor}</div>
+                    <div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:6 }}>{sub}</div>
+                  </div>
+                );
+                const kpiSaldo = (
+                  <div style={{ background:`linear-gradient(140deg, ${D.sidebarHov}, ${D.primaryDk})`, borderRadius:D.radius, padding: isMobile?"16px 18px":"18px 20px", boxShadow:D.shadowMd, color:"#fff", position:"relative", overflow:"hidden", minWidth:0 }}>
+                    <div style={{ position:"absolute", top:-26, right:-26, width:96, height:96, borderRadius:"50%", background:"rgba(16,185,129,0.18)" }} />
+                    <div style={{ position:"relative" }}>
+                      <div style={{ fontFamily:D.fontBody, fontSize:10.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".8px", opacity:.85 }}>Saldo em caixa</div>
+                      <div style={{ fontFamily:D.fontDisplay, fontSize: isMobile?22:26, fontWeight:700, letterSpacing:"-0.02em", marginTop:8, lineHeight:1, color: saldoCaixaTotal<0?"#FCA5A5":"#fff" }}>{fmt(saldoCaixaTotal)}</div>
+                      <div style={{ fontFamily:D.fontBody, fontSize:11.5, opacity:.8, marginTop:6 }}>Acumulado geral</div>
+                    </div>
+                  </div>
+                );
+                const kpiStrip = (
+                  <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(4,1fr)", gap: isMobile?12:16, marginBottom:16 }}>
+                    {kpiSaldo}
+                    {kpiLight("Arrecadação do mês", `${arrecadadoPct}%`, cobMes.length?`${pagos} de ${cobMes.length} pagas`:"sem cobranças", arrecadadoPct>=80?D.success:arrecadadoPct>0?D.warning:D.textMut)}
+                    {kpiLight("Inadimplentes", `${inadimplentes}`, `${fmt(totalPendente)} a receber`, inadimplentes>0?D.danger:D.success)}
+                    {kpiLight("Moradores", `${moradores.length}`, "unidades cadastradas", D.text)}
+                  </div>
+                );
+                // Nota amigável quando o mês selecionado não tem cobranças
+                const notaVazia = cobMes.length===0 ? (
+                  <div style={{ background:D.secondary, border:`1px solid ${D.border}`, borderRadius:D.radius, padding:"12px 16px", marginBottom:16, fontFamily:D.fontBody, fontSize:13, color:D.textSec, display:"flex", alignItems:"center", gap:10 }}>
+                    <span style={{ color:D.accent, display:"flex", flexShrink:0 }}><NavIcon id="iniciarCobranca" size={16} /></span>
+                    <span>{marcoZero ? `Não há cobranças em ${mesLabel(mesSel)}. A cobrança deste condomínio começa em ${mesLabel(marcoZero.slice(0,7))}.` : `Não há cobranças lançadas em ${mesLabel(mesSel)}.`}</span>
+                  </div>
+                ) : null;
+
                 if (isMobile) {
                   return (
                     <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                      {chartCard}{saldoCard}{inadimplCard}{cobrancasCard}{ocorrenciasCard}{atividadeCard}
+                      {kpiStrip}{notaVazia}{chartCard}{inadimplCard}{cobrancasCard}{ocorrenciasCard}{atividadeCard}
                     </div>
                   );
                 }
                 return (
-                  <div style={{ display:"grid", gridTemplateColumns:"minmax(0,2fr) minmax(0,1fr)", gap:16, alignItems:"start" }}>
-                    <div style={{ display:"flex", flexDirection:"column", gap:16, minWidth:0 }}>
-                      {chartCard}
-                      {cobrancasCard}
-                      {ocorrenciasCard}
+                  <>
+                    {kpiStrip}
+                    {notaVazia}
+                    <div style={{ display:"grid", gridTemplateColumns:"minmax(0,2fr) minmax(0,1fr)", gap:16, alignItems:"start" }}>
+                      <div style={{ display:"flex", flexDirection:"column", gap:16, minWidth:0 }}>
+                        {chartCard}
+                        {cobrancasCard}
+                        {ocorrenciasCard}
+                      </div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:16, minWidth:0 }}>
+                        {inadimplCard}
+                        {atividadeCard}
+                      </div>
                     </div>
-                    <div style={{ display:"flex", flexDirection:"column", gap:16, minWidth:0 }}>
-                      {saldoCard}
-                      {inadimplCard}
-                      {atividadeCard}
-                    </div>
-                  </div>
+                  </>
                 );
               })()}
 

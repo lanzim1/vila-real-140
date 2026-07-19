@@ -2206,6 +2206,7 @@ export default function App() {
   const [logs, setLogs]         = useState([]);
   const [filtroLog, setFiltroLog] = useState("tudo");
   const [filtroMorador, setFiltroMorador] = useState("todos");
+  const [filtroCobranca, setFiltroCobranca] = useState("todos");
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -3801,11 +3802,11 @@ export default function App() {
         {cob.dataPagamento && <div style={{ fontSize:12, color:"#9aa6b5", marginBottom:8 }}>Pago em {cob.dataPagamento}</div>}
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
           {cob.status !== "pago" ? (
-            !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ padding:"7px 14px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>✓ Registrar Pgto</button>
+            !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Registrar Pgto</button>
           ) : (
             <>
-              {cob.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:cob.comprovante, nome:m.nome, arquivoNome:cob.arquivoNome } })} style={{ padding:"7px 14px", background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>📄 Comprovante</button>}
-              {!readOnly && <button onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} style={{ padding:"7px 14px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>↩ Estornar</button>}
+              {cob.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:cob.comprovante, nome:m.nome, arquivoNome:cob.arquivoNome } })} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="histDoc" size={14} /> Comprovante</button>}
+              {!readOnly && <button onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logUndo" size={14} /> Estornar</button>}
             </>
           )}
         </div>
@@ -4214,9 +4215,9 @@ export default function App() {
           <div>
             <TopBar title="Cobranças" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12, flexWrap:"wrap", gap:10 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
-                <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Cobranças</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:0, fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Cobranças</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Registre pagamentos e comprovantes</p>
               </div>
               <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
@@ -4224,9 +4225,45 @@ export default function App() {
                   {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
                 </select>
                 <button onClick={exportarCobrancasCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>⬇ Exportar CSV</button>
-                {!readOnly && !isMobile && <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"9px 16px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>{enviandoEmails?"📧 Enviando...":"📧 Cobrar pendentes"}</button>}
+                {!readOnly && !isMobile && <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"9px 16px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, fontFamily:D.fontBody }}>{enviandoEmails?"Enviando...":"Cobrar pendentes"}</button>}
               </div>
             </div>
+
+            {/* ── Resumo financeiro do mês ── */}
+            {(() => {
+              let arrecadado = 0, aReceber = 0;
+              cobMes.forEach(c => {
+                const t = encargosCobranca(c).valorTotal;
+                if (c.status === "pago") arrecadado += t; else aReceber += t;
+              });
+              const total = arrecadado + aReceber;
+              const pct = total > 0 ? Math.round((arrecadado / total) * 100) : 0;
+              const pagosN = cobMes.filter(c=>c.status==="pago").length;
+              const brl = (v) => v.toLocaleString("pt-BR", { minimumFractionDigits:2, maximumFractionDigits:2 });
+              if (cobMes.length === 0) return null;
+              return (
+                <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"1fr 1fr 1.4fr", gap:12, marginBottom:16 }}>
+                  <div style={{ background:D.successBg, borderRadius:D.radius, padding:"16px 18px", border:`1px solid ${D.border}` }}>
+                    <div style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.success, textTransform:"uppercase", letterSpacing:".8px", marginBottom:6 }}>Arrecadado</div>
+                    <div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:D.text, letterSpacing:"-0.02em" }}>R$ {brl(arrecadado)}</div>
+                  </div>
+                  <div style={{ background:D.warningBg, borderRadius:D.radius, padding:"16px 18px", border:`1px solid ${D.border}` }}>
+                    <div style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.warning, textTransform:"uppercase", letterSpacing:".8px", marginBottom:6 }}>A receber</div>
+                    <div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:D.text, letterSpacing:"-0.02em" }}>R$ {brl(aReceber)}</div>
+                  </div>
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", border:`1px solid ${D.border}`, boxShadow:D.shadow }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:8 }}>
+                      <span style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Arrecadação do mês</span>
+                      <span style={{ fontFamily:D.fontDisplay, fontSize:18, fontWeight:700, color:D.success }}>{pct}%</span>
+                    </div>
+                    <div style={{ height:10, background:D.muted, borderRadius:20, overflow:"hidden", marginBottom:6 }}>
+                      <div style={{ width:`${pct}%`, height:"100%", background:D.success, borderRadius:20, transition:"width .4s ease" }} />
+                    </div>
+                    <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{pagosN} de {cobMes.length} pagaram{aReceber>0?` · faltam R$ ${brl(aReceber)}`:""}</div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ── Cobranças extras / rateios ── */}
             {podeUsar("cobrancaExtra") ? (
@@ -4275,58 +4312,104 @@ export default function App() {
               </div>
             )}
 
-            {isMobile ? (
-              <div>{cobMes.map((cob,i) => <CobCard key={i} cob={cob} />)}</div>
-            ) : (
-              <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden", marginTop:16 }}>
-                <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                  <thead>
-                    <tr style={{ background:"#F8FAFC" }}>
-                      {["Unidade","Morador","Valor","Status","Data Pgto","Ações"].map(h => (
-                        <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, borderBottom:`1px solid ${D.border}` }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cobMes.map((cob,i) => {
-                      const m = moradores.find(x => x.id === cob.moradorId);
-                      if (!m) return null;
-                      const enc = encargosCobranca(cob);
+            {(() => {
+              const cont = {
+                todos: cobMes.length,
+                pago: cobMes.filter(c=>c.status==="pago").length,
+                pendente: cobMes.filter(c=>c.status==="pendente").length,
+                atrasado: cobMes.filter(c=>c.status==="atrasado").length,
+              };
+              const chips = [
+                { id:"todos",    label:"Todos",     cor:D.primary },
+                { id:"pago",     label:"Pagos",     cor:D.success },
+                { id:"pendente", label:"Pendentes", cor:D.warning },
+                { id:"atrasado", label:"Atrasados", cor:D.danger },
+              ];
+              const lista = cobMes.filter(c => filtroCobranca==="todos" || c.status===filtroCobranca);
+
+              const AcaoBtn = ({ icon, cor, titulo, onClick }) => (
+                <button onClick={onClick} title={titulo} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color: cor||D.textSec, border:`1px solid ${D.border}`, borderRadius:8, cursor:"pointer" }}>
+                  <NavIcon id={icon} size={15} />
+                </button>
+              );
+
+              return (
+              <>
+                {cobMes.length > 0 && (
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
+                    {chips.map(c => {
+                      const ativo = filtroCobranca===c.id;
                       return (
-                        <tr key={i} style={{ borderBottom:`1px solid ${D.border}` }}>
-                          <td style={{ padding:"13px 16px", fontWeight:600, color:D.text, fontSize:13 }}>{m.unidade}</td>
-                          <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>{m.nome}</td>
-                          <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>
-                            {enc.multa > 0 || enc.juros > 0 ? (
-                              <div>
-                                <div style={{ fontWeight:700, color:D.danger }}>R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
-                                <div style={{ fontSize:11, color:D.textMut }}>base {enc.valorBase.toFixed(2).replace(".",",")} + enc. {(enc.multa+enc.juros).toFixed(2).replace(".",",")}</div>
-                              </div>
-                            ) : (
-                              <span>R$ {enc.valorBase.toFixed(2).replace(".",",")}</span>
-                            )}
-                          </td>
-                          <td style={{ padding:"13px 16px" }}><Badge status={cob.status} /></td>
-                          <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec, fontFamily:D.fontBody }}>{cob.dataPagamento || "—"}</td>
-                          <td style={{ padding:"13px 16px" }}>
-                            <div style={{ display:"flex", gap:8 }}>
-                              {cob.status !== "pago" ? (
-                                !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ padding:"5px 12px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✓ Registrar Pgto</button>
-                              ) : (
-                                <>
-                                  {cob.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:cob.comprovante, nome:m.nome, arquivoNome:cob.arquivoNome } })} style={{ padding:"5px 12px", background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>📄 Ver</button>}
-                                  {!readOnly && <button onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} style={{ padding:"5px 12px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>↩ Estornar</button>}
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                        <button key={c.id} onClick={()=>setFiltroCobranca(c.id)} style={{ display:"flex", alignItems:"center", gap:7, padding:"6px 14px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                          {c.id!=="todos" && <span style={{ width:7, height:7, borderRadius:"50%", background: ativo?"#fff":c.cor }} />}
+                          {c.label} <span style={{ opacity:.6 }}>{cont[c.id]}</span>
+                        </button>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                  </div>
+                )}
+
+                {isMobile ? (
+                  <div>{lista.map((cob,i) => <CobCard key={i} cob={cob} />)}</div>
+                ) : (
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
+                    {cobMes.length === 0 ? (
+                      <div style={{ padding:32, textAlign:"center", color:D.textMut, fontSize:13, fontFamily:D.fontBody }}>Nenhuma cobrança neste mês.</div>
+                    ) : lista.length === 0 ? (
+                      <div style={{ padding:32, textAlign:"center", color:D.textMut, fontSize:13, fontFamily:D.fontBody }}>Nenhuma cobrança nesta categoria.</div>
+                    ) : (
+                    <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                      <thead>
+                        <tr style={{ background:D.muted }}>
+                          {["Unidade","Morador","Valor","Status","Data Pgto","Ações"].map(h => (
+                            <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, borderBottom:`1px solid ${D.border}` }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lista.map((cob,i) => {
+                          const m = moradores.find(x => x.id === cob.moradorId);
+                          if (!m) return null;
+                          const enc = encargosCobranca(cob);
+                          return (
+                            <tr key={i} style={{ borderBottom:`1px solid ${D.border}` }}>
+                              <td style={{ padding:"13px 16px", fontWeight:600, color:D.text, fontSize:13 }}>{m.unidade}</td>
+                              <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>{m.nome}</td>
+                              <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>
+                                {enc.multa > 0 || enc.juros > 0 ? (
+                                  <div>
+                                    <div style={{ fontWeight:700, color:D.danger }}>R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
+                                    <div style={{ fontSize:11, color:D.textMut }}>base {enc.valorBase.toFixed(2).replace(".",",")} + enc. {(enc.multa+enc.juros).toFixed(2).replace(".",",")}</div>
+                                  </div>
+                                ) : (
+                                  <span>R$ {enc.valorBase.toFixed(2).replace(".",",")}</span>
+                                )}
+                              </td>
+                              <td style={{ padding:"13px 16px" }}><Badge status={cob.status} /></td>
+                              <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec, fontFamily:D.fontBody }}>{cob.dataPagamento || "—"}</td>
+                              <td style={{ padding:"13px 16px" }}>
+                                <div style={{ display:"flex", gap:6 }}>
+                                  {cob.status !== "pago" ? (
+                                    !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Registrar</button>
+                                  ) : (
+                                    <>
+                                      {cob.comprovante && <AcaoBtn icon="histDoc" titulo="Ver comprovante" onClick={() => setModal({ type:"comprovante", data:{ comprovante:cob.comprovante, nome:m.nome, arquivoNome:cob.arquivoNome } })} />}
+                                      {!readOnly && <AcaoBtn icon="logUndo" cor={D.danger} titulo="Estornar pagamento" onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} />}
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    )}
+                  </div>
+                )}
+              </>
+              );
+            })()}
           </div>
           </div>
         )}

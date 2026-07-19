@@ -4391,7 +4391,7 @@ export default function App() {
                   {/* Chips de status */}
                   <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:16 }}>
                     {chips.map(c => {
-                      if (c.id!=="todos" && cont[c.id]===0) return null;
+                      // Mostra sempre os 4 filtros, mesmo zerados
                       const ativo = filtroMorador===c.id;
                       return (
                         <button key={c.id} onClick={()=>setFiltroMorador(c.id)} style={{ display:"flex", alignItems:"center", gap:7, padding:"6px 14px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>

@@ -2122,11 +2122,29 @@ const NAV_ICON_PATHS = {
   logDot:      '<circle cx="12" cy="12" r="4"/>',
   histDoc:     '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/>',
   link:        '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  clock:       '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  catLuz:      '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
+  catLimpeza:  '<path d="M12 3l1.6 4.8L18 9l-4.4 1.2L12 15l-1.6-4.8L6 9l4.4-1.2z"/><path d="M5 18l1.5 1.5M18 4l1 1"/>',
+  catPortaria: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  catElevador: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="m9 10 3-3 3 3"/><path d="m9 14 3 3 3-3"/>',
+  catJardim:   '<path d="M7 20h10"/><path d="M12 20c0-4 0-6 0-8"/><path d="M12 12c-1.5-3-4-3-6-3 0 2 1 4.5 4 4.5"/><path d="M12 10c1.2-2.4 3.3-2.4 5-2.4 0 1.8-.9 3.9-3.5 3.9"/>',
+  catSalario:  '<path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/><path d="M4 15v-2a8 8 0 0 1 16 0v2"/><path d="M10 9V6a2 2 0 0 1 4 0v3"/>',
+  catInternet: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  catImpostos: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z"/><path d="M14 8H8M16 12H8M13 16H8"/>',
 };
 const NavIcon = ({ id, size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display:"block", flexShrink:0 }}
     dangerouslySetInnerHTML={{ __html: NAV_ICON_PATHS[id] || "" }} />
 );
+
+// Mapa: categoria de despesa → id do ícone de traço
+const CAT_ICON_ID = {
+  agua:"despesas", luz:"catLuz", limpeza:"catLimpeza", portaria:"catPortaria",
+  elevador:"catElevador", jardinagem:"catJardim", salario:"catSalario",
+  internet:"catInternet", manutencao:"servicos", material:"entregas",
+  impostos:"catImpostos", outro:"logDot",
+};
+const catIconId = (tipo) => CAT_ICON_ID[tipo] || "logDot";
 
 // ── Histórico: classificação por categoria, ícone e agrupamento por data ──
 const TIPOS_LOG = [
@@ -2207,6 +2225,7 @@ export default function App() {
   const [filtroLog, setFiltroLog] = useState("tudo");
   const [filtroMorador, setFiltroMorador] = useState("todos");
   const [filtroCobranca, setFiltroCobranca] = useState("todos");
+  const [filtroDespesa, setFiltroDespesa] = useState("todas");
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -3815,19 +3834,22 @@ export default function App() {
   };
 
   const DespCard = ({ d }) => (
-    <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${d.status==="pago"?D.success:D.danger}`, marginBottom:10 }}>
+    <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${d.status==="pago"?D.success:D.warning}`, marginBottom:10 }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
-        <div>
-          <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{despCat(d.tipo).icon} {d.descricao || despCat(d.tipo).label}</div>
-          <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>{mesLabel(d.mes)} · R$ {d.valor.toFixed(2).replace(".",",")}</div>
+        <div style={{ display:"flex", gap:10, alignItems:"center", minWidth:0 }}>
+          <div style={{ width:36, height:36, borderRadius:9, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.accent, flexShrink:0 }}><NavIcon id={catIconId(d.tipo)} size={17} /></div>
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontWeight:600, color:D.text, fontSize:14, fontFamily:D.fontDisplay }}>{d.descricao || despCat(d.tipo).label}</div>
+            <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>{mesLabel(d.mes)} · R$ {d.valor.toFixed(2).replace(".",",")}</div>
+          </div>
         </div>
         <Badge status={d.status} />
       </div>
-      {d.dataPagamento && <div style={{ fontSize:12, color:"#9aa6b5", marginBottom:8 }}>Pago em {d.dataPagamento}</div>}
+      {d.dataPagamento && <div style={{ fontSize:12, color:D.textMut, marginBottom:8 }}>Pago em {d.dataPagamento}</div>}
       <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-        {d.status !== "pago" && !readOnly && <button onClick={() => marcarDespesaPaga(d.id)} style={{ padding:"7px 14px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>✓ Marcar Paga</button>}
-        {d.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} style={{ padding:"7px 14px", background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>📄 Ver</button>}
-        {!readOnly && <button onClick={() => { if(window.confirm("Remover esta despesa?")) removerDespesa(d.id); }} style={{ padding:"7px 14px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>Remover</button>}
+        {d.status !== "pago" && !readOnly && <button onClick={() => marcarDespesaPaga(d.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Marcar Paga</button>}
+        {d.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="histDoc" size={14} /> Comprovante</button>}
+        {!readOnly && <button onClick={() => { if(window.confirm("Remover esta despesa?")) removerDespesa(d.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>}
       </div>
     </div>
   );
@@ -4616,7 +4638,7 @@ export default function App() {
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
-                <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Água &amp; Luz</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:0, fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Água &amp; Luz</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Contas e despesas fixas</p>
               </div>
               <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
@@ -4625,58 +4647,135 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit,minmax(160px,1fr))", gap:12, marginBottom:16 }}>
-              {[
-                { label:"Total Pago",     valor:`R$ ${despesas.filter(d=>d.status==="pago").reduce((s,d)=>s+d.valor,0).toFixed(2).replace(".",",")}`, icon:"✅", cor:"#2E7D32" },
-                { label:"Total Pendente", valor:`R$ ${despesas.filter(d=>d.status!=="pago").reduce((s,d)=>s+d.valor,0).toFixed(2).replace(".",",")}`, icon:"⏳", cor:"#B03A2E" },
-                { label:"Cadastradas",    valor: despesas.length,                                                                                      icon:"📋", cor:"#2E6DA4" },
-              ].map((c,i) => (
-                <div key={i} style={{ background:"#fff", borderRadius:12, padding:"14px 14px 12px", boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderTop:`3px solid ${c.cor}` }}>
-                  <div style={{ fontSize:18, marginBottom:4 }}>{c.icon}</div>
-                  <div style={{ fontSize: isMobile ? 16 : 19, fontWeight:700, color:c.cor }}>{c.valor}</div>
-                  <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{c.label}</div>
-                </div>
-              ))}
-            </div>
+            {(() => {
+              const totalPago = despesas.filter(d=>d.status==="pago").reduce((s,d)=>s+d.valor,0);
+              const totalPend = despesas.filter(d=>d.status!=="pago").reduce((s,d)=>s+d.valor,0);
+              const brl = (v) => `R$ ${v.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+              const cards = [
+                { label:"Total pago",     valor:brl(totalPago), icon:"logCheck", cor:D.success },
+                { label:"Total pendente", valor:brl(totalPend), icon:"clock",    cor:D.warning },
+                { label:"Cadastradas",    valor:String(despesas.length), icon:"histDoc", cor:D.text },
+              ];
 
-            {isMobile ? (
-              <div>
-                {[...despesas].sort((a,b)=>b.mes.localeCompare(a.mes)).map(d => <DespCard key={d.id} d={d} />)}
-                {despesas.length === 0 && <div style={{ color:"#9aa6b5", fontSize:13, textAlign:"center", padding:24 }}>Nenhuma despesa cadastrada.</div>}
-              </div>
-            ) : (
-              <div style={{ background:"#fff", borderRadius:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)", overflow:"hidden" }}>
-                <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                  <thead>
-                    <tr style={{ background:"#F8FAFC" }}>
-                      {["Tipo","Descrição","Mês","Valor","Status","Data Pgto","Ações"].map(h => (
-                        <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, borderBottom:`1px solid ${D.border}` }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...despesas].sort((a,b)=>b.mes.localeCompare(a.mes)).map(d => (
-                      <tr key={d.id} style={{ borderBottom:`1px solid ${D.border}` }}>
-                        <td style={{ padding:"13px 16px", fontSize:18 }}>{despCat(d.tipo).icon}</td>
-                        <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>{d.descricao||despCat(d.tipo).label}</td>
-                        <td style={{ padding:"13px 16px", fontSize:13, color:"#6B7A8D" }}>{mesLabel(d.mes)}</td>
-                        <td style={{ padding:"13px 16px", fontSize:13, fontWeight:600, color:"#1E3A5F" }}>R$ {d.valor.toFixed(2).replace(".",",")}</td>
-                        <td style={{ padding:"13px 16px" }}><Badge status={d.status} /></td>
-                        <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec, fontFamily:D.fontBody }}>{d.dataPagamento||"—"}</td>
-                        <td style={{ padding:"13px 16px" }}>
-                          <div style={{ display:"flex", gap:8 }}>
-                            {d.status!=="pago" && !readOnly && <button onClick={() => marcarDespesaPaga(d.id)} style={{ padding:"5px 12px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>✓ Marcar Paga</button>}
-                            {d.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} style={{ padding:"5px 12px", background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>📄 Ver</button>}
-                            {!readOnly && <button onClick={() => { if(window.confirm("Remover?")) removerDespesa(d.id); }} style={{ padding:"5px 12px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>Remover</button>}
+              // "Onde vai o dinheiro" — total por categoria (top 5)
+              const porCat = {};
+              despesas.forEach(d => { porCat[d.tipo] = (porCat[d.tipo]||0) + d.valor; });
+              const ranking = Object.entries(porCat).sort((a,b)=>b[1]-a[1]).slice(0,5);
+              const maxCat = ranking.length ? ranking[0][1] : 0;
+              const totalGeral = totalPago + totalPend;
+
+              // Filtro
+              const cont = { todas: despesas.length, pago: despesas.filter(d=>d.status==="pago").length, pendente: despesas.filter(d=>d.status!=="pago").length };
+              const chips = [
+                { id:"todas",    label:"Todas",     cor:D.primary },
+                { id:"pago",     label:"Pagas",     cor:D.success },
+                { id:"pendente", label:"Pendentes", cor:D.warning },
+              ];
+              const lista = [...despesas].sort((a,b)=>b.mes.localeCompare(a.mes))
+                .filter(d => filtroDespesa==="todas" || (filtroDespesa==="pago" ? d.status==="pago" : d.status!=="pago"));
+
+              const AcaoBtn = ({ icon, cor, titulo, onClick }) => (
+                <button onClick={onClick} title={titulo} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color: cor||D.textSec, border:`1px solid ${D.border}`, borderRadius:8, cursor:"pointer" }}>
+                  <NavIcon id={icon} size={15} />
+                </button>
+              );
+
+              return (
+              <>
+                {/* Cards de resumo */}
+                <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3,1fr)", gap:12, marginBottom:16 }}>
+                  {cards.map((c,i) => (
+                    <div key={i} style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, display:"flex", alignItems:"center", gap:14 }}>
+                      <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:c.cor, flexShrink:0 }}><NavIcon id={c.icon} size={19} /></div>
+                      <div style={{ minWidth:0 }}>
+                        <div style={{ fontFamily:D.fontDisplay, fontSize: isMobile?17:20, fontWeight:700, color:c.cor, letterSpacing:"-0.02em", lineHeight:1 }}>{c.valor}</div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:4 }}>{c.label}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Onde vai o dinheiro (top categorias) */}
+                {ranking.length > 0 && (
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?16:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:16 }}>
+                    <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, letterSpacing:"-0.02em", marginBottom:14 }}>Onde vai o dinheiro</div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                      {ranking.map(([tipo, valor]) => (
+                        <div key={tipo}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
+                            <span style={{ display:"flex", alignItems:"center", gap:8, fontFamily:D.fontBody, fontSize:13, color:D.text }}>
+                              <span style={{ color:D.accent, display:"flex" }}><NavIcon id={catIconId(tipo)} size={15} /></span>
+                              {despCat(tipo).label}
+                            </span>
+                            <span style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>{brl(valor)} <span style={{ color:D.textMut, fontWeight:400, fontSize:12 }}>· {totalGeral?Math.round(valor/totalGeral*100):0}%</span></span>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {despesas.length===0 && <tr><td colSpan={7} style={{ padding:24, textAlign:"center", color:"#9aa6b5", fontSize:13 }}>Nenhuma despesa cadastrada.</td></tr>}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                          <div style={{ height:7, background:D.muted, borderRadius:20, overflow:"hidden" }}>
+                            <div style={{ width:`${maxCat?Math.round(valor/maxCat*100):0}%`, height:"100%", background:D.accent, borderRadius:20 }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Filtros */}
+                {despesas.length > 0 && (
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
+                    {chips.map(c => {
+                      const ativo = filtroDespesa===c.id;
+                      return (
+                        <button key={c.id} onClick={()=>setFiltroDespesa(c.id)} style={{ display:"flex", alignItems:"center", gap:7, padding:"6px 14px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                          {c.id!=="todas" && <span style={{ width:7, height:7, borderRadius:"50%", background: ativo?"#fff":c.cor }} />}
+                          {c.label} <span style={{ opacity:.6 }}>{cont[c.id]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {isMobile ? (
+                  <div>
+                    {lista.map(d => <DespCard key={d.id} d={d} />)}
+                    {despesas.length === 0 && <div style={{ color:D.textMut, fontSize:13, textAlign:"center", padding:24 }}>Nenhuma despesa cadastrada.</div>}
+                    {despesas.length > 0 && lista.length === 0 && <div style={{ color:D.textMut, fontSize:13, textAlign:"center", padding:24 }}>Nenhuma despesa nesta categoria.</div>}
+                  </div>
+                ) : (
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
+                    <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                      <thead>
+                        <tr style={{ background:D.muted }}>
+                          {["Tipo","Descrição","Mês","Valor","Status","Data Pgto","Ações"].map(h => (
+                            <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, borderBottom:`1px solid ${D.border}` }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lista.map(d => (
+                          <tr key={d.id} style={{ borderBottom:`1px solid ${D.border}` }}>
+                            <td style={{ padding:"13px 16px" }}><span style={{ color:D.accent, display:"flex" }} title={despCat(d.tipo).label}><NavIcon id={catIconId(d.tipo)} size={18} /></span></td>
+                            <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>{d.descricao||despCat(d.tipo).label}</td>
+                            <td style={{ padding:"13px 16px", fontSize:13, color:D.textSec }}>{mesLabel(d.mes)}</td>
+                            <td style={{ padding:"13px 16px", fontSize:13, fontWeight:600, color:D.text }}>R$ {d.valor.toFixed(2).replace(".",",")}</td>
+                            <td style={{ padding:"13px 16px" }}><Badge status={d.status} /></td>
+                            <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec, fontFamily:D.fontBody }}>{d.dataPagamento||"—"}</td>
+                            <td style={{ padding:"13px 16px" }}>
+                              <div style={{ display:"flex", gap:6 }}>
+                                {d.status!=="pago" && !readOnly && <button onClick={() => marcarDespesaPaga(d.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Marcar paga</button>}
+                                {d.comprovante && <AcaoBtn icon="histDoc" titulo="Ver comprovante" onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} />}
+                                {!readOnly && <AcaoBtn icon="logTrash" cor={D.danger} titulo="Remover despesa" onClick={() => { if(window.confirm("Remover esta despesa?")) removerDespesa(d.id); }} />}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {despesas.length===0 && <tr><td colSpan={7} style={{ padding:24, textAlign:"center", color:D.textMut, fontSize:13 }}>Nenhuma despesa cadastrada.</td></tr>}
+                        {despesas.length>0 && lista.length===0 && <tr><td colSpan={7} style={{ padding:24, textAlign:"center", color:D.textMut, fontSize:13 }}>Nenhuma despesa nesta categoria.</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+              );
+            })()}
           </div>
           </div>
         )}

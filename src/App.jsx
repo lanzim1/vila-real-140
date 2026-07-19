@@ -2109,6 +2109,10 @@ const NAV_ICON_PATHS = {
   agenda:      '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
   historico:   '<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>',
   config:      '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  assinatura:  '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
+  multa:       '<path d="M19 5 5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+  iniciarCobranca: '<path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+  emails:      '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/>',
 };
 const NavIcon = ({ id, size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display:"block", flexShrink:0 }}
@@ -3201,6 +3205,24 @@ export default function App() {
       jurosPercentMes: parseFloat(juros) || 0,
     }, { merge:true });
     showToast("Configuração de multa/juros salva!");
+  };
+
+  // Salva todos os parâmetros da tela de config de uma vez
+  const [salvandoConfig, setSalvandoConfig] = useState(false);
+  const salvarConfigGeral = async () => {
+    setSalvandoConfig(true);
+    try {
+      const dados = { taxa: parseFloat(taxa) || 0, diaVencimento: parseInt(diaVencimento) || 10 };
+      if (podeUsar("multaJuros")) {
+        dados.cobrarMultaJuros = cobrarMultaJuros;
+        dados.multaPercent = parseFloat(multaPercent) || 0;
+        dados.jurosPercentMes = parseFloat(jurosPercentMes) || 0;
+      }
+      await setDoc(doc(db,"condominios",condominioId), dados, { merge:true });
+      showToast("Configurações salvas!");
+    } catch (e) {
+      showToast("Erro ao salvar. Tente novamente.");
+    } finally { setSalvandoConfig(false); }
   };
 
   // ── Envio de e-mails ──
@@ -5416,7 +5438,7 @@ export default function App() {
 
             {/* Card de assinatura */}
             <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
-              <h3 style={{ color:D.text, margin:"0 0 16px", fontSize:14, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>💳 Sua assinatura</h3>
+              <h3 style={{ color:D.text, margin:"0 0 16px", fontSize:14, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em", display:"flex", alignItems:"center", gap:8 }}><span style={{ color:D.accent, display:"flex" }}><NavIcon id="assinatura" size={17} /></span> Sua assinatura</h3>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
                 <div>
                   <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
@@ -5446,66 +5468,105 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-              <h3 style={{ color:D.text, margin:"0 0 16px", fontSize:14, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Taxa mensal</h3>
-              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Valor (R$)</label>
-              <input type="number" value={taxa} onChange={e=>setTaxa(parseFloat(e.target.value)||0)} style={{ display:"block", width:"100%", padding:"12px 14px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:16, color:D.text, marginTop:8, boxSizing:"border-box", fontFamily:D.fontBody }} />
-              <button onClick={() => salvarTaxa(taxa)} style={{ marginTop:14, padding:"11px 24px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontWeight:600, fontSize:14, fontWeight:600, cursor:"pointer" }}>Salvar</button>
+            {/* Card de PARÂMETROS (salvamento único) */}
+            {(() => {
+              const alterada =
+                (parseFloat(taxa)||0) !== (parseFloat(condominio?.taxa)||0) ||
+                (parseInt(diaVencimento)||10) !== (parseInt(condominio?.diaVencimento)||10) ||
+                (podeUsar("multaJuros") && (
+                  Boolean(cobrarMultaJuros) !== Boolean(condominio?.cobrarMultaJuros) ||
+                  (parseFloat(multaPercent)||0) !== (parseFloat(condominio?.multaPercent)||0) ||
+                  (parseFloat(jurosPercentMes)||0) !== (parseFloat(condominio?.jurosPercentMes)||0)
+                ));
+              return (
+              <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
+                <h3 style={{ color:D.text, margin:"0 0 4px", fontSize:15, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Parâmetros de cobrança</h3>
+                <p style={{ color:D.textSec, fontSize:12.5, margin:"0 0 20px" }}>Ajuste os valores e clique em salvar no fim do card.</p>
 
-              <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
-
-              <h3 style={{ color:"#1E3A5F", margin:"0 0 6px", fontSize:15, fontWeight:700 }}>📅 Dia de vencimento</h3>
-              <p style={{ color:"#6B7A8D", fontSize:12, margin:"0 0 14px" }}>O sistema enviará e-mails automaticamente 5 dias antes e no dia do vencimento.</p>
-              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Dia do mês (1–28)</label>
-              <div style={{ display:"flex", gap:10, alignItems:"flex-end", marginTop:8 }}>
-                <input type="number" min={1} max={28} value={diaVencimento} onChange={e=>setDiaVencimento(parseInt(e.target.value)||10)} style={{ width:100, padding:"12px 14px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:16, color:"#1E3A5F", boxSizing:"border-box" }} />
-                <button onClick={() => salvarDiaVencimento(diaVencimento)} style={{ padding:"12px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer" }}>Salvar</button>
-              </div>
-
-              <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
-
-              {/* Multa e juros por atraso (Padrão) */}
-              <h3 style={{ color:"#1E3A5F", margin:"0 0 6px", fontSize:15, fontWeight:700 }}>⚖️ Multa e juros por atraso</h3>
-              {podeUsar("multaJuros") ? (
-                <>
-                  <p style={{ color:"#6B7A8D", fontSize:12, margin:"0 0 14px" }}>Quando ativo, cobranças em atraso recebem multa (uma vez) e juros proporcionais aos dias de atraso. Padrão legal: 2% de multa + 1% de juros ao mês.</p>
-                  <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", background:D.muted, padding:"12px 14px", borderRadius:D.radiusSm, marginBottom:14 }}>
-                    <input type="checkbox" checked={cobrarMultaJuros} onChange={e=>setCobrarMultaJuros(e.target.checked)} style={{ width:18, height:18, cursor:"pointer" }} />
-                    <div style={{ fontFamily:D.fontBody, fontSize:14, color:D.text, fontWeight:600 }}>Cobrar multa e juros automaticamente</div>
-                  </label>
-                  <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"flex-end" }}>
-                    <div>
-                      <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Multa (%)</label>
-                      <input type="number" step="0.1" min={0} value={multaPercent} onChange={e=>setMultaPercent(e.target.value)} disabled={!cobrarMultaJuros} style={{ width:90, padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:15, color:D.text, boxSizing:"border-box", opacity: cobrarMultaJuros?1:.5 }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Juros ao mês (%)</label>
-                      <input type="number" step="0.1" min={0} value={jurosPercentMes} onChange={e=>setJurosPercentMes(e.target.value)} disabled={!cobrarMultaJuros} style={{ width:110, padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:15, color:D.text, boxSizing:"border-box", opacity: cobrarMultaJuros?1:.5 }} />
-                    </div>
-                    <button onClick={() => salvarConfigMultaJuros(cobrarMultaJuros, multaPercent, jurosPercentMes)} style={{ padding:"11px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer" }}>Salvar</button>
-                  </div>
-                  {cobrarMultaJuros && (
-                    <div style={{ marginTop:14, background:D.secondary, borderRadius:D.radiusSm, padding:"12px 14px", fontFamily:D.fontBody, fontSize:12, color:D.text }}>
-                      <b>Exemplo:</b> uma taxa de R$ {taxa.toFixed(2).replace(".",",")} com 15 dias de atraso ficaria: R$ {taxa.toFixed(2).replace(".",",")} + multa R$ {(taxa*(parseFloat(multaPercent)||0)/100).toFixed(2).replace(".",",")} + juros R$ {(taxa*(parseFloat(jurosPercentMes)||0)/100*(15/30)).toFixed(2).replace(".",",")} = <b>R$ {(taxa + taxa*(parseFloat(multaPercent)||0)/100 + taxa*(parseFloat(jurosPercentMes)||0)/100*(15/30)).toFixed(2).replace(".",",")}</b>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div style={{ background:D.muted, borderRadius:D.radiusSm, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-                  <span style={{ fontSize:20 }}>🔒</span>
-                  <div style={{ flex:1, minWidth:180 }}>
-                    <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>Multa e juros — plano Padrão</div>
-                    <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Cobre automaticamente multa e juros sobre atrasos.</div>
-                  </div>
-                  <a href="mailto:comercial.mysindi@gmail.com?subject=Upgrade de plano — MySindi" style={{ padding:"8px 16px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>Fazer upgrade</a>
+                {/* Taxa mensal */}
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                  <span style={{ color:D.accent, display:"flex" }}><NavIcon id="cobrancas" size={17} /></span>
+                  <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>Taxa mensal</span>
                 </div>
-              )}
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Valor (R$)</label>
+                <input type="number" value={taxa} onChange={e=>setTaxa(parseFloat(e.target.value)||0)} style={{ display:"block", width:"100%", padding:"12px 14px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:16, color:D.text, marginTop:8, boxSizing:"border-box", fontFamily:D.fontBody }} />
 
-              <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
+                <hr style={{ margin:"22px 0", border:"none", borderTop:`1px solid ${D.border}` }} />
 
-              {/* Zerar atrasos / início de cobrança — marco zero */}
-              <h3 style={{ color:"#1E3A5F", margin:"0 0 6px", fontSize:15, fontWeight:700 }}>🔄 Iniciar cobrança a partir do próximo mês</h3>
-              <p style={{ color:"#6B7A8D", fontSize:12, margin:"0 0 12px" }}>
+                {/* Dia de vencimento */}
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                  <span style={{ color:D.accent, display:"flex" }}><NavIcon id="reservas" size={17} /></span>
+                  <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>Dia de vencimento</span>
+                </div>
+                <p style={{ color:D.textSec, fontSize:12, margin:"0 0 12px" }}>O sistema enviará e-mails automaticamente 5 dias antes e no dia do vencimento.</p>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Dia do mês (1–28)</label>
+                <input type="number" min={1} max={28} value={diaVencimento} onChange={e=>setDiaVencimento(parseInt(e.target.value)||10)} style={{ display:"block", width:120, padding:"12px 14px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:16, color:D.text, marginTop:8, boxSizing:"border-box", fontFamily:D.fontBody }} />
+
+                <hr style={{ margin:"22px 0", border:"none", borderTop:`1px solid ${D.border}` }} />
+
+                {/* Multa e juros */}
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                  <span style={{ color:D.accent, display:"flex" }}><NavIcon id="multa" size={17} /></span>
+                  <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>Multa e juros por atraso</span>
+                </div>
+                {podeUsar("multaJuros") ? (
+                  <>
+                    <p style={{ color:D.textSec, fontSize:12, margin:"0 0 14px" }}>Quando ativo, cobranças em atraso recebem multa (uma vez) e juros proporcionais aos dias de atraso. Padrão legal: 2% de multa + 1% de juros ao mês.</p>
+                    <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", background:D.muted, padding:"12px 14px", borderRadius:D.radiusSm, marginBottom:14 }}>
+                      <input type="checkbox" checked={cobrarMultaJuros} onChange={e=>setCobrarMultaJuros(e.target.checked)} style={{ width:18, height:18, cursor:"pointer" }} />
+                      <div style={{ fontFamily:D.fontBody, fontSize:14, color:D.text, fontWeight:600 }}>Cobrar multa e juros automaticamente</div>
+                    </label>
+                    <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"flex-end" }}>
+                      <div>
+                        <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Multa (%)</label>
+                        <input type="number" step="0.1" min={0} value={multaPercent} onChange={e=>setMultaPercent(e.target.value)} disabled={!cobrarMultaJuros} style={{ width:90, padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:15, color:D.text, boxSizing:"border-box", opacity: cobrarMultaJuros?1:.5 }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Juros ao mês (%)</label>
+                        <input type="number" step="0.1" min={0} value={jurosPercentMes} onChange={e=>setJurosPercentMes(e.target.value)} disabled={!cobrarMultaJuros} style={{ width:110, padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:15, color:D.text, boxSizing:"border-box", opacity: cobrarMultaJuros?1:.5 }} />
+                      </div>
+                    </div>
+                    {cobrarMultaJuros && (
+                      <div style={{ marginTop:14, background:D.secondary, borderRadius:D.radiusSm, padding:"12px 14px", fontFamily:D.fontBody, fontSize:12, color:D.text }}>
+                        <b>Exemplo:</b> uma taxa de R$ {taxa.toFixed(2).replace(".",",")} com 15 dias de atraso ficaria: R$ {taxa.toFixed(2).replace(".",",")} + multa R$ {(taxa*(parseFloat(multaPercent)||0)/100).toFixed(2).replace(".",",")} + juros R$ {(taxa*(parseFloat(jurosPercentMes)||0)/100*(15/30)).toFixed(2).replace(".",",")} = <b>R$ {(taxa + taxa*(parseFloat(multaPercent)||0)/100 + taxa*(parseFloat(jurosPercentMes)||0)/100*(15/30)).toFixed(2).replace(".",",")}</b>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ background:D.muted, borderRadius:D.radiusSm, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                    <span style={{ fontSize:20 }}>🔒</span>
+                    <div style={{ flex:1, minWidth:180 }}>
+                      <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>Multa e juros — plano Padrão</div>
+                      <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Cobre automaticamente multa e juros sobre atrasos.</div>
+                    </div>
+                    <a href="mailto:comercial.mysindi@gmail.com?subject=Upgrade de plano — MySindi" style={{ padding:"8px 16px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>Fazer upgrade</a>
+                  </div>
+                )}
+
+                {/* Barra de salvar (único) */}
+                {!readOnly && (
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"flex-end", gap:14, marginTop:24, paddingTop:18, borderTop:`1px solid ${D.border}` }}>
+                    {alterada && <span style={{ fontFamily:D.fontBody, fontSize:12.5, color:D.warning, fontWeight:500 }}>Você tem alterações não salvas</span>}
+                    <button onClick={salvarConfigGeral} disabled={!alterada || salvandoConfig} style={{ padding:"12px 28px", background: alterada ? D.primary : D.muted, color: alterada ? "#fff" : D.textMut, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontWeight:600, fontSize:14, cursor: (alterada && !salvandoConfig) ? "pointer" : "default" }}>
+                      {salvandoConfig ? "Salvando..." : "Salvar alterações"}
+                    </button>
+                  </div>
+                )}
+              </div>
+              );
+            })()}
+
+            {/* Card de AÇÕES */}
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
+              <h3 style={{ color:D.text, margin:"0 0 4px", fontSize:15, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Ações</h3>
+              <p style={{ color:D.textSec, fontSize:12.5, margin:"0 0 20px" }}>Estas ações têm efeito imediato e não fazem parte do salvamento acima.</p>
+
+              {/* Iniciar cobrança — marco zero */}
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                <span style={{ color:D.accent, display:"flex" }}><NavIcon id="iniciarCobranca" size={17} /></span>
+                <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>Iniciar cobrança a partir do próximo mês</span>
+              </div>
+              <p style={{ color:D.textSec, fontSize:12, margin:"0 0 12px" }}>
                 Define o <b>mês que vem</b> como o primeiro mês de cobrança. As cobranças pendentes de meses anteriores (deste mês pra trás) são <b>removidas</b>, e o sistema passa a gerar e cobrar somente a partir do próximo mês. Não mexe no dia de vencimento nem em pagamentos já registrados. Ideal para o início da operação.
               </p>
               {marcoZero && (
@@ -5514,23 +5575,27 @@ export default function App() {
                 </div>
               )}
               {!readOnly && (
-                <button onClick={() => { if(window.confirm("Iniciar a cobrança só a partir do mês que vem?\n\n• As cobranças pendentes deste mês e anteriores serão REMOVIDAS\n• O sistema passa a cobrar a partir do próximo mês\n• Pagamentos já registrados e o dia de vencimento NÃO são afetados")) zerarAtrasados(); }} style={{ padding:"11px 20px", background:"#1E3A5F", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
-                  🔄 Iniciar cobrança no próximo mês
+                <button onClick={() => { if(window.confirm("Iniciar a cobrança só a partir do mês que vem?\n\n• As cobranças pendentes deste mês e anteriores serão REMOVIDAS\n• O sistema passa a cobrar a partir do próximo mês\n• Pagamentos já registrados e o dia de vencimento NÃO são afetados")) zerarAtrasados(); }} style={{ padding:"11px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                  Iniciar cobrança no próximo mês
                 </button>
               )}
 
-              <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
+              <hr style={{ margin:"24px 0", border:"none", borderTop:`1px solid ${D.border}` }} />
 
-              <h3 style={{ color:"#1E3A5F", margin:"0 0 6px", fontSize:15, fontWeight:700 }}>📧 Disparar e-mails manualmente</h3>
+              {/* Disparar e-mails */}
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                <span style={{ color:D.accent, display:"flex" }}><NavIcon id="emails" size={17} /></span>
+                <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>Disparar e-mails manualmente</span>
+              </div>
               {podeUsar("emailAuto") ? (
                 <>
-                  <p style={{ color:"#6B7A8D", fontSize:12, margin:"0 0 14px" }}>Use estes botões caso queira enviar fora do disparo automático. O sistema evita duplicatas no mesmo dia.</p>
+                  <p style={{ color:D.textSec, fontSize:12, margin:"0 0 14px" }}>Use estes botões caso queira enviar fora do disparo automático. O sistema evita duplicatas no mesmo dia.</p>
                   <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-                    <button onClick={() => dispararEmails("lembrete")} disabled={enviandoEmails} style={{ padding:"10px 18px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>
-                      {enviandoEmails ? "Enviando..." : `📧 Lembrete a todos (${moradores.length})`}
+                    <button onClick={() => dispararEmails("lembrete")} disabled={enviandoEmails} style={{ padding:"10px 18px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, fontFamily:D.fontBody }}>
+                      {enviandoEmails ? "Enviando..." : `Lembrete a todos (${moradores.length})`}
                     </button>
-                    <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"10px 18px", background:"#C9933A", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1 }}>
-                      {enviandoEmails ? "Enviando..." : `⚠️ Cobrar pendentes (${pendentes})`}
+                    <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"10px 18px", background:D.warning, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, fontFamily:D.fontBody }}>
+                      {enviandoEmails ? "Enviando..." : `Cobrar pendentes (${pendentes})`}
                     </button>
                   </div>
                 </>
@@ -5544,18 +5609,18 @@ export default function App() {
                   <a href="mailto:comercial.mysindi@gmail.com?subject=Upgrade de plano — MySindi" style={{ padding:"8px 16px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>Fazer upgrade</a>
                 </div>
               )}
+            </div>
 
-              <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
-
-              <h3 style={{ color:"#1E3A5F", margin:"0 0 10px", fontSize:15, fontWeight:700 }}>Conta conectada</h3>
-              <div style={{ fontSize:13, color:D.textSec, lineHeight:1.8, background:"#F8FAFC", borderRadius:D.radiusSm, padding:"12px 16px", border:`1px solid ${D.border}` }}>
-                <div>E-mail: <b style={{color:"#1E3A5F"}}>{user?.email}</b></div>
-                <div style={{ marginTop:6, fontSize:11, color:"#aaa" }}>Para trocar a senha, use o painel do Firebase (Authentication → Users).</div>
+            {/* Card de INFO */}
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+              <h3 style={{ color:D.text, margin:"0 0 12px", fontSize:15, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em", display:"flex", alignItems:"center", gap:8 }}><span style={{ color:D.accent, display:"flex" }}><NavIcon id="moradores" size={17} /></span> Conta conectada</h3>
+              <div style={{ fontSize:13, color:D.textSec, lineHeight:1.8, background:D.muted, borderRadius:D.radiusSm, padding:"12px 16px", border:`1px solid ${D.border}` }}>
+                <div>E-mail: <b style={{color:D.text}}>{user?.email}</b></div>
+                <div style={{ marginTop:6, fontSize:11, color:D.textMut }}>Para trocar a senha, use o painel do Firebase (Authentication → Users).</div>
               </div>
-              <hr style={{ margin:"24px 0", border:"none", borderTop:"1px solid #E8EDF3" }} />
-              <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, lineHeight:1.8, fontFamily:D.fontBody }}>
-                <div>🏢 Condomínio Vila Real 140</div>
-                <div>📦 Versão 2.0 · Firebase + React</div>
+              <div style={{ marginTop:16, fontSize:12, color:D.textMut, fontFamily:D.fontBody, lineHeight:1.8 }}>
+                <div>{condominio?.nome || "Condomínio"}</div>
+                <div>MySindi · Versão 2.0 · Firebase + React</div>
               </div>
             </div>
           </div>

@@ -2090,6 +2090,31 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   );
 }
 
+// Ícones de navegação (SVG de traço, sem dependências — herdam a cor via currentColor)
+const NAV_ICON_PATHS = {
+  dashboard:   '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+  cobrancas:   '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.2"/><path d="M6 12h.01M18 12h.01"/>',
+  moradores:   '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  despesas:    '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5S5 13 5 15a7 7 0 0 0 7 7z"/>',
+  servicos:    '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  reservas:    '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  acessos:     '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m14 9 7-7"/><path d="m16.5 4.5 3 3M19 7l2-2"/>',
+  entregas:    '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+  comunicados: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
+  ocorrencias: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><path d="M12 9v4M12 17h.01"/>',
+  enquetes:    '<path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  documentos:  '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  fundoReserva:'<path d="M3 21h18M4 10h16M5 6l7-3 7 3M5 10v11M19 10v11M9 14v3M12 14v3M15 14v3"/>',
+  fluxoCaixa:  '<path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/>',
+  agenda:      '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
+  historico:   '<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>',
+  config:      '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+};
+const NavIcon = ({ id, size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display:"block", flexShrink:0 }}
+    dangerouslySetInnerHTML={{ __html: NAV_ICON_PATHS[id] || "" }} />
+);
+
 export default function App() {
   const isMobile = useIsMobile();
   const [user, setUser]             = useState(null);
@@ -3560,6 +3585,16 @@ export default function App() {
     ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config." }] : []),
   ];
 
+  // Agrupamento da sidebar desktop (seções com título)
+  const gruposNav = [
+    { titulo:"Principal",   ids:["dashboard","cobrancas","moradores"] },
+    { titulo:"Operação",    ids:["despesas","servicos","reservas","acessos","entregas"] },
+    { titulo:"Comunicação", ids:["comunicados","ocorrencias","enquetes"] },
+    { titulo:"Financeiro",  ids:["fundoReserva","fluxoCaixa"] },
+    { titulo:"Geral",       ids:["documentos","agenda","historico", ...(!readOnly ? ["config"] : [])] },
+  ];
+  const labelPorId = Object.fromEntries(navItems.map(n => [n.id, n.label]));
+
   if (!authChecked) return (
     <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#1E3A5F", color:"#fff", fontFamily:D.fontBody }}>Carregando...</div>
   );
@@ -3738,17 +3773,23 @@ export default function App() {
             </div>
           </div>
           {/* Nav */}
-          <nav style={{ flex:1, padding:"8px 10px" }}>
-            {navItems.map(n => {
-              const bloqueado = !podeUsar(n.id);
-              return (
-              <button key={n.id} onClick={() => setAba(n.id)} style={{ display:"flex", alignItems:"center", gap:9, width:"100%", padding:"9px 11px", background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", color: aba===n.id ? "#fff" : "rgba(226,232,245,0.85)", fontFamily:D.fontBody, fontSize:13, fontWeight: aba===n.id ? 600 : 500, textAlign:"left", borderRadius:8, marginBottom:1, outline:"none", borderLeft: aba===n.id ? `2px solid ${D.sidebarActBdr}` : "2px solid transparent" }}>
-                <span style={{ fontSize:15, minWidth:18, textAlign:"center", opacity: aba===n.id?1:.8 }}>{n.icon}</span>
-                <span style={{ flex:1 }}>{n.label}</span>
-                {bloqueado && <span style={{ fontSize:11, opacity:.6 }}>🔒</span>}
-              </button>
-              );
-            })}
+          <nav style={{ flex:1, padding:"10px 10px", overflowY:"auto" }}>
+            {gruposNav.map((grupo, gi) => (
+              <div key={grupo.titulo} style={{ marginBottom: gi < gruposNav.length-1 ? 14 : 0 }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:10, fontWeight:600, color:"rgba(226,232,245,0.35)", textTransform:"uppercase", letterSpacing:"1px", padding:"0 11px 6px" }}>{grupo.titulo}</div>
+                {grupo.ids.map(id => {
+                  const bloqueado = !podeUsar(id);
+                  const ativo = aba===id;
+                  return (
+                    <button key={id} onClick={() => setAba(id)} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", padding:"8px 11px", background: ativo ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", color: ativo ? "#fff" : "rgba(226,232,245,0.82)", fontFamily:D.fontBody, fontSize:13, fontWeight: ativo ? 600 : 500, textAlign:"left", borderRadius:8, marginBottom:1, outline:"none", borderLeft: ativo ? `2px solid ${D.sidebarActBdr}` : "2px solid transparent" }}>
+                      <span style={{ opacity: ativo?1:.75, display:"flex" }}><NavIcon id={id} /></span>
+                      <span style={{ flex:1 }}>{labelPorId[id]}</span>
+                      {bloqueado && <span style={{ fontSize:11, opacity:.6 }}>🔒</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
           {/* Bottom */}
           <div style={{ padding:"10px 10px 18px", borderTop:`1px solid ${D.sidebarBdr}` }}>
@@ -3777,7 +3818,7 @@ export default function App() {
                     const bloqueado = !podeUsar(n.id);
                     return (
                     <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", padding:"10px 4px", display:"flex", flexDirection:"column", alignItems:"center", gap:4, color: aba===n.id ? "#fff" : "rgba(226,232,245,0.75)", borderRadius:10, fontFamily:D.fontBody, position:"relative" }}>
-                      <span style={{ fontSize:20 }}>{n.icon}</span>
+                      <span style={{ display:"flex" }}><NavIcon id={n.id} size={20} /></span>
                       <span style={{ fontSize:10, fontWeight: aba===n.id?600:400 }}>{n.label}</span>
                       {bloqueado && <span style={{ position:"absolute", top:4, right:8, fontSize:10 }}>🔒</span>}
                     </button>
@@ -3802,7 +3843,7 @@ export default function App() {
           <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:D.sidebar, display:"flex", zIndex:499, boxShadow:`0 -1px 0 ${D.sidebarBdr}, 0 -4px 16px rgba(28,45,94,.4)`, paddingBottom:"env(safe-area-inset-bottom,0)", height:64 }}>
             {navPrincipal.map(n => (
               <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color: aba===n.id ? D.accent : "rgba(226,232,245,0.75)", borderTop: aba===n.id ? `2px solid ${D.accent}` : "2px solid transparent", fontFamily:D.fontBody }}>
-                <span style={{ fontSize:19 }}>{n.icon}</span>
+                <span style={{ display:"flex" }}><NavIcon id={n.id} size={19} /></span>
                 <span style={{ fontSize:9.5, fontWeight: aba===n.id?600:400 }}>{n.label}</span>
               </button>
             ))}

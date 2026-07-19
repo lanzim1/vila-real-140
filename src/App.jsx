@@ -467,6 +467,112 @@ const gerarCondId = (nome) => {
 };
 
 // ── Login / Cadastro ──
+// ── Documentos legais (LGPD) ──
+// IMPORTANTE: textos-base. Devem ser revisados por um advogado antes de valerem
+// juridicamente. Ajuste o nome da empresa/responsável e o e-mail do encarregado.
+const CONTATO_DPO = "comercial.mysindi@gmail.com";
+const TEXTO_PRIVACIDADE = `POLÍTICA DE PRIVACIDADE — MySindi
+
+Última atualização: ${new Date().toLocaleDateString("pt-BR")}
+
+Esta Política explica como o MySindi ("nós") coleta, usa, armazena e protege os dados pessoais tratados na plataforma de gestão de condomínios, em conformidade com a Lei nº 13.709/2018 (LGPD).
+
+1. QUEM TRATA OS DADOS
+O MySindi é a plataforma que hospeda os dados. O síndico/administrador do condomínio é o responsável por inserir e gerenciar os dados dos moradores, atuando como controlador dessas informações. O MySindi atua como operador, tratando os dados conforme as instruções do síndico e para viabilizar o serviço.
+
+2. DADOS QUE COLETAMOS
+- Do síndico/administrador: nome, e-mail, e dados de acesso.
+- Dos moradores (inseridos pelo síndico): nome, unidade, e-mail, telefone, proprietário do imóvel, veículos, pets e informações de cobrança (valores, status de pagamento).
+- Dados de uso: registros de acesso e ações realizadas na plataforma (logs), para segurança e auditoria.
+
+3. PARA QUE USAMOS
+Os dados são usados exclusivamente para a gestão do condomínio: emissão e controle de cobranças, comunicação entre síndico e moradores, reservas de áreas, ocorrências, enquetes, prestação de contas e demais funções da plataforma.
+
+4. BASE LEGAL
+O tratamento se fundamenta na execução de contrato e no legítimo interesse da gestão condominial, além do consentimento quando aplicável, nos termos dos artigos 7º e 10 da LGPD.
+
+5. COMPARTILHAMENTO
+Não vendemos dados pessoais. Os dados podem ser processados por provedores de infraestrutura (como Google Firebase, para hospedagem e banco de dados, e provedores de envio de e-mail), estritamente para operar o serviço. Esses provedores seguem seus próprios padrões de segurança.
+
+6. ARMAZENAMENTO E SEGURANÇA
+Os dados são armazenados em servidores do Google Firebase. Adotamos medidas técnicas de segurança, como isolamento de dados por condomínio e controle de acesso. Nenhum sistema é 100% imune; em caso de incidente de segurança relevante, notificaremos os titulares e a ANPD conforme a LGPD.
+
+7. RETENÇÃO
+Os dados são mantidos enquanto durar a relação de uso da plataforma. Após o encerramento, podem ser mantidos pelo prazo necessário ao cumprimento de obrigações legais e, depois, eliminados.
+
+8. DIREITOS DO TITULAR
+Você pode solicitar a qualquer momento: confirmação e acesso aos seus dados, correção, anonimização, portabilidade, eliminação e informação sobre compartilhamento. Para exercer, entre em contato pelo e-mail abaixo. Solicitações que envolvam dados de moradores devem ser encaminhadas ao síndico do condomínio, que é o controlador.
+
+9. COOKIES
+Utilizamos apenas os cookies e o armazenamento local necessários para autenticação e funcionamento da plataforma. Não usamos cookies de publicidade.
+
+10. CONTATO / ENCARREGADO (DPO)
+Dúvidas ou solicitações relativas a dados pessoais: ${CONTATO_DPO}.
+
+11. ALTERAÇÕES
+Esta Política pode ser atualizada. A data no topo indica a última revisão.`;
+
+const TEXTO_TERMOS = `TERMOS DE USO — MySindi
+
+Última atualização: ${new Date().toLocaleDateString("pt-BR")}
+
+Ao criar uma conta e usar o MySindi, você concorda com estes Termos.
+
+1. O SERVIÇO
+O MySindi é uma plataforma online de gestão de condomínios (cobranças, moradores, finanças, reservas, comunicação e funções relacionadas). Oferecemos o serviço "como está", buscando a maior disponibilidade possível, sem garantia de funcionamento ininterrupto.
+
+2. CADASTRO E CONTA
+Para usar, é necessário criar uma conta com dados verdadeiros. Você é responsável por manter a confidencialidade de suas credenciais e por todas as ações realizadas na sua conta.
+
+3. RESPONSABILIDADES DO SÍNDICO/ADMINISTRADOR
+Ao inserir dados de moradores, você declara ter base legal para isso e assume o papel de controlador desses dados, comprometendo-se a usá-los apenas para a gestão do condomínio e a respeitar a LGPD.
+
+4. PLANOS E PAGAMENTO
+O serviço pode ser oferecido em planos gratuitos (teste), de cortesia ou pagos. As condições de cada plano (limites e valores) são informadas na contratação. Planos de teste podem expirar.
+
+5. USO ACEITÁVEL
+É proibido usar a plataforma para fins ilícitos, inserir dados sem autorização, tentar burlar a segurança ou acessar dados de outros condomínios.
+
+6. PROPRIEDADE INTELECTUAL
+O software, a marca e o design do MySindi pertencem aos seus criadores. Os dados inseridos pertencem ao respectivo condomínio/usuário.
+
+7. LIMITAÇÃO DE RESPONSABILIDADE
+O MySindi não se responsabiliza por decisões administrativas ou financeiras tomadas com base nas informações do sistema, nem por perdas decorrentes de uso indevido, força maior ou falhas de terceiros (provedores de infraestrutura).
+
+8. CANCELAMENTO
+Você pode encerrar o uso quando quiser. Podemos suspender contas que violem estes Termos.
+
+9. ALTERAÇÕES E FORO
+Estes Termos podem ser atualizados. Questões não resolvidas amigavelmente serão tratadas conforme a legislação brasileira.
+
+Contato: ${CONTATO_DPO}.`;
+
+// Sobreposição que exibe um documento legal em tela cheia
+const LegalDoc = ({ tipo, onClose }) => {
+  const isMobile = useIsMobile();
+  const titulo = tipo === "termos" ? "Termos de Uso" : "Política de Privacidade";
+  const texto = tipo === "termos" ? TEXTO_TERMOS : TEXTO_PRIVACIDADE;
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.6)", backdropFilter:"blur(3px)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding: isMobile?12:24 }} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:D.bgCard, borderRadius:D.radius, width:"100%", maxWidth:720, maxHeight:"88vh", display:"flex", flexDirection:"column", boxShadow:D.shadowMd, overflow:"hidden" }}>
+        <div style={{ padding: isMobile?"16px 18px":"18px 24px", borderBottom:`1px solid ${D.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <h2 style={{ fontFamily:D.fontDisplay, fontSize:18, fontWeight:700, color:D.text, margin:0, letterSpacing:"-0.02em" }}>{titulo}</h2>
+          <button onClick={onClose} style={{ background:D.muted, border:"none", borderRadius:8, width:32, height:32, cursor:"pointer", fontSize:16, color:D.textSec }}>✕</button>
+        </div>
+        <div style={{ padding: isMobile?"18px":"24px 28px", overflowY:"auto", fontFamily:D.fontBody, fontSize:13.5, color:D.text, lineHeight:1.7, whiteSpace:"pre-wrap" }}>
+          {texto}
+          <div style={{ marginTop:20, padding:"12px 14px", background:D.warningBg, borderRadius:D.radiusSm, fontSize:12, color:"#92400E" }}>
+            ⚠️ Documento-base. Recomendamos revisão por um advogado especializado antes da vigência definitiva.
+          </div>
+        </div>
+        <div style={{ padding:"14px 24px", borderTop:`1px solid ${D.border}`, textAlign:"right" }}>
+          <button onClick={onClose} style={{ padding:"10px 22px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Login = ({ modoInicial = "login", onVoltar }) => {
   const [modo, setModo]   = useState(modoInicial); // "login" | "cadastro"
   const [email, setEmail] = useState("");
@@ -484,6 +590,8 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
   const [falhas, setFalhas] = useState(0);
   const [esperarAte, setEsperarAte] = useState(0);
   const [agora, setAgora] = useState(Date.now());
+  const [aceito, setAceito] = useState(false);      // consentimento LGPD (cadastro)
+  const [docLegal, setDocLegal] = useState(null);   // "privacidade" | "termos" | null
   useEffect(() => {
     if (!esperarAte) return;
     const t = setInterval(() => setAgora(Date.now()), 500);
@@ -556,6 +664,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
   const handleGoogleCadastro = async () => {
     setErr("");
     if (!nomeCond || !numApt) { setErr("Preencha o nome do condomínio e a quantidade de apartamentos antes de continuar com o Google."); return; }
+    if (!aceito) { setErr("Para criar a conta, você precisa aceitar a Política de Privacidade e os Termos de Uso."); return; }
     setLoading(true);
     try {
       const cred = await signInWithPopup(auth, new GoogleAuthProvider());
@@ -567,6 +676,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
 
       const condId = gerarCondId(nomeCond);
       const plano = planoPorTamanho(numApt);
+      const aceiteEm = new Date().toISOString();
       // 1º o condomínio (a regra do vínculo exige que ele já exista e seja seu)
       await setDoc(doc(db, "condominios", condId), {
         nome: nomeCond.trim(), plano, numApartamentos: parseInt(numApt) || 0,
@@ -576,11 +686,13 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
         ativo: true,
         trialAte: new Date(Date.now() + 14*24*60*60*1000).toLocaleDateString("pt-BR"),
         statusAssinatura: "trial", cicloCobranca: "mensal",
+        aceitouTermos: true, aceitouTermosEm: aceiteEm,
       });
       // 2º o vínculo usuário → condomínio
       await setDoc(doc(db, "usuarios", uid), {
         email: emailG, nome: nomeG, condominioId: condId, papel: "sindico",
         criadoEm: new Date().toLocaleDateString("pt-BR"),
+        aceitouTermos: true, aceitouTermosEm: aceiteEm,
       });
     } catch (e) {
       const m = msgErroAuth(e);
@@ -595,6 +707,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
       setErr("Preencha todos os campos."); return;
     }
     if (pass.length < 6) { setErr("A senha deve ter no mínimo 6 caracteres."); return; }
+    if (!aceito) { setErr("Para criar a conta, você precisa aceitar a Política de Privacidade e os Termos de Uso."); return; }
     setLoading(true);
     try {
       // 1. Cria a conta (faz login automático)
@@ -602,6 +715,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
       const uid = cred.user.uid;
       const condId = gerarCondId(nomeCond);
       const plano = planoPorTamanho(numApt);
+      const aceiteEm = new Date().toISOString();
 
       // 2. Cria o condomínio PRIMEIRO (a regra do vínculo exige que ele já exista
       //    e tenha sindicoUid == você — impede alguém se vincular a condomínio alheio)
@@ -619,6 +733,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
         trialAte: new Date(Date.now() + 14*24*60*60*1000).toLocaleDateString("pt-BR"),
         statusAssinatura: "trial",
         cicloCobranca: "mensal",
+        aceitouTermos: true, aceitouTermosEm: aceiteEm,
       });
 
       // 3. Vincula usuário → condomínio (o app relê com re-tentativa ao carregar)
@@ -628,6 +743,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
         condominioId: condId,
         papel: "sindico",
         criadoEm: new Date().toLocaleDateString("pt-BR"),
+        aceitouTermos: true, aceitouTermosEm: aceiteEm,
       });
       // O onAuthStateChanged já vai detectar o login e carregar o condomínio
     } catch (e) {
@@ -695,6 +811,15 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
 
         {err && <div style={{ background:D.dangerBg, color:"#991B1B", fontSize:13, padding:"10px 14px", borderRadius:8, marginBottom:16, textAlign:"center" }}>{err}</div>}
 
+        {modo === "cadastro" && (
+          <label style={{ display:"flex", alignItems:"flex-start", gap:10, marginBottom:16, cursor:"pointer", fontFamily:D.fontBody }}>
+            <input type="checkbox" checked={aceito} onChange={e=>setAceito(e.target.checked)} style={{ width:18, height:18, marginTop:1, flexShrink:0, cursor:"pointer", accentColor:D.primary }} />
+            <span style={{ fontSize:12.5, color:D.textSec, lineHeight:1.5 }}>
+              Li e aceito a <button type="button" onClick={()=>setDocLegal("privacidade")} style={{ background:"none", border:"none", padding:0, color:D.accent, fontWeight:600, cursor:"pointer", fontSize:12.5, fontFamily:D.fontBody, textDecoration:"underline" }}>Política de Privacidade</button> e os <button type="button" onClick={()=>setDocLegal("termos")} style={{ background:"none", border:"none", padding:0, color:D.accent, fontWeight:600, cursor:"pointer", fontSize:12.5, fontFamily:D.fontBody, textDecoration:"underline" }}>Termos de Uso</button>.
+            </span>
+          </label>
+        )}
+
         <button onClick={modo==="login"?handleLogin:handleCadastro} disabled={loading || segsRestantes>0} style={{ width:"100%", padding:"14px", background: segsRestantes>0 ? D.textMut : `linear-gradient(135deg, ${D.sidebarHov}, ${D.primaryDk})`, color:"#fff", border:"none", borderRadius:10, fontSize:15, fontWeight:700, cursor: (loading||segsRestantes>0)?"default":"pointer", opacity: loading?.75:1, letterSpacing:".3px", boxShadow: segsRestantes>0?"none":`0 4px 16px rgba(30,58,114,0.35)`, fontFamily:D.fontBody }}>
           {segsRestantes > 0 ? `Aguarde ${segsRestantes}s...` : loading ? (modo==="login"?"Verificando...":"Criando conta...") : (modo==="login"?"Entrar":"Criar conta grátis")}
         </button>
@@ -739,6 +864,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
           )}
         </div>
       </div>
+      {docLegal && <LegalDoc tipo={docLegal} onClose={()=>setDocLegal(null)} />}
     </div>
   );
 };
@@ -747,6 +873,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
 const LandingPage = ({ onEntrar, onCadastrar }) => {
   const isMobile = useIsMobile();
   const [cicloAnual, setCicloAnual] = useState(false);
+  const [docLegal, setDocLegal] = useState(null);
 
   const irParaPlanos = () => {
     const el = document.getElementById("planos");
@@ -1033,9 +1160,14 @@ const LandingPage = ({ onEntrar, onCadastrar }) => {
       {/* ── Footer ── */}
       <footer style={{ background:D.sidebar, color:"rgba(226,232,240,0.6)", padding: isMobile?"32px 20px":"40px", textAlign:"center", borderTop:`1px solid ${D.sidebarBdr}` }}>
         <div style={{ display:"flex", justifyContent:"center", marginBottom:16 }}><Logo light /></div>
-        <p style={{ fontSize:13, margin:"0 0 8px" }}>Gestão de condomínios simples e profissional.</p>
+        <p style={{ fontSize:13, margin:"0 0 12px" }}>Gestão de condomínios simples e profissional.</p>
+        <div style={{ display:"flex", gap:18, justifyContent:"center", flexWrap:"wrap", marginBottom:14 }}>
+          <button onClick={()=>setDocLegal("privacidade")} style={{ background:"none", border:"none", color:"rgba(226,232,240,0.7)", fontSize:13, cursor:"pointer", fontFamily:D.fontBody, textDecoration:"underline" }}>Política de Privacidade</button>
+          <button onClick={()=>setDocLegal("termos")} style={{ background:"none", border:"none", color:"rgba(226,232,240,0.7)", fontSize:13, cursor:"pointer", fontFamily:D.fontBody, textDecoration:"underline" }}>Termos de Uso</button>
+        </div>
         <p style={{ fontSize:12, color:"rgba(226,232,240,0.4)", margin:0 }}>© {new Date().getFullYear()} MySindi · Todos os direitos reservados</p>
       </footer>
+      {docLegal && <LegalDoc tipo={docLegal} onClose={()=>setDocLegal(null)} />}
     </div>
   );
 };
@@ -1464,6 +1596,7 @@ const AdminPanel = ({ onSair }) => {
 // ── Portal do Morador ──
 function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const [morador, setMorador]     = useState(null);
+  const [docLegal, setDocLegal]   = useState(null);
   const [cobrancas, setCobrancas] = useState([]);
   const [reservasMor, setReservasMor] = useState([]);
   const [comunicadosMor, setComunicadosMor] = useState([]);
@@ -1918,7 +2051,17 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
           </div>
         )}
 
+        <div style={{ marginTop:32, paddingTop:20, borderTop:`1px solid ${D.border}`, textAlign:"center" }}>
+          <p style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, lineHeight:1.6, margin:"0 0 8px", maxWidth:520, marginLeft:"auto", marginRight:"auto" }}>
+            Seus dados são tratados pela administração do condomínio para fins de gestão condominial, conforme a LGPD.
+          </p>
+          <button onClick={()=>setDocLegal("privacidade")} style={{ background:"none", border:"none", color:D.accent, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, textDecoration:"underline" }}>
+            Política de Privacidade
+          </button>
+        </div>
+
       </div>
+      {docLegal && <LegalDoc tipo={docLegal} onClose={()=>setDocLegal(null)} />}
     </div>
   );
 }

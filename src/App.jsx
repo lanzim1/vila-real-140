@@ -2122,6 +2122,7 @@ const NAV_ICON_PATHS = {
   logDot:      '<circle cx="12" cy="12" r="4"/>',
   histDoc:     '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/>',
   link:        '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  mais:        '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
   clock:       '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   catLuz:      '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
   catLimpeza:  '<path d="M12 3l1.6 4.8L18 9l-4.4 1.2L12 15l-1.6-4.8L6 9l4.4-1.2z"/><path d="M5 18l1.5 1.5M18 4l1 1"/>',
@@ -3942,16 +3943,24 @@ export default function App() {
           )}
           {/* Barra principal */}
           <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:D.sidebar, display:"flex", zIndex:499, boxShadow:`0 -1px 0 ${D.sidebarBdr}, 0 -4px 16px rgba(28,45,94,.4)`, paddingBottom:"env(safe-area-inset-bottom,0)", height:64 }}>
-            {navPrincipal.map(n => (
-              <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color: aba===n.id ? D.accent : "rgba(226,232,245,0.75)", borderTop: aba===n.id ? `2px solid ${D.accent}` : "2px solid transparent", fontFamily:D.fontBody }}>
-                <span style={{ display:"flex" }}><NavIcon id={n.id} size={19} /></span>
-                <span style={{ fontSize:9.5, fontWeight: aba===n.id?600:400 }}>{n.label}</span>
+            {navPrincipal.map(n => {
+              const ativo = aba===n.id;
+              return (
+              <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, color: ativo ? "#93C5FD" : "rgba(226,232,245,0.72)", borderTop: ativo ? `2px solid #93C5FD` : "2px solid transparent", fontFamily:D.fontBody }}>
+                <span style={{ display:"flex", height:20, alignItems:"center" }}><NavIcon id={n.id} size={20} /></span>
+                <span style={{ fontSize:9.5, fontWeight: ativo?600:400, lineHeight:1 }}>{n.label}</span>
               </button>
-            ))}
-            <button onClick={() => setMaisAberto(v=>!v)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"10px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color: maisAberto || navSecundario.some(n=>n.id===aba) ? D.accent : "rgba(226,232,245,0.75)", borderTop: maisAberto || navSecundario.some(n=>n.id===aba) ? `2px solid ${D.accent}` : "2px solid transparent", fontFamily:D.fontBody }}>
-              <span style={{ fontSize:19 }}>⋯</span>
-              <span style={{ fontSize:9.5, fontWeight: maisAberto?600:400 }}>Mais</span>
-            </button>
+              );
+            })}
+            {(() => {
+              const ativo = maisAberto || navSecundario.some(n=>n.id===aba);
+              return (
+              <button onClick={() => setMaisAberto(v=>!v)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, color: ativo ? "#93C5FD" : "rgba(226,232,245,0.72)", borderTop: ativo ? `2px solid #93C5FD` : "2px solid transparent", fontFamily:D.fontBody }}>
+                <span style={{ display:"flex", height:20, alignItems:"center" }}><NavIcon id="mais" size={20} /></span>
+                <span style={{ fontSize:9.5, fontWeight: ativo?600:400, lineHeight:1 }}>Mais</span>
+              </button>
+              );
+            })()}
           </nav>
         </>
       )}
@@ -4282,11 +4291,11 @@ export default function App() {
                 <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:0, fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Cobranças</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Registre pagamentos e comprovantes</p>
               </div>
-              <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
-                <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard }}>
+              <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", width: isMobile?"100%":"auto" }}>
+                <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, flex: isMobile?1:"none" }}>
                   {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
                 </select>
-                <button onClick={exportarCobrancasCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>⬇ Exportar CSV</button>
+                <button onClick={exportarCobrancasCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, flex: isMobile?1:"none", whiteSpace:"nowrap" }}>⬇ Exportar CSV</button>
                 {!readOnly && !isMobile && <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"9px 16px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, fontFamily:D.fontBody }}>{enviandoEmails?"Enviando...":"Cobrar pendentes"}</button>}
               </div>
             </div>
@@ -4330,10 +4339,13 @@ export default function App() {
             {/* ── Cobranças extras / rateios ── */}
             {podeUsar("cobrancaExtra") ? (
               <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, padding: isMobile?16:20, marginBottom:16 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: (cobrancasExtras.filter(e=>e.mes===mesSel).length ? 14 : 0), flexWrap:"wrap", gap:10 }}>
-                  <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>➕ Cobranças extras — {mesLabel(mesSel)}</div>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, flexDirection: isMobile?"column":"row", alignItems: isMobile?"stretch":"center", gap:12 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>
+                    <span style={{ color:D.accent, display:"flex" }}><NavIcon id="cobrancas" size={17} /></span>
+                    Cobranças extras — {mesLabel(mesSel)}
+                  </div>
                   {!readOnly && (
-                    <button onClick={() => { setNovaCobExtra({ descricao:"", modo:"unidade", valor:"", mes: mesSel }); setModal({ type:"novaCobExtra" }); }} style={{ padding:"8px 14px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>+ Nova cobrança extra</button>
+                    <button onClick={() => { setNovaCobExtra({ descricao:"", modo:"unidade", valor:"", mes: mesSel }); setModal({ type:"novaCobExtra" }); }} style={{ padding:"9px 14px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width: isMobile?"100%":"auto" }}>+ Nova cobrança extra</button>
                   )}
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
@@ -4353,7 +4365,7 @@ export default function App() {
                         </div>
                         <div style={{ display:"flex", gap:8 }}>
                           {!readOnly && <button onClick={() => setModal({ type:"gerenciarExtra", data:{ extraId: extra.id } })} style={{ padding:"7px 14px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Gerenciar</button>}
-                          {!readOnly && <button onClick={() => { if(window.confirm(`Remover a cobrança extra "${extra.descricao}"? Isso apaga os registros de pagamento dela.`)) removerCobrancaExtra(extra); }} style={{ padding:"7px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>}
+                          {!readOnly && <button onClick={() => { if(window.confirm(`Remover a cobrança extra "${extra.descricao}"? Isso apaga os registros de pagamento dela.`)) removerCobrancaExtra(extra); }} title="Remover" style={{ width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>}
                         </div>
                       </div>
                     );
@@ -4484,18 +4496,16 @@ export default function App() {
 
               {/* Cabeçalho + ações */}
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
-                <div>
-                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{moradores.length} unidade{moradores.length!==1?"s":""} cadastrada{moradores.length!==1?"s":""}</div>
-                </div>
-                <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
-                  <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"8px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, fontFamily:D.fontBody }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{moradores.length} unidade{moradores.length!==1?"s":""} cadastrada{moradores.length!==1?"s":""}</div>
+                <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", width: isMobile?"100%":"auto" }}>
+                  <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, fontFamily:D.fontBody, flex: isMobile?1:"none" }}>
                     {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
                   </select>
-                  <button onClick={exportarMoradoresCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                  <button onClick={exportarMoradoresCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, flex: isMobile?1:"none", whiteSpace:"nowrap" }}>
                     ⬇ Exportar CSV
                   </button>
                   {!readOnly && (
-                    <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
+                    <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)`, width: isMobile?"100%":"auto" }}>
                       + Adicionar morador
                     </button>
                   )}
@@ -4568,12 +4578,12 @@ export default function App() {
                                 {cob && <Badge status={cob.status} />}
                               </div>
                               {m.email && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.email}</div>}
-                              <div style={{ display:"flex", gap:8, marginTop:10, flexWrap:"wrap" }}>
-                                <button onClick={() => setModal({ type:"historico", data:m })} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="histDoc" size={14} /> Histórico</button>
-                                <button onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="link" size={14} /> Link</button>
+                              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginTop:12 }}>
+                                <button onClick={() => setModal({ type:"historico", data:m })} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="histDoc" size={14} /> Histórico</button>
+                                <button onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="link" size={14} /> Link</button>
                                 {!readOnly && <>
-                                  <button onClick={() => abrirEditar(m)} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logPencil" size={14} /> Editar</button>
-                                  <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>
+                                  <button onClick={() => abrirEditar(m)} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logPencil" size={14} /> Editar</button>
+                                  <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>
                                 </>}
                               </div>
                             </div>

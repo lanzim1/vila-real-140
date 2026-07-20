@@ -2226,6 +2226,7 @@ export default function App() {
   const [filtroMorador, setFiltroMorador] = useState("todos");
   const [filtroCobranca, setFiltroCobranca] = useState("todos");
   const [filtroDespesa, setFiltroDespesa] = useState("todas");
+  const [filtroReserva, setFiltroReserva] = useState("todas");
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -4898,119 +4899,149 @@ export default function App() {
             <TopBar title="Reservas" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
-              {/* Cards de resumo */}
-              <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(3,1fr)", gap:12, marginBottom:20 }}>
-                {[
-                  { label:"Aguardando aprovação", valor: reservas.filter(r=>r.status==="pendente").length,  icon:"⏳", cor:D.warning,  bg:D.warningBg  },
-                  { label:"Aprovadas",             valor: reservas.filter(r=>r.status==="aprovada").length,  icon:"✅", cor:D.success,  bg:D.successBg  },
-                  { label:"Rejeitadas",            valor: reservas.filter(r=>r.status==="rejeitada").length, icon:"❌", cor:D.danger,   bg:D.dangerBg   },
-                ].map((c,i) => (
-                  <div key={i} style={{ background:c.bg, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                    <div style={{ fontSize:20, marginBottom:6 }}>{c.icon}</div>
-                    <div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:c.cor, letterSpacing:"-0.02em" }}>{c.valor}</div>
-                    <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:3 }}>{c.label}</div>
+              {(() => {
+                const pend = reservas.filter(r=>r.status==="pendente");
+                const aprov = reservas.filter(r=>r.status==="aprovada");
+                const rejet = reservas.filter(r=>r.status==="rejeitada");
+                const hist = reservas.filter(r=>r.status!=="pendente");
+
+                const cards = [
+                  { label:"Aguardando aprovação", valor: pend.length,  icon:"clock",    cor:D.warning },
+                  { label:"Aprovadas",            valor: aprov.length, icon:"logCheck", cor:D.success },
+                  { label:"Rejeitadas",           valor: rejet.length, icon:"logTrash", cor:D.danger  },
+                ];
+
+                const chips = [
+                  { id:"todas",     label:"Todas",      cor:D.primary, n:hist.length },
+                  { id:"aprovada",  label:"Aprovadas",  cor:D.success, n:aprov.length },
+                  { id:"rejeitada", label:"Rejeitadas", cor:D.danger,  n:rejet.length },
+                ];
+                const histFiltrado = hist.filter(r => filtroReserva==="todas" || r.status===filtroReserva);
+
+                return (
+                <>
+                  {/* Cards de resumo */}
+                  <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(3,1fr)", gap:12, marginBottom:16 }}>
+                    {cards.map((c,i) => (
+                      <div key={i} style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, display:"flex", alignItems:"center", gap:14 }}>
+                        <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:c.cor, flexShrink:0 }}><NavIcon id={c.icon} size={19} /></div>
+                        <div><div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:c.cor, letterSpacing:"-0.02em", lineHeight:1 }}>{c.valor}</div><div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:4 }}>{c.label}</div></div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              {/* Botão nova reserva (síndico) */}
-              {!readOnly && (
-                <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:16 }}>
-                  <button onClick={() => { setNovaReserva({ area:"Churrasqueira", data:"", horario:"", observacao:"", moradorId:"", moradorNome:"" }); setModal({ type:"novaReservaSindico" }); }} style={{ padding:"9px 18px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
-                    + Nova Reserva
-                  </button>
-                </div>
-              )}
+                  {/* Faixa de destaque + botão nova reserva */}
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, marginBottom:16, flexWrap:"wrap" }}>
+                    {pend.length > 0 ? (
+                      <div style={{ display:"flex", alignItems:"center", gap:10, background:D.warningBg, border:`1px solid #FDE68A`, borderRadius:D.radius, padding:"10px 16px", flex:1, minWidth:220 }}>
+                        <span style={{ color:D.warning, display:"flex" }}><NavIcon id="clock" size={17} /></span>
+                        <span style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:"#92400E" }}>{pend.length} {pend.length===1?"reserva aguardando":"reservas aguardando"} sua aprovação</span>
+                      </div>
+                    ) : <div style={{ flex:1 }} />}
+                    {!readOnly && (
+                      <button onClick={() => { setNovaReserva({ area:"Churrasqueira", data:"", horario:"", observacao:"", moradorId:"", moradorNome:"" }); setModal({ type:"novaReservaSindico" }); }} style={{ padding:"10px 18px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)`, whiteSpace:"nowrap" }}>+ Nova Reserva</button>
+                    )}
+                  </div>
 
-              {/* Pendentes — precisam de aprovação */}
-              {reservas.filter(r=>r.status==="pendente").length > 0 && (
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>⏳ Aguardando aprovação</div>
-                  <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
-                    <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                      <thead>
-                        <tr style={{ background:D.muted }}>
-                          {["Área","Morador","Data","Horário","Observação","Ações"].map(h => (
-                            <th key={h} style={{ padding:"10px 18px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reservas.filter(r=>r.status==="pendente").map((r,i) => (
-                          <tr key={r.id} style={{ borderBottom:`1px solid ${D.border}` }}>
-                            <td style={{ padding:"13px 18px" }}>
-                              <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>🔥 {r.area}</div>
-                              <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:2 }}>Solicitado em {r.criadoEm}</div>
-                            </td>
-                            <td style={{ padding:"13px 18px" }}>
-                              <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.nome}</div>
-                              <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textSec }}>{r.unidade}</div>
-                            </td>
-                            <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.data}</td>
-                            <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.horario}</td>
-                            <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{r.observacao||"—"}</td>
-                            <td style={{ padding:"13px 18px" }}>
-                              {!readOnly && (
-                                <div style={{ display:"flex", gap:8 }}>
-                                  <button onClick={() => aprovarReserva(r.id)} style={{ padding:"6px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>✓ Aprovar</button>
-                                  <button onClick={() => rejeitarReserva(r.id)} style={{ padding:"6px 14px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>✗ Rejeitar</button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
+                  {/* Pendentes — precisam de aprovação */}
+                  {pend.length > 0 && (
+                    <div style={{ marginBottom:20 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+                        <span style={{ width:8, height:8, borderRadius:"50%", background:D.warning }} />
+                        <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Aguardando aprovação</span>
+                      </div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                        {pend.map(r => (
+                          <div key={r.id} style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.warning}`, padding:16, display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                            <div style={{ display:"flex", gap:12, alignItems:"center", minWidth:0 }}>
+                              <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.accent, flexShrink:0 }}><NavIcon id="reservas" size={19} /></div>
+                              <div style={{ minWidth:0 }}>
+                                <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>{r.area} · {r.data} {r.horario&&`· ${r.horario}`}</div>
+                                <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{r.nome} · {r.unidade}{r.observacao?` · ${r.observacao}`:""}</div>
+                                <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:2 }}>Solicitado em {r.criadoEm}</div>
+                              </div>
+                            </div>
+                            {!readOnly && (
+                              <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+                                <button onClick={() => aprovarReserva(r.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={15} /> Aprovar</button>
+                                <button onClick={() => rejeitarReserva(r.id)} title="Rejeitar" style={{ width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={16} /></button>
+                              </div>
+                            )}
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+                      </div>
+                    </div>
+                  )}
 
-              {/* Histórico de reservas */}
-              <div>
-                <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>📋 Histórico de Reservas</div>
-                {reservas.filter(r=>r.status!=="pendente").length === 0 ? (
-                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:32, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                    <div style={{ fontSize:36, marginBottom:10 }}>📅</div>
-                    <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhuma reserva aprovada ou rejeitada ainda.</div>
+                  {/* Histórico */}
+                  <div>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, marginBottom:12, flexWrap:"wrap" }}>
+                      <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Histórico de reservas</span>
+                      {hist.length > 0 && (
+                        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                          {chips.map(c => {
+                            const ativo = filtroReserva===c.id;
+                            return (
+                              <button key={c.id} onClick={()=>setFiltroReserva(c.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 12px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                                {c.id!=="todas" && <span style={{ width:6, height:6, borderRadius:"50%", background: ativo?"#fff":c.cor }} />}
+                                {c.label} <span style={{ opacity:.6 }}>{c.n}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    {hist.length === 0 ? (
+                      <div style={{ background:D.bgCard, borderRadius:D.radius, padding:36, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                        <div style={{ display:"flex", justifyContent:"center", marginBottom:10, color:D.textMut }}><NavIcon id="reservas" size={34} /></div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhuma reserva aprovada ou rejeitada ainda.</div>
+                      </div>
+                    ) : (
+                      <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
+                        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                          <thead>
+                            <tr style={{ background:D.muted }}>
+                              {["Área","Morador","Data","Horário","Status", ...(readOnly?[]:["Ações"])].map(h => (
+                                <th key={h} style={{ padding:"10px 18px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {histFiltrado.map(r => (
+                              <tr key={r.id} style={{ borderBottom:`1px solid ${D.border}` }}>
+                                <td style={{ padding:"13px 18px" }}>
+                                  <span style={{ display:"flex", alignItems:"center", gap:8, fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>
+                                    <span style={{ color:D.accent, display:"flex" }}><NavIcon id="reservas" size={16} /></span>{r.area}
+                                  </span>
+                                </td>
+                                <td style={{ padding:"13px 18px" }}>
+                                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.nome}</div>
+                                  <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textSec }}>{r.unidade}</div>
+                                </td>
+                                <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.data}</td>
+                                <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.horario||"—"}</td>
+                                <td style={{ padding:"13px 18px" }}>
+                                  <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px 3px 8px", borderRadius:20, fontSize:12, fontWeight:600, background: r.status==="aprovada"?D.successBg:D.dangerBg, color: r.status==="aprovada"?D.success:D.danger }}>
+                                    <span style={{ width:6, height:6, borderRadius:"50%", background: r.status==="aprovada"?D.success:D.danger }} />
+                                    {r.status==="aprovada"?"Aprovada":"Rejeitada"}
+                                  </span>
+                                </td>
+                                {!readOnly && (
+                                  <td style={{ padding:"13px 18px" }}>
+                                    <button onClick={() => { if(window.confirm("Remover esta reserva?")) removerReserva(r.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                            {histFiltrado.length===0 && <tr><td colSpan={readOnly?5:6} style={{ padding:24, textAlign:"center", color:D.textMut, fontSize:13, fontFamily:D.fontBody }}>Nenhuma reserva nesta categoria.</td></tr>}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
-                    <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                      <thead>
-                        <tr style={{ background:D.muted }}>
-                          {["Área","Morador","Data","Horário","Status","Ações"].map(h => (
-                            <th key={h} style={{ padding:"10px 18px", textAlign:"left", fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", borderBottom:`1px solid ${D.border}` }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reservas.filter(r=>r.status!=="pendente").map((r,i) => (
-                          <tr key={r.id} style={{ borderBottom:`1px solid ${D.border}` }}>
-                            <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>🔥 {r.area}</td>
-                            <td style={{ padding:"13px 18px" }}>
-                              <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.nome}</div>
-                              <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textSec }}>{r.unidade}</div>
-                            </td>
-                            <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.data}</td>
-                            <td style={{ padding:"13px 18px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>{r.horario}</td>
-                            <td style={{ padding:"13px 18px" }}>
-                              <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px 3px 8px", borderRadius:20, fontSize:12, fontWeight:600, background: r.status==="aprovada"?D.successBg:D.dangerBg, color: r.status==="aprovada"?D.success:D.danger }}>
-                                <span style={{ width:6, height:6, borderRadius:"50%", background: r.status==="aprovada"?D.success:D.danger }} />
-                                {r.status==="aprovada"?"Aprovada":"Rejeitada"}
-                              </span>
-                            </td>
-                            <td style={{ padding:"13px 18px" }}>
-                              {!readOnly && (
-                                <button onClick={() => { if(window.confirm("Remover esta reserva?")) removerReserva(r.id); }} style={{ padding:"5px 12px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Remover</button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+                </>
+                );
+              })()}
             </div>
           </div>
         )}

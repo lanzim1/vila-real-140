@@ -5432,48 +5432,60 @@ export default function App() {
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ação */}
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:12 }}>
                 <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>Registre encomendas recebidas e notifique os moradores</div>
                 {!readOnly && (
-                  <button onClick={() => { setNovaEntrega({ moradorId:"", remetente:"", descricao:"", obs:"" }); setModal({ type:"novaEntrega" }); }} style={{ padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
+                  <button onClick={() => { setNovaEntrega({ moradorId:"", remetente:"", descricao:"", obs:"" }); setModal({ type:"novaEntrega" }); }} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)`, width: isMobile?"100%":"auto" }}>
                     + Registrar encomenda
                   </button>
                 )}
               </div>
 
               {/* Cards de resumo */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:20 }}>
-                <div style={{ background:D.warningBg, borderRadius:D.radius, padding:"16px 18px", border:`1px solid ${D.border}` }}>
-                  <div style={{ fontSize:20, marginBottom:6 }}>📦</div>
-                  <div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:D.warning, letterSpacing:"-0.02em" }}>{aguardando.length}</div>
-                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>Aguardando retirada</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, display:"flex", alignItems:"center", gap:14 }}>
+                  <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.warning, flexShrink:0 }}><NavIcon id="entregas" size={19} /></div>
+                  <div><div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:D.warning, letterSpacing:"-0.02em", lineHeight:1 }}>{aguardando.length}</div><div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:4 }}>Aguardando retirada</div></div>
                 </div>
-                <div style={{ background:D.successBg, borderRadius:D.radius, padding:"16px 18px", border:`1px solid ${D.border}` }}>
-                  <div style={{ fontSize:20, marginBottom:6 }}>✅</div>
-                  <div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:D.success, letterSpacing:"-0.02em" }}>{retiradas.length}</div>
-                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>Já retiradas</div>
+                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, display:"flex", alignItems:"center", gap:14 }}>
+                  <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.success, flexShrink:0 }}><NavIcon id="logCheck" size={19} /></div>
+                  <div><div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:D.success, letterSpacing:"-0.02em", lineHeight:1 }}>{retiradas.length}</div><div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:4 }}>Já retiradas</div></div>
                 </div>
               </div>
+
+              {/* Faixa de destaque */}
+              {aguardando.length > 0 && (
+                <div style={{ display:"flex", alignItems:"center", gap:10, background:D.warningBg, border:`1px solid #FDE68A`, borderRadius:D.radius, padding:"10px 16px", marginBottom:16 }}>
+                  <span style={{ color:D.warning, display:"flex" }}><NavIcon id="entregas" size={17} /></span>
+                  <span style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:"#92400E" }}>{aguardando.length} {aguardando.length===1?"encomenda aguardando":"encomendas aguardando"} retirada</span>
+                </div>
+              )}
 
               {/* Aguardando retirada */}
               {aguardando.length > 0 && (
                 <div style={{ marginBottom:24 }}>
-                  <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>📦 Aguardando retirada</div>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+                    <span style={{ width:8, height:8, borderRadius:"50%", background:D.warning }} />
+                    <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Aguardando retirada</span>
+                  </div>
                   <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
                     {aguardando.map(e => (
-                      <div key={e.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${D.warning}` }}>
+                      <div key={e.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.warning}` }}>
                         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, flexWrap:"wrap" }}>
-                          <div style={{ flex:1, minWidth:180 }}>
-                            <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{e.descricao}</div>
-                            <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, marginTop:3 }}>Para: <b>{e.moradorNome}</b> · {e.unidade}</div>
-                            {e.remetente && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:2 }}>Remetente: {e.remetente}</div>}
-                            {e.obs && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:2 }}>{e.obs}</div>}
-                            <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:6 }}>Chegou em {e.dataChegada} às {e.horaChegada}</div>
+                          <div style={{ display:"flex", gap:12, alignItems:"flex-start", flex:1, minWidth:180 }}>
+                            <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.accent, flexShrink:0 }}><NavIcon id="entregas" size={19} /></div>
+                            <div style={{ minWidth:0 }}>
+                              <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{e.descricao}</div>
+                              <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, marginTop:3 }}>Para: <b style={{ color:D.text }}>{e.moradorNome}</b> · {e.unidade}</div>
+                              {e.remetente && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:2 }}>Remetente: {e.remetente}</div>}
+                              {e.obs && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:2 }}>{e.obs}</div>}
+                              <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:6 }}>Chegou em {e.dataChegada} às {e.horaChegada}</div>
+                            </div>
                           </div>
                           {!readOnly && (
-                            <div style={{ display:"flex", gap:6, flexShrink:0 }}>
-                              <button onClick={() => marcarRetirada(e)} style={{ padding:"7px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>✓ Retirada</button>
-                              <button onClick={() => { if(window.confirm("Remover este registro?")) removerEntrega(e.id); }} style={{ padding:"7px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
+                            <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+                              <button onClick={() => marcarRetirada(e)} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={15} /> Retirada</button>
+                              <button onClick={() => { if(window.confirm("Remover este registro?")) removerEntrega(e.id); }} title="Remover" style={{ width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={16} /></button>
                             </div>
                           )}
                         </div>
@@ -5484,10 +5496,13 @@ export default function App() {
               )}
 
               {/* Histórico de retiradas */}
-              <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>✅ Já retiradas</div>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+                <span style={{ width:8, height:8, borderRadius:"50%", background:D.success }} />
+                <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Já retiradas</span>
+              </div>
               {retiradas.length === 0 && aguardando.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                  <div style={{ fontSize:40, marginBottom:12 }}>📦</div>
+                  <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="entregas" size={36} /></div>
                   <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhuma encomenda registrada</div>
                   <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Quando chegar uma encomenda, registre aqui e o morador será avisado.</div>
                 </div>
@@ -5496,17 +5511,20 @@ export default function App() {
               ) : (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
                   {retiradas.map((e,i) => (
-                    <div key={e.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", borderBottom: i<retiradas.length-1?`1px solid ${D.border}`:"none", gap:12, flexWrap:"wrap" }}>
-                      <div style={{ flex:1, minWidth:160 }}>
-                        <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:600, color:D.text }}>{e.descricao}</div>
-                        <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{e.moradorNome} · {e.unidade}</div>
+                    <div key={e.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 16px", borderBottom: i<retiradas.length-1?`1px solid ${D.border}`:"none", gap:12 }}>
+                      <div style={{ display:"flex", gap:11, alignItems:"center", flex:1, minWidth:0 }}>
+                        <div style={{ width:32, height:32, borderRadius:8, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.textSec, flexShrink:0 }}><NavIcon id="entregas" size={15} /></div>
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:600, color:D.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{e.descricao}</div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{e.moradorNome} · {e.unidade}</div>
+                        </div>
                       </div>
-                      <div style={{ textAlign:"right" }}>
-                        <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.success, fontWeight:600 }}>Retirada</div>
-                        <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut }}>{e.dataRetirada}{e.horaRetirada?` às ${e.horaRetirada}`:""}</div>
+                      <div style={{ textAlign:"right", flexShrink:0 }}>
+                        <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px 3px 8px", borderRadius:20, fontSize:11.5, fontWeight:600, background:D.successBg, color:D.success }}><span style={{ width:6, height:6, borderRadius:"50%", background:D.success }} />Retirada</span>
+                        <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:3 }}>{e.dataRetirada}{e.horaRetirada?` às ${e.horaRetirada}`:""}</div>
                       </div>
                       {!readOnly && (
-                        <button onClick={() => { if(window.confirm("Remover este registro?")) removerEntrega(e.id); }} style={{ background:"none", border:"none", color:D.textMut, cursor:"pointer", fontSize:16 }}>×</button>
+                        <button onClick={() => { if(window.confirm("Remover este registro?")) removerEntrega(e.id); }} title="Remover" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer", flexShrink:0 }}><NavIcon id="logTrash" size={15} /></button>
                       )}
                     </div>
                   ))}

@@ -4638,7 +4638,7 @@ export default function App() {
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
-                <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:0, fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Água &amp; Luz</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:0, fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Água & Luz</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Contas e despesas fixas</p>
               </div>
               <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
@@ -4795,7 +4795,7 @@ export default function App() {
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
-                <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:0, fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Serviços &amp; Manutenção</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:0, fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Serviços & Manutenção</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Consertos e melhorias do condomínio</p>
               </div>
               {!readOnly && <button onClick={() => setModal({ type:"novoServico" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>+ Novo</button>}

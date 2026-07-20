@@ -2123,6 +2123,10 @@ const NAV_ICON_PATHS = {
   histDoc:     '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/>',
   link:        '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   mais:        '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  acPorta:     '<path d="M13 4h3a2 2 0 0 1 2 2v14"/><path d="M2 20h3M13 20h9"/><path d="M10 12v.01"/><path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.562z"/>',
+  acEmpresa:   '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/>',
+  acMotivo:    '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8"/>',
+  acCasa:      '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
   clock:       '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   catLuz:      '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
   catLimpeza:  '<path d="M12 3l1.6 4.8L18 9l-4.4 1.2L12 15l-1.6-4.8L6 9l4.4-1.2z"/><path d="M5 18l1.5 1.5M18 4l1 1"/>',
@@ -2228,6 +2232,7 @@ export default function App() {
   const [filtroCobranca, setFiltroCobranca] = useState("todos");
   const [filtroDespesa, setFiltroDespesa] = useState("todas");
   const [filtroReserva, setFiltroReserva] = useState("todas");
+  const [filtroAcesso, setFiltroAcesso] = useState("todos");
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -5092,73 +5097,106 @@ export default function App() {
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
-                <h2 style={{ fontFamily:D.fontDisplay, color:"#1E3A5F", margin:0, fontSize:h2size }}>Controle de Acessos</h2>
+                <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:0, fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Controle de Acessos</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Visitantes e prestadores de serviço</p>
               </div>
               {!readOnly && (
-                <button onClick={() => { setNovoAcesso({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" }); setModal({ type:"novoAcesso" }); }} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
+                <button onClick={() => { setNovoAcesso({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" }); setModal({ type:"novoAcesso" }); }} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)`, width: isMobile?"100%":"auto" }}>
                   + Registrar Entrada
                 </button>
               )}
             </div>
 
-            {/* Cards de resumo */}
-            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3,1fr)", gap:12, marginBottom:20 }}>
-              {[
-                { label:"Total de acessos",  valor: acessos.length,                                   icon:"🚪", cor:"#1E3A5F" },
-                { label:"Ainda no condomínio", valor: acessos.filter(a=>!a.horaSaida).length,          icon:"🟡", cor:"#F57F17" },
-                { label:"Saíram",             valor: acessos.filter(a=>!!a.horaSaida).length,          icon:"✅", cor:"#2E7D32" },
-              ].map((c,i) => (
-                <div key={i} style={{ background:"#fff", borderRadius:12, padding:"14px 14px 12px", boxShadow:"0 2px 8px rgba(0,0,0,.06)", borderTop:`3px solid ${c.cor}` }}>
-                  <div style={{ fontSize:20, marginBottom:4 }}>{c.icon}</div>
-                  <div style={{ fontSize:20, fontWeight:700, color:c.cor }}>{c.valor}</div>
-                  <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{c.label}</div>
-                </div>
-              ))}
-            </div>
+            {(() => {
+              const dentro = acessos.filter(a=>!a.horaSaida);
+              const sairam = acessos.filter(a=>!!a.horaSaida);
+              const cards = [
+                { label:"Total de acessos",   valor: acessos.length, icon:"acPorta", cor:D.text },
+                { label:"Ainda no condomínio", valor: dentro.length,  icon:"clock",   cor:D.warning },
+                { label:"Saíram",              valor: sairam.length,  icon:"logCheck",cor:D.success },
+              ];
+              const chips = [
+                { id:"todos",  label:"Todos",        cor:D.primary, n:acessos.length },
+                { id:"dentro", label:"No condomínio", cor:D.warning, n:dentro.length },
+                { id:"sairam", label:"Saíram",        cor:D.success, n:sairam.length },
+              ];
+              const lista = acessos.filter(a => filtroAcesso==="todos" || (filtroAcesso==="dentro" ? !a.horaSaida : !!a.horaSaida));
 
-            {/* Lista de acessos */}
-            {acessos.length === 0 ? (
-              <div style={{ background:"#fff", borderRadius:12, padding:40, textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-                <div style={{ fontSize:40, marginBottom:12 }}>🚪</div>
-                <div style={{ color:D.textMut, fontSize:14, fontFamily:D.fontBody }}>Nenhum acesso registrado ainda.</div>
-              </div>
-            ) : (
-              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                {acessos.map((a) => (
-                  <div key={a.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:18, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${a.horaSaida ? "#2E7D32" : "#F57F17"}` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
-                      <div>
-                        <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{a.nome}</div>
-                        {a.empresa && <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>🏢 {a.empresa}</div>}
-                        <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>📋 {a.motivo}</div>
-                        {a.unidade && <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>🏠 {a.unidade}</div>}
-                      </div>
-                      <div style={{ textAlign:"right", flexShrink:0 }}>
-                        <div style={{ fontSize:12, color:"#1E3A5F", fontWeight:600 }}>{a.dataEntrada}</div>
-                        <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>Entrada: {a.horaEntrada}</div>
-                        {a.horaSaida
-                          ? <div style={{ fontSize:12, color:"#2E7D32", marginTop:2, fontWeight:600 }}>Saída: {a.horaSaida}</div>
-                          : <div style={{ fontSize:12, color:"#F57F17", marginTop:2, fontWeight:600 }}>No condomínio</div>
-                        }
-                      </div>
+              return (
+              <>
+                {/* Resumo */}
+                <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3,1fr)", gap:12, marginBottom:16 }}>
+                  {cards.map((c,i) => (
+                    <div key={i} style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, display:"flex", alignItems:"center", gap:14, gridColumn: (isMobile && i===2)?"1 / -1":"auto" }}>
+                      <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:c.cor, flexShrink:0 }}><NavIcon id={c.icon} size={19} /></div>
+                      <div><div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:c.cor, lineHeight:1, letterSpacing:"-0.02em" }}>{c.valor}</div><div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:4 }}>{c.label}</div></div>
                     </div>
-                    {!readOnly && (
-                      <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
-                        {!a.horaSaida && (
-                          <button onClick={() => registrarSaida(a.id)} style={{ padding:"6px 14px", background:"#DCFCE7", color:"#166534", border:"1px solid #86EFAC", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                            ✓ Registrar Saída
-                          </button>
-                        )}
-                        <button onClick={() => { if(window.confirm("Remover este registro?")) removerAcesso(a.id); }} style={{ padding:"6px 14px", background:"#FEE2E2", color:"#991B1B", border:"1px solid #FECACA", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                          Remover
-                        </button>
-                      </div>
-                    )}
+                  ))}
+                </div>
+
+                {acessos.length === 0 ? (
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                    <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="acPorta" size={36} /></div>
+                    <div style={{ color:D.textMut, fontSize:14, fontFamily:D.fontBody }}>Nenhum acesso registrado ainda.</div>
                   </div>
-                ))}
-              </div>
-            )}
+                ) : (
+                  <>
+                    {/* Filtros */}
+                    <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
+                      {chips.map(c => {
+                        const ativo = filtroAcesso===c.id;
+                        return (
+                          <button key={c.id} onClick={()=>setFiltroAcesso(c.id)} style={{ display:"flex", alignItems:"center", gap:7, padding:"6px 14px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                            {c.id!=="todos" && <span style={{ width:7, height:7, borderRadius:"50%", background: ativo?"#fff":c.cor }} />}
+                            {c.label} <span style={{ opacity:.6 }}>{c.n}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                      {lista.map((a) => {
+                        const dentroAgora = !a.horaSaida;
+                        return (
+                          <div key={a.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${dentroAgora ? D.warning : D.success}` }}>
+                            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:10 }}>
+                              <div style={{ display:"flex", gap:12, alignItems:"flex-start", minWidth:0 }}>
+                                <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.accent, flexShrink:0 }}><NavIcon id="acPorta" size={19} /></div>
+                                <div style={{ minWidth:0 }}>
+                                  <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>{a.nome}</div>
+                                  <div style={{ display:"flex", flexWrap:"wrap", gap:"2px 12px", marginTop:3 }}>
+                                    {a.empresa && <span style={{ display:"flex", alignItems:"center", gap:5, fontFamily:D.fontBody, fontSize:12, color:D.textSec }}><span style={{ color:D.textMut, display:"flex" }}><NavIcon id="acEmpresa" size={13} /></span>{a.empresa}</span>}
+                                    <span style={{ display:"flex", alignItems:"center", gap:5, fontFamily:D.fontBody, fontSize:12, color:D.textSec }}><span style={{ color:D.textMut, display:"flex" }}><NavIcon id="acMotivo" size={13} /></span>{a.motivo}</span>
+                                    {a.unidade && <span style={{ display:"flex", alignItems:"center", gap:5, fontFamily:D.fontBody, fontSize:12, color:D.textSec }}><span style={{ color:D.textMut, display:"flex" }}><NavIcon id="acCasa" size={13} /></span>{a.unidade}</span>}
+                                  </div>
+                                </div>
+                              </div>
+                              <div style={{ textAlign:"right", flexShrink:0 }}>
+                                <div style={{ fontSize:12, color:D.text, fontWeight:600, fontFamily:D.fontBody }}>{a.dataEntrada}</div>
+                                <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>Entrada {a.horaEntrada}</div>
+                                {a.horaSaida
+                                  ? <div style={{ fontSize:12, color:D.success, marginTop:2, fontWeight:600, fontFamily:D.fontBody }}>Saída {a.horaSaida}</div>
+                                  : <span style={{ display:"inline-flex", alignItems:"center", gap:5, marginTop:4, padding:"3px 10px 3px 8px", borderRadius:20, fontSize:11.5, fontWeight:600, background:D.warningBg, color:"#92400E" }}><span style={{ width:6, height:6, borderRadius:"50%", background:D.warning }} />No condomínio</span>
+                                }
+                              </div>
+                            </div>
+                            {!readOnly && (
+                              <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
+                                {dentroAgora && (
+                                  <button onClick={() => registrarSaida(a.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={15} /> Registrar saída</button>
+                                )}
+                                <button onClick={() => { if(window.confirm("Remover este registro?")) removerAcesso(a.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </>
+              );
+            })()}
           </div>
           </div>
         )}

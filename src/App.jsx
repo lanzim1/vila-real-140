@@ -2127,6 +2127,9 @@ const NAV_ICON_PATHS = {
   acEmpresa:   '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/>',
   acMotivo:    '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8"/>',
   acCasa:      '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  pin:         '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+  lock:        '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  unlock:      '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
   clock:       '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   catLuz:      '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
   catLimpeza:  '<path d="M12 3l1.6 4.8L18 9l-4.4 1.2L12 15l-1.6-4.8L6 9l4.4-1.2z"/><path d="M5 18l1.5 1.5M18 4l1 1"/>',
@@ -5222,7 +5225,7 @@ export default function App() {
               {/* Lista de comunicados */}
               {comunicados.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                  <div style={{ fontSize:40, marginBottom:12 }}>📢</div>
+                  <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="comunicados" size={36} /></div>
                   <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhum comunicado ainda</div>
                   <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Publique avisos para que todos os moradores vejam no portal individual.</div>
                 </div>
@@ -5231,14 +5234,14 @@ export default function App() {
                   {comunicados.map(com => (
                     <div key={com.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:"18px 20px", boxShadow:D.shadow, border:`1px solid ${com.fixado ? D.accent : D.border}`, borderLeft:`4px solid ${com.fixado ? D.accent : D.border}` }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, marginBottom:8 }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-                          {com.fixado && <span style={{ background:D.secondary, color:D.accent, fontSize:11, fontWeight:700, padding:"2px 10px", borderRadius:12, fontFamily:D.fontBody }}>📌 Fixado</span>}
+                        <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", minWidth:0 }}>
+                          {com.fixado && <span style={{ display:"inline-flex", alignItems:"center", gap:5, background:D.secondary, color:D.accent, fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:12, fontFamily:D.fontBody }}><NavIcon id="pin" size={12} /> Fixado</span>}
                           <span style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{com.titulo}</span>
                         </div>
                         {!readOnly && (
                           <div style={{ display:"flex", gap:6, flexShrink:0 }}>
-                            <button onClick={() => alternarFixado(com)} title={com.fixado?"Desafixar":"Fixar no topo"} style={{ padding:"5px 10px", background:D.muted, color:D.textSec, border:`1px solid ${D.border}`, borderRadius:6, fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>📌</button>
-                            <button onClick={() => { if(window.confirm("Remover este comunicado?")) removerComunicado(com.id); }} style={{ padding:"5px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
+                            <button onClick={() => alternarFixado(com)} title={com.fixado?"Desafixar":"Fixar no topo"} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background: com.fixado?D.secondary:D.muted, color: com.fixado?D.accent:D.textSec, border:`1px solid ${D.border}`, borderRadius:8, cursor:"pointer" }}><NavIcon id="pin" size={15} /></button>
+                            <button onClick={() => { if(window.confirm("Remover este comunicado?")) removerComunicado(com.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                           </div>
                         )}
                       </div>
@@ -5552,7 +5555,7 @@ export default function App() {
 
               {enquetes.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                  <div style={{ fontSize:40, marginBottom:12 }}>🗳️</div>
+                  <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="enquetes" size={36} /></div>
                   <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhuma enquete ainda</div>
                   <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Crie uma votação para os moradores decidirem juntos (obras, cores, datas de assembleia, etc.).</div>
                 </div>
@@ -5570,7 +5573,7 @@ export default function App() {
                             {enq.descricao && <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, marginTop:3 }}>{enq.descricao}</div>}
                             <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:4 }}>{total} voto{total!==1?"s":""} · {enq.criadoEm}</div>
                           </div>
-                          <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color: aberta?D.success:D.textSec, background: aberta?D.successBg:D.muted, padding:"4px 12px", borderRadius:12, whiteSpace:"nowrap" }}>{aberta?"🟢 Aberta":"🔒 Encerrada"}</span>
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:6, fontFamily:D.fontBody, fontSize:12, fontWeight:600, color: aberta?D.success:D.textSec, background: aberta?D.successBg:D.muted, padding:"4px 12px 4px 10px", borderRadius:20, whiteSpace:"nowrap" }}><span style={{ width:7, height:7, borderRadius:"50%", background: aberta?D.success:D.textMut }} />{aberta?"Aberta":"Encerrada"}</span>
                         </div>
 
                         {/* Resultados */}
@@ -5609,8 +5612,8 @@ export default function App() {
 
                         {!readOnly && (
                           <div style={{ display:"flex", gap:8, marginTop:14, flexWrap:"wrap" }}>
-                            <button onClick={() => encerrarEnquete(enq.id, aberta)} style={{ padding:"7px 14px", background: aberta?D.warningBg:D.successBg, color: aberta?"#92400E":D.success, border:`1px solid ${aberta?"#FDE68A":"#86EFAC"}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>{aberta?"🔒 Encerrar":"🔓 Reabrir"}</button>
-                            <button onClick={() => { if(window.confirm(`Remover a enquete "${enq.titulo}"? Os votos serão apagados.`)) removerEnquete(enq); }} style={{ padding:"7px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
+                            <button onClick={() => encerrarEnquete(enq.id, aberta)} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", background: aberta?D.warningBg:D.successBg, color: aberta?"#92400E":D.success, border:`1px solid ${aberta?"#FDE68A":"#86EFAC"}`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id={aberta?"lock":"unlock"} size={14} /> {aberta?"Encerrar":"Reabrir"}</button>
+                            <button onClick={() => { if(window.confirm(`Remover a enquete "${enq.titulo}"? Os votos serão apagados.`)) removerEnquete(enq); }} title="Remover" style={{ width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                           </div>
                         )}
                       </div>
@@ -5626,9 +5629,9 @@ export default function App() {
         {/* ── Ocorrências (síndico) ── */}
         {aba === "ocorrencias" && podeUsar("ocorrencias") && (() => {
           const statusInfo = {
-            aberta:       { rotulo:"Aberta",       icon:"🕒", cor:D.warning, bg:D.warningBg },
-            em_andamento: { rotulo:"Em andamento", icon:"🔧", cor:D.accent,  bg:D.secondary },
-            resolvida:    { rotulo:"Resolvida",    icon:"✅", cor:D.success,  bg:D.successBg },
+            aberta:       { rotulo:"Aberta",       icon:"clock",    cor:D.warning, bg:D.warningBg },
+            em_andamento: { rotulo:"Em andamento", icon:"servicos", cor:D.accent,  bg:D.secondary },
+            resolvida:    { rotulo:"Resolvida",    icon:"logCheck", cor:D.success,  bg:D.successBg },
           };
           const filtradas = filtroOcorrencia === "todas" ? ocorrencias : ocorrencias.filter(o => o.status === filtroOcorrencia);
           const cont = {
@@ -5638,10 +5641,10 @@ export default function App() {
             resolvida: ocorrencias.filter(o=>o.status==="resolvida").length,
           };
           const filtros = [
-            { id:"todas", label:`Todas (${cont.todas})` },
-            { id:"aberta", label:`Abertas (${cont.aberta})` },
-            { id:"em_andamento", label:`Em andamento (${cont.em_andamento})` },
-            { id:"resolvida", label:`Resolvidas (${cont.resolvida})` },
+            { id:"todas",        label:"Todas",        cor:D.primary, n:cont.todas },
+            { id:"aberta",       label:"Abertas",      cor:D.warning, n:cont.aberta },
+            { id:"em_andamento", label:"Em andamento", cor:D.accent,  n:cont.em_andamento },
+            { id:"resolvida",    label:"Resolvidas",   cor:D.success, n:cont.resolvida },
           ];
           return (
           <div>
@@ -5650,14 +5653,20 @@ export default function App() {
 
               {/* Filtros */}
               <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:16 }}>
-                {filtros.map(f => (
-                  <button key={f.id} onClick={()=>setFiltroOcorrencia(f.id)} style={{ padding:"7px 14px", background: filtroOcorrencia===f.id?D.primary:D.bgCard, color: filtroOcorrencia===f.id?"#fff":D.textSec, border:`1px solid ${filtroOcorrencia===f.id?D.primary:D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>{f.label}</button>
-                ))}
+                {filtros.map(f => {
+                  const ativo = filtroOcorrencia===f.id;
+                  return (
+                    <button key={f.id} onClick={()=>setFiltroOcorrencia(f.id)} style={{ display:"flex", alignItems:"center", gap:7, padding:"6px 14px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                      {f.id!=="todas" && <span style={{ width:7, height:7, borderRadius:"50%", background: ativo?"#fff":f.cor }} />}
+                      {f.label} <span style={{ opacity:.6 }}>{f.n}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               {filtradas.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                  <div style={{ fontSize:40, marginBottom:12 }}>🛎️</div>
+                  <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="ocorrencias" size={36} /></div>
                   <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhuma ocorrência {filtroOcorrencia!=="todas"?"nesse status":""}</div>
                   <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>As ocorrências abertas pelos moradores no portal aparecem aqui.</div>
                 </div>
@@ -5674,7 +5683,7 @@ export default function App() {
                               {o.unidade} · {o.nome} · {o.categoria} · {o.criadoEm}
                             </div>
                           </div>
-                          <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:si.cor, background:si.bg, padding:"4px 12px", borderRadius:12, whiteSpace:"nowrap" }}>{si.icon} {si.rotulo}</span>
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:6, fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:si.cor, background:si.bg, padding:"4px 12px 4px 9px", borderRadius:20, whiteSpace:"nowrap" }}><NavIcon id={si.icon} size={13} /> {si.rotulo}</span>
                         </div>
                         <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.text, lineHeight:1.55, margin:"12px 0 0", background:D.muted, padding:"10px 12px", borderRadius:D.radiusSm }}>{o.descricao}</p>
                         {o.respostaSindico && (
@@ -5684,10 +5693,10 @@ export default function App() {
                         )}
                         {!readOnly && (
                           <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
-                            <button onClick={() => { setRespostaOcorr(o.respostaSindico || ""); setModal({ type:"responderOcorrencia", data:{ id:o.id, titulo:o.titulo } }); }} style={{ padding:"7px 14px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Responder</button>
-                            {o.status !== "em_andamento" && <button onClick={() => responderOcorrencia(o.id, o.respostaSindico || "", "em_andamento")} style={{ padding:"7px 14px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>🔧 Em andamento</button>}
-                            {o.status !== "resolvida" && <button onClick={() => responderOcorrencia(o.id, o.respostaSindico || "", "resolvida")} style={{ padding:"7px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>✅ Resolver</button>}
-                            <button onClick={() => { if(window.confirm("Remover esta ocorrência?")) removerOcorrencia(o.id); }} style={{ padding:"7px 10px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:13, cursor:"pointer", fontFamily:D.fontBody }}>🗑️</button>
+                            <button onClick={() => { setRespostaOcorr(o.respostaSindico || ""); setModal({ type:"responderOcorrencia", data:{ id:o.id, titulo:o.titulo } }); }} style={{ padding:"8px 14px", background:D.primary, color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Responder</button>
+                            {o.status !== "em_andamento" && <button onClick={() => responderOcorrencia(o.id, o.respostaSindico || "", "em_andamento")} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="servicos" size={14} /> Em andamento</button>}
+                            {o.status !== "resolvida" && <button onClick={() => responderOcorrencia(o.id, o.respostaSindico || "", "resolvida")} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Resolver</button>}
+                            <button onClick={() => { if(window.confirm("Remover esta ocorrência?")) removerOcorrencia(o.id); }} title="Remover" style={{ width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                           </div>
                         )}
                       </div>

@@ -4952,7 +4952,7 @@ export default function App() {
                       </div>
                       <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
                         {pend.map(r => (
-                          <div key={r.id} style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.warning}`, padding:16, display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                          <div key={r.id} style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.warning}`, padding:16, display:"flex", justifyContent:"space-between", alignItems: isMobile?"stretch":"center", gap:12, flexDirection: isMobile?"column":"row" }}>
                             <div style={{ display:"flex", gap:12, alignItems:"center", minWidth:0 }}>
                               <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.accent, flexShrink:0 }}><NavIcon id="reservas" size={19} /></div>
                               <div style={{ minWidth:0 }}>
@@ -4995,6 +4995,35 @@ export default function App() {
                       <div style={{ background:D.bgCard, borderRadius:D.radius, padding:36, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
                         <div style={{ display:"flex", justifyContent:"center", marginBottom:10, color:D.textMut }}><NavIcon id="reservas" size={34} /></div>
                         <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhuma reserva aprovada ou rejeitada ainda.</div>
+                      </div>
+                    ) : isMobile ? (
+                      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                        {histFiltrado.map(r => {
+                          const aprov = r.status==="aprovada";
+                          return (
+                            <div key={r.id} style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${aprov?D.success:D.danger}`, padding:14 }}>
+                              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+                                <div style={{ display:"flex", gap:10, alignItems:"center", minWidth:0 }}>
+                                  <div style={{ width:34, height:34, borderRadius:9, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.accent, flexShrink:0 }}><NavIcon id="reservas" size={16} /></div>
+                                  <div style={{ minWidth:0 }}>
+                                    <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>{r.area}</div>
+                                    <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{r.nome} · {r.unidade}</div>
+                                  </div>
+                                </div>
+                                <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px 3px 8px", borderRadius:20, fontSize:11.5, fontWeight:600, background: aprov?D.successBg:D.dangerBg, color: aprov?D.success:D.danger, flexShrink:0 }}>
+                                  <span style={{ width:6, height:6, borderRadius:"50%", background: aprov?D.success:D.danger }} />
+                                  {aprov?"Aprovada":"Rejeitada"}
+                                </span>
+                              </div>
+                              <div style={{ fontFamily:D.fontBody, fontSize:12.5, color:D.textSec, marginTop:8 }}>{r.data}{r.horario?` · ${r.horario}`:""}</div>
+                              {!readOnly && (
+                                <div style={{ marginTop:10 }}>
+                                  <button onClick={() => { if(window.confirm("Remover esta reserva?")) removerReserva(r.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>

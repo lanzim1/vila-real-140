@@ -286,7 +286,7 @@ const TopBar = ({ title, user, readOnly, nPendentes, moradores, onBuscar, onConf
     <div style={{ background:D.bgCard, borderBottom:`1px solid ${D.border}`, padding: isMobile?"12px 16px":"14px 28px", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0, gap:12 }}>
       <div style={{ minWidth:0 }}>
         <h1 style={{ fontFamily:D.fontDisplay, fontSize: isMobile?17:20, fontWeight:600, color:D.text, margin:0, letterSpacing:"-0.02em", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{title}</h1>
-        {!isMobile && <p style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, margin:"2px 0 0", textTransform:"capitalize" }}>{hoje}</p>}
+        <p style={{ fontFamily:D.fontBody, fontSize: isMobile?11:12, color:D.textSec, margin:"2px 0 0", textTransform:"capitalize", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{hoje}</p>
       </div>
 
       <div style={{ display:"flex", alignItems:"center", gap: isMobile?12:18, flexShrink:0 }}>

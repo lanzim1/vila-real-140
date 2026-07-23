@@ -2130,6 +2130,9 @@ const NAV_ICON_PATHS = {
   pin:         '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
   lock:        '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   unlock:      '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+  setaCima:    '<path d="M12 19V5"/><path d="m5 12 7-7 7 7"/>',
+  setaBaixo:   '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+  banco:       '<path d="M3 21h18"/><path d="M5 21V10M9 21V10M15 21V10M19 21V10"/><path d="M3 10l9-6 9 6z"/>',
   clock:       '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   catLuz:      '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
   catLimpeza:  '<path d="M12 3l1.6 4.8L18 9l-4.4 1.2L12 15l-1.6-4.8L6 9l4.4-1.2z"/><path d="M5 18l1.5 1.5M18 4l1 1"/>',
@@ -5342,7 +5345,7 @@ export default function App() {
               {/* Saldo do fundo — hero */}
               <div style={{ background:`linear-gradient(135deg, ${D.sidebar}, ${D.primary})`, borderRadius:D.radiusXl, padding: isMobile?"22px 20px":"28px 32px", marginBottom:20, color:"#fff", boxShadow:`0 8px 32px rgba(30,58,114,0.3)`, position:"relative", overflow:"hidden" }}>
                 <div style={{ position:"absolute", top:-20, right:-10, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,0.06)", pointerEvents:"none" }} />
-                <div style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, textTransform:"uppercase", letterSpacing:"1px", opacity:.75, marginBottom:8 }}>🏦 Saldo do Fundo de Reserva</div>
+                <div style={{ display:"flex", alignItems:"center", gap:8, fontFamily:D.fontBody, fontSize:12, fontWeight:600, textTransform:"uppercase", letterSpacing:"1px", opacity:.75, marginBottom:8 }}><NavIcon id="banco" size={15} /> Saldo do Fundo de Reserva</div>
                 <div style={{ fontFamily:D.fontDisplay, fontSize: isMobile?30:38, fontWeight:700, letterSpacing:"-0.02em", lineHeight:1, marginBottom:12 }}>R$ {saldoFundo.toFixed(2).replace(".",",")}</div>
                 <div style={{ display:"flex", gap:20, flexWrap:"wrap" }}>
                   <div>
@@ -5384,8 +5387,8 @@ export default function App() {
               {/* Botões de ação */}
               {!readOnly && (
                 <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
-                  <button onClick={()=>{ setNovaMovFundo({ tipo:"aporte", valor:"", descricao:"", data:"" }); setModal({ type:"novaMovFundo" }); }} style={{ padding:"10px 18px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>+ Aporte manual</button>
-                  <button onClick={()=>{ setNovaMovFundo({ tipo:"retirada", valor:"", descricao:"", data:"" }); setModal({ type:"novaMovFundo" }); }} style={{ padding:"10px 18px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>− Retirada</button>
+                  <button onClick={()=>{ setNovaMovFundo({ tipo:"aporte", valor:"", descricao:"", data:"" }); setModal({ type:"novaMovFundo" }); }} style={{ display:"flex", alignItems:"center", gap:7, padding:"10px 18px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="setaCima" size={15} /> Aporte manual</button>
+                  <button onClick={()=>{ setNovaMovFundo({ tipo:"retirada", valor:"", descricao:"", data:"" }); setModal({ type:"novaMovFundo" }); }} style={{ display:"flex", alignItems:"center", gap:7, padding:"10px 18px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="setaBaixo" size={15} /> Retirada</button>
                 </div>
               )}
 
@@ -5393,31 +5396,34 @@ export default function App() {
               <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>Movimentações</div>
               {fundoMovs.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                  <div style={{ fontSize:40, marginBottom:12 }}>🏦</div>
+                  <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="banco" size={36} /></div>
                   <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhuma movimentação ainda</div>
                   <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Registre aportes mensais para construir o fundo de reserva do condomínio.</div>
                 </div>
               ) : (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
-                  {fundoMovs.map((m,i) => (
-                    <div key={m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom: i<fundoMovs.length-1?`1px solid ${D.border}`:"none" }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                        <div style={{ width:36, height:36, borderRadius:9, background: m.tipo==="aporte"?D.successBg:D.dangerBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>{m.tipo==="aporte"?"↑":"↓"}</div>
-                        <div>
-                          <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:600, color:D.text }}>{m.descricao}</div>
+                  {fundoMovs.map((m,i) => {
+                    const aporte = m.tipo==="aporte";
+                    return (
+                    <div key={m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", borderBottom: i<fundoMovs.length-1?`1px solid ${D.border}`:"none", gap:12 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:12, minWidth:0 }}>
+                        <div style={{ width:34, height:34, borderRadius:9, background: aporte?D.successBg:D.dangerBg, color: aporte?D.success:D.danger, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id={aporte?"setaCima":"setaBaixo"} size={16} /></div>
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:600, color:D.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.descricao}</div>
                           <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut }}>{m.data}</div>
                         </div>
                       </div>
-                      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                        <span style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:700, color: m.tipo==="aporte"?D.success:D.danger }}>
-                          {m.tipo==="aporte"?"+":"−"} R$ {m.valor.toFixed(2).replace(".",",")}
+                      <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
+                        <span style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:700, color: aporte?D.success:D.danger }}>
+                          {aporte?"+":"−"} R$ {m.valor.toFixed(2).replace(".",",")}
                         </span>
                         {!readOnly && (
-                          <button onClick={()=>{ if(window.confirm("Remover esta movimentação?")) removerMovFundo(m.id); }} style={{ background:"none", border:"none", color:D.textMut, cursor:"pointer", fontSize:16 }}>×</button>
+                          <button onClick={()=>{ if(window.confirm("Remover esta movimentação?")) removerMovFundo(m.id); }} title="Remover" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

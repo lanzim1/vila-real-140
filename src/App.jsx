@@ -2133,6 +2133,16 @@ const NAV_ICON_PATHS = {
   setaCima:    '<path d="M12 19V5"/><path d="m5 12 7-7 7 7"/>',
   setaBaixo:   '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
   banco:       '<path d="M3 21h18"/><path d="M5 21V10M9 21V10M15 21V10M19 21V10"/><path d="M3 10l9-6 9 6z"/>',
+  alerta:      '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  docEscudo:   '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+  docCert:     '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>',
+  fogo:        '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  download:    '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>',
+  evFesta:     '<path d="M8 2h8"/><path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656-.984A4 4 0 0 1 15 4.788V2"/><path d="M7 15a6.472 6.472 0 0 1 5 0 6.47 6.47 0 0 0 5 0"/>',
+  evAssembleia:'<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h6"/>',
+  evSol:       '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+  fxCash:      '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+  fxMoeda:     '<circle cx="12" cy="12" r="9"/><path d="M14.8 9.4a3 3 0 0 0-2.8-1.4c-1.7 0-2.7.8-2.7 2 0 2.8 5.8 1.3 5.8 4 0 1.3-1.1 2.1-2.9 2.1a3.2 3.2 0 0 1-3-1.5"/><path d="M12 6.5v11"/>',
   clock:       '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   catLuz:      '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
   catLimpeza:  '<path d="M12 3l1.6 4.8L18 9l-4.4 1.2L12 15l-1.6-4.8L6 9l4.4-1.2z"/><path d="M5 18l1.5 1.5M18 4l1 1"/>',
@@ -2156,6 +2166,20 @@ const CAT_ICON_ID = {
   impostos:"catImpostos", outro:"logDot",
 };
 const catIconId = (tipo) => CAT_ICON_ID[tipo] || "logDot";
+
+// ── Documentos: ícone por categoria ──
+const DOC_ICON_ID = {
+  "Alvará":"docCert", "Seguro / Apólice":"docEscudo", "Elevador (ART)":"catElevador",
+  "Contrato":"acMotivo", "Certidão":"docCert", "AVCB (Bombeiros)":"fogo", "Outro":"histDoc",
+};
+const docIconId = (cat) => DOC_ICON_ID[cat] || "histDoc";
+
+// ── Agenda: ícone por tipo de evento ──
+const EV_ICON_ID = {
+  "Evento":"evFesta", "Manutenção":"servicos", "Assembleia":"evAssembleia",
+  "Reunião":"moradores", "Feriado":"evSol", "Outro":"pin",
+};
+const evIconId = (tipo) => EV_ICON_ID[tipo] || "pin";
 
 // ── Histórico: classificação por categoria, ícone e agrupamento por data ──
 const TIPOS_LOG = [
@@ -2239,6 +2263,8 @@ export default function App() {
   const [filtroDespesa, setFiltroDespesa] = useState("todas");
   const [filtroReserva, setFiltroReserva] = useState("todas");
   const [filtroAcesso, setFiltroAcesso] = useState("todos");
+  const [filtroDoc, setFiltroDoc] = useState("todos");
+  const [filtroEvento, setFiltroEvento] = useState("todos");
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -5268,63 +5294,116 @@ export default function App() {
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
                 <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>Documentos importantes do condomínio, com alerta de vencimento</div>
                 {!readOnly && (
-                  <button onClick={() => { setNovoDocumento({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"" }); setModal({ type:"novoDocumento" }); }} style={{ padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
+                  <button onClick={() => { setNovoDocumento({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"" }); setModal({ type:"novoDocumento" }); }} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)`, width: isMobile?"100%":"auto" }}>
                     + Novo documento
                   </button>
                 )}
               </div>
 
-              {/* Alertas de vencimento próximo */}
               {(() => {
-                const vencendo = documentos.filter(d => { const s = situacaoDoc(d.vencimento); return s.dias !== null && s.dias <= 30; });
-                if (vencendo.length === 0) return null;
+                const comSit = documentos.map(d => ({ ...d, sit: situacaoDoc(d.vencimento) }));
+                const vencidos = comSit.filter(d => d.sit.dias !== null && d.sit.dias < 0);
+                const vencendo = comSit.filter(d => d.sit.dias !== null && d.sit.dias >= 0 && d.sit.dias <= 30);
+                const emDia    = comSit.filter(d => d.sit.dias === null || d.sit.dias > 30);
+                const atencao  = vencidos.length + vencendo.length;
+
+                const cards = [
+                  { label:"Em dia",   valor: emDia.length,    icon:"logCheck", cor:D.success },
+                  { label:"Vencendo", valor: vencendo.length, icon:"clock",    cor:D.warning },
+                  { label:"Vencidos", valor: vencidos.length, icon:"alerta",   cor:D.danger  },
+                ];
+                const chips = [
+                  { id:"todos",    label:"Todos",    cor:D.primary, n:comSit.length },
+                  { id:"emDia",    label:"Em dia",   cor:D.success, n:emDia.length },
+                  { id:"vencendo", label:"Vencendo", cor:D.warning, n:vencendo.length },
+                  { id:"vencidos", label:"Vencidos", cor:D.danger,  n:vencidos.length },
+                ];
+                const lista = filtroDoc==="emDia" ? emDia : filtroDoc==="vencendo" ? vencendo : filtroDoc==="vencidos" ? vencidos : comSit;
+
                 return (
-                  <div style={{ background:D.warningBg, border:`1px solid ${D.warning}`, borderRadius:D.radius, padding:"14px 18px", marginBottom:20, display:"flex", alignItems:"center", gap:12 }}>
-                    <span style={{ fontSize:22 }}>⚠️</span>
-                    <div style={{ fontFamily:D.fontBody, fontSize:13, color:"#92400E" }}>
-                      <b>{vencendo.length} documento(s)</b> vencido(s) ou vencendo nos próximos 30 dias. Verifique a lista abaixo.
+                <>
+                  {/* Cards de resumo */}
+                  {documentos.length > 0 && (
+                    <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(3,1fr)", gap:12, marginBottom:16 }}>
+                      {cards.map((c,i) => (
+                        <div key={i} style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, display:"flex", alignItems:"center", gap:14, gridColumn: (isMobile && i===2)?"1 / -1":"auto" }}>
+                          <div style={{ width:40, height:40, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:c.cor, flexShrink:0 }}><NavIcon id={c.icon} size={19} /></div>
+                          <div><div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:c.cor, lineHeight:1, letterSpacing:"-0.02em" }}>{c.valor}</div><div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:4 }}>{c.label}</div></div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  )}
+
+                  {/* Faixa de alerta */}
+                  {atencao > 0 && (
+                    <div style={{ display:"flex", alignItems:"center", gap:10, background:D.warningBg, border:`1px solid #FDE68A`, borderRadius:D.radius, padding:"10px 16px", marginBottom:16 }}>
+                      <span style={{ color:D.warning, display:"flex", flexShrink:0 }}><NavIcon id="alerta" size={17} /></span>
+                      <span style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:"#92400E" }}>{atencao} {atencao===1?"documento precisa":"documentos precisam"} de atenção</span>
+                    </div>
+                  )}
+
+                  {documentos.length === 0 ? (
+                    <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                      <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="documentos" size={36} /></div>
+                      <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhum documento cadastrado</div>
+                      <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Guarde alvará, apólice de seguro, ART do elevador, contratos e outros documentos importantes.</div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Filtros */}
+                      <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
+                        {chips.map(c => {
+                          const ativo = filtroDoc===c.id;
+                          return (
+                            <button key={c.id} onClick={()=>setFiltroDoc(c.id)} style={{ display:"flex", alignItems:"center", gap:7, padding:"6px 14px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                              {c.id!=="todos" && <span style={{ width:7, height:7, borderRadius:"50%", background: ativo?"#fff":c.cor }} />}
+                              {c.label} <span style={{ opacity:.6 }}>{c.n}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {lista.length === 0 ? (
+                        <div style={{ background:D.bgCard, borderRadius:D.radius, padding:32, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                          <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhum documento nesta situação.</div>
+                        </div>
+                      ) : (
+                        <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"repeat(auto-fill,minmax(320px,1fr))", gap:14 }}>
+                          {lista.map(docItem => {
+                            const s = docItem.sit;
+                            return (
+                              <div key={docItem.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:"18px 20px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${s.cor}` }}>
+                                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, marginBottom:10 }}>
+                                  <div style={{ display:"flex", alignItems:"center", gap:11, minWidth:0 }}>
+                                    <div style={{ width:38, height:38, borderRadius:9, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.accent, flexShrink:0 }}><NavIcon id={docIconId(docItem.categoria)} size={18} /></div>
+                                    <div style={{ minWidth:0 }}>
+                                      <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{docItem.nome}</div>
+                                      <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{docItem.categoria}</div>
+                                    </div>
+                                  </div>
+                                  {!readOnly && (
+                                    <button onClick={() => { if(window.confirm("Remover este documento?")) removerDocumento(docItem.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer", flexShrink:0 }}><NavIcon id="logTrash" size={15} /></button>
+                                  )}
+                                </div>
+                                <span style={{ display:"inline-flex", alignItems:"center", gap:6, background:s.bg, color:s.cor, fontSize:12, fontWeight:600, padding:"4px 12px 4px 9px", borderRadius:20, fontFamily:D.fontBody, marginBottom:10 }}>
+                                  <span style={{ width:6, height:6, borderRadius:"50%", background:s.cor }} />{s.label}
+                                </span>
+                                {docItem.obs && <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.5, margin:"0 0 10px" }}>{docItem.obs}</p>}
+                                {docItem.arquivo && (
+                                  <a href={docItem.arquivo} download={docItem.arquivoNome||docItem.nome} style={{ display:"inline-flex", alignItems:"center", gap:6, fontFamily:D.fontBody, fontSize:13, color:D.accent, fontWeight:600, textDecoration:"none" }}>
+                                    <NavIcon id="download" size={14} /> Baixar arquivo
+                                  </a>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
                 );
               })()}
-
-              {/* Lista de documentos */}
-              {documentos.length === 0 ? (
-                <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                  <div style={{ fontSize:40, marginBottom:12 }}>📁</div>
-                  <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhum documento cadastrado</div>
-                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Guarde alvará, apólice de seguro, ART do elevador, contratos e outros documentos importantes.</div>
-                </div>
-              ) : (
-                <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"repeat(auto-fill,minmax(320px,1fr))", gap:14 }}>
-                  {documentos.map(docItem => {
-                    const s = situacaoDoc(docItem.vencimento);
-                    return (
-                      <div key={docItem.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:"18px 20px", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, marginBottom:10 }}>
-                          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                            <div style={{ width:38, height:38, borderRadius:9, background:D.secondary, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>📄</div>
-                            <div>
-                              <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{docItem.nome}</div>
-                              <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{docItem.categoria}</div>
-                            </div>
-                          </div>
-                          {!readOnly && (
-                            <button onClick={() => { if(window.confirm("Remover este documento?")) removerDocumento(docItem.id); }} style={{ padding:"4px 8px", background:D.dangerBg, color:D.danger, border:`1px solid #FECACA`, borderRadius:6, fontSize:12, cursor:"pointer", fontFamily:D.fontBody, flexShrink:0 }}>🗑️</button>
-                          )}
-                        </div>
-                        <div style={{ display:"inline-block", background:s.bg, color:s.cor, fontSize:12, fontWeight:600, padding:"4px 12px", borderRadius:20, fontFamily:D.fontBody, marginBottom:10 }}>{s.label}</div>
-                        {docItem.obs && <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.5, margin:"0 0 10px" }}>{docItem.obs}</p>}
-                        {docItem.arquivo && (
-                          <a href={docItem.arquivo} download={docItem.arquivoNome||docItem.nome} style={{ display:"inline-flex", alignItems:"center", gap:6, fontFamily:D.fontBody, fontSize:13, color:D.accent, fontWeight:600, textDecoration:"none" }}>
-                            📎 Baixar arquivo
-                          </a>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -5769,35 +5848,45 @@ export default function App() {
               <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?16:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:16 }}>
                 <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em", marginBottom:14 }}>Detalhamento — {mesLabel(mesSel)}</div>
                 {[
-                  { label:"💰 Taxas pagas", valor:fMes.taxas, cor:D.success },
-                  { label:"➕ Cobranças extras pagas", valor:fMes.extras, cor:D.success },
-                  { label:"💵 Receitas avulsas", valor:fMes.recAvulsas, cor:D.success },
-                  { label:"💧 Despesas pagas", valor:-fMes.despesasPagas, cor:D.danger },
-                  { label:"🔧 Serviços concluídos", valor:-fMes.servConcluidos, cor:D.danger },
-                ].map((it,idx) => (
-                  <div key={idx} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"9px 0", borderBottom: idx<4?`1px solid ${D.border}`:"none" }}>
-                    <span style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{it.label}</span>
-                    <span style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:600, color: it.valor===0?D.textMut:it.cor }}>{it.valor>=0?"+":"−"} {fmt(Math.abs(it.valor))}</span>
+                  { label:"Taxas pagas",            icon:"fxCash",  valor:fMes.taxas,             cor:D.success },
+                  { label:"Cobranças extras pagas", icon:"logPlus", valor:fMes.extras,            cor:D.success },
+                  { label:"Receitas avulsas",       icon:"fxMoeda", valor:fMes.recAvulsas,        cor:D.success },
+                  { label:"Despesas pagas",         icon:"catLuz",  valor:-fMes.despesasPagas,    cor:D.danger },
+                  { label:"Serviços concluídos",    icon:"servicos",valor:-fMes.servConcluidos,   cor:D.danger },
+                ].map((it,idx) => {
+                  const zerado = it.valor === 0;
+                  return (
+                  <div key={idx} style={{ display:"flex", alignItems:"center", gap:11, padding:"9px 0", borderBottom: idx<4?`1px solid ${D.border}`:"none" }}>
+                    <div style={{ width:30, height:30, borderRadius:8, background: zerado?D.muted:(it.cor===D.success?D.successBg:D.dangerBg), color: zerado?D.textMut:it.cor, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id={it.icon} size={15} /></div>
+                    <span style={{ flex:1, fontFamily:D.fontBody, fontSize:13, color:D.textSec, minWidth:0 }}>{it.label}</span>
+                    <span style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:600, color: zerado?D.textMut:it.cor, flexShrink:0 }}>{it.valor>=0?"+":"−"} {fmt(Math.abs(it.valor))}</span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Receitas avulsas do mês */}
               <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?16:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:16 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: receitasMes.length?14:0, flexWrap:"wrap", gap:10 }}>
-                  <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>💵 Receitas avulsas — {mesLabel(mesSel)}</div>
-                  {!readOnly && <button onClick={() => { setNovaReceita({ descricao:"", valor:"", categoria:"Outra", mes: mesSel }); setModal({ type:"novaReceita" }); }} style={{ padding:"8px 14px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>+ Nova receita</button>}
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems: isMobile?"stretch":"center", marginBottom: receitasMes.length?14:0, flexDirection: isMobile?"column":"row", gap:10 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>
+                    <span style={{ color:D.accent, display:"flex" }}><NavIcon id="fxMoeda" size={17} /></span>
+                    Receitas avulsas — {mesLabel(mesSel)}
+                  </div>
+                  {!readOnly && <button onClick={() => { setNovaReceita({ descricao:"", valor:"", categoria:"Outra", mes: mesSel }); setModal({ type:"novaReceita" }); }} style={{ padding:"9px 14px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width: isMobile?"100%":"auto" }}>+ Nova receita</button>}
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                   {receitasMes.map(r => (
-                    <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background:D.successBg, borderRadius:D.radiusSm, borderLeft:`4px solid ${D.success}` }}>
-                      <div>
-                        <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>{r.descricao}</div>
-                        <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{r.categoria}</div>
+                    <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background:D.bgCard, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.success}`, borderRadius:D.radiusSm, gap:10 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:11, minWidth:0 }}>
+                        <div style={{ width:32, height:32, borderRadius:8, background:D.successBg, color:D.success, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id="setaCima" size={15} /></div>
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.descricao}</div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{r.categoria}</div>
+                        </div>
                       </div>
-                      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
                         <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:700, color:D.success }}>+ {fmt(r.valor)}</div>
-                        {!readOnly && <button onClick={() => { if(window.confirm("Remover esta receita?")) removerReceita(r.id); }} style={{ background:"none", border:"none", color:D.textMut, cursor:"pointer", fontSize:15 }}>🗑️</button>}
+                        {!readOnly && <button onClick={() => { if(window.confirm("Remover esta receita?")) removerReceita(r.id); }} title="Remover" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>}
                       </div>
                     </div>
                   ))}
@@ -5836,34 +5925,42 @@ export default function App() {
           const ordenados = [...eventos].sort((a,b) => parseData(a.data) - parseData(b.data));
           const proximos = ordenados.filter(e => parseData(e.data) >= hoje);
           const passados = ordenados.filter(e => parseData(e.data) < hoje).reverse();
-          const iconeTipo = { "Evento":"🎉", "Manutenção":"🔧", "Assembleia":"📋", "Reunião":"👥", "Feriado":"🏖️", "Outro":"📌" };
           const corTipo = { "Evento":D.accent, "Manutenção":D.warning, "Assembleia":D.primary, "Reunião":D.success, "Feriado":D.danger, "Outro":D.textSec };
           const fmtData = (d) => { const dt=parseData(d); return dt.toLocaleDateString("pt-BR",{ weekday:"short", day:"2-digit", month:"short" }); };
           const diasAte = (d) => { const dt=parseData(d); const diff=Math.ceil((dt-hoje)/(1000*60*60*24)); if(diff===0) return "Hoje"; if(diff===1) return "Amanhã"; return `Em ${diff} dias`; };
 
-          const CardEvento = ({ e, passado }) => (
-            <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`4px solid ${corTipo[e.tipo]||D.textSec}`, opacity: passado?0.7:1 }}>
+          const CardEvento = ({ e, passado }) => {
+            const cor = corTipo[e.tipo] || D.textSec;
+            const prazo = diasAte(e.data);
+            const urgente = prazo==="Hoje" || prazo==="Amanhã";
+            return (
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${cor}`, opacity: passado?0.65:1 }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12 }}>
-                <div style={{ display:"flex", gap:12, flex:1 }}>
-                  <div style={{ width:44, height:44, borderRadius:10, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>{iconeTipo[e.tipo]||"📌"}</div>
+                <div style={{ display:"flex", gap:12, flex:1, minWidth:0 }}>
+                  <div style={{ width:40, height:40, borderRadius:10, background:D.muted, color:cor, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id={evIconId(e.tipo)} size={19} /></div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{e.titulo}</div>
                     <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginTop:3 }}>
-                      <span style={{ fontFamily:D.fontBody, fontSize:12, color:corTipo[e.tipo]||D.textSec, fontWeight:600 }}>{e.tipo}</span>
+                      <span style={{ fontFamily:D.fontBody, fontSize:12, color:cor, fontWeight:600 }}>{e.tipo}</span>
                       <span style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, textTransform:"capitalize" }}>· {fmtData(e.data)}{e.hora?` · ${e.hora}`:""}</span>
                     </div>
                     {e.descricao && <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.5, margin:"8px 0 0" }}>{e.descricao}</p>}
                   </div>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8, flexShrink:0 }}>
-                  {!passado && <span style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:600, color: diasAte(e.data)==="Hoje"?D.danger:D.textMut, whiteSpace:"nowrap" }}>{diasAte(e.data)}</span>}
+                  {!passado && (
+                    urgente
+                      ? <span style={{ fontFamily:D.fontBody, fontSize:11.5, fontWeight:600, color:D.danger, background:D.dangerBg, padding:"3px 10px", borderRadius:20, whiteSpace:"nowrap" }}>{prazo}</span>
+                      : <span style={{ fontFamily:D.fontBody, fontSize:11.5, fontWeight:600, color:D.textMut, whiteSpace:"nowrap" }}>{prazo}</span>
+                  )}
                   {!readOnly && (
-                    <button onClick={() => { if(window.confirm("Remover este evento?")) removerEvento(e.id); }} style={{ background:"none", border:"none", color:D.textMut, cursor:"pointer", fontSize:15 }}>🗑️</button>
+                    <button onClick={() => { if(window.confirm("Remover este evento?")) removerEvento(e.id); }} title="Remover" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                   )}
                 </div>
               </div>
             </div>
-          );
+            );
+          };
 
           return (
           <div>
@@ -5873,7 +5970,7 @@ export default function App() {
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
                 <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>Eventos, manutenções, assembleias e datas importantes</div>
                 {!readOnly && (
-                  <button onClick={() => { setNovoEvento({ titulo:"", tipo:"Evento", data:"", hora:"", descricao:"" }); setModal({ type:"novoEvento" }); }} style={{ padding:"9px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>
+                  <button onClick={() => { setNovoEvento({ titulo:"", tipo:"Evento", data:"", hora:"", descricao:"" }); setModal({ type:"novoEvento" }); }} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)`, width: isMobile?"100%":"auto" }}>
                     + Novo evento
                   </button>
                 )}
@@ -5881,30 +5978,79 @@ export default function App() {
 
               {eventos.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-                  <div style={{ fontSize:40, marginBottom:12 }}>🗓️</div>
+                  <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="agenda" size={36} /></div>
                   <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Agenda vazia</div>
                   <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Adicione eventos, manutenções programadas e assembleias para organizar o condomínio.</div>
                 </div>
-              ) : (
+              ) : (() => {
+                const tiposPresentes = [...new Set(eventos.map(e=>e.tipo))];
+                const chips = [{ id:"todos", label:"Todos", cor:D.primary, n:eventos.length },
+                  ...tiposPresentes.map(t => ({ id:t, label:t, cor:corTipo[t]||D.textSec, n:eventos.filter(e=>e.tipo===t).length }))];
+                const fil = (arr) => filtroEvento==="todos" ? arr : arr.filter(e=>e.tipo===filtroEvento);
+                const prox = fil(proximos);
+                const pass = fil(passados);
+                const primeiro = proximos[0];
+
+                return (
                 <>
-                  {proximos.length > 0 && (
-                    <div style={{ marginBottom:24 }}>
-                      <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>Próximos eventos</div>
-                      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                        {proximos.map(e => <CardEvento key={e.id} e={e} passado={false} />)}
-                      </div>
+                  {/* Faixa do próximo evento */}
+                  {primeiro && (
+                    <div style={{ display:"flex", alignItems:"center", gap:10, background:D.secondary, border:`1px solid ${D.border}`, borderRadius:D.radius, padding:"10px 16px", marginBottom:16 }}>
+                      <span style={{ color:D.accent, display:"flex", flexShrink:0 }}><NavIcon id="agenda" size={17} /></span>
+                      <span style={{ fontFamily:D.fontBody, fontSize:13, color:D.text, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                        Próximo: <b>{primeiro.titulo}</b> · {diasAte(primeiro.data).toLowerCase()}
+                      </span>
                     </div>
                   )}
-                  {passados.length > 0 && (
-                    <div>
-                      <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.textSec, marginBottom:12, letterSpacing:"-0.02em" }}>Eventos passados</div>
-                      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                        {passados.map(e => <CardEvento key={e.id} e={e} passado={true} />)}
-                      </div>
+
+                  {/* Filtros por tipo */}
+                  {tiposPresentes.length > 1 && (
+                    <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:16 }}>
+                      {chips.map(c => {
+                        const ativo = filtroEvento===c.id;
+                        return (
+                          <button key={c.id} onClick={()=>setFiltroEvento(c.id)} style={{ display:"flex", alignItems:"center", gap:7, padding:"6px 14px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                            {c.id!=="todos" && <span style={{ width:7, height:7, borderRadius:"50%", background: ativo?"#fff":c.cor }} />}
+                            {c.label} <span style={{ opacity:.6 }}>{c.n}</span>
+                          </button>
+                        );
+                      })}
                     </div>
+                  )}
+
+                  {prox.length === 0 && pass.length === 0 ? (
+                    <div style={{ background:D.bgCard, borderRadius:D.radius, padding:32, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                      <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhum evento deste tipo.</div>
+                    </div>
+                  ) : (
+                    <>
+                      {prox.length > 0 && (
+                        <div style={{ marginBottom:24 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+                            <span style={{ width:8, height:8, borderRadius:"50%", background:D.accent }} />
+                            <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Próximos eventos</span>
+                          </div>
+                          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                            {prox.map(e => <CardEvento key={e.id} e={e} passado={false} />)}
+                          </div>
+                        </div>
+                      )}
+                      {pass.length > 0 && (
+                        <div>
+                          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+                            <span style={{ width:8, height:8, borderRadius:"50%", background:D.textMut }} />
+                            <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Eventos passados</span>
+                          </div>
+                          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                            {pass.map(e => <CardEvento key={e.id} e={e} passado={true} />)}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
-              )}
+                );
+              })()}
             </div>
           </div>
           );

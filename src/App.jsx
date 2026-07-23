@@ -2444,6 +2444,7 @@ export default function App() {
   const [buscaComun, setBuscaComun]     = useState("");
   const [buscaDoc, setBuscaDoc]         = useState("");
   const [fichaSecao, setFichaSecao]     = useState("cobrancas");
+  const [selCob, setSelCob]             = useState([]);
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -2607,6 +2608,17 @@ export default function App() {
 
 
   const showToast = (msg, type="success") => setToast({ msg, type });
+
+  // Rede de segurança: qualquer escrita que falhe sem tratamento próprio avisa o síndico
+  // em vez de falhar em silêncio (a ação simplesmente não acontecia e ninguém sabia).
+  useEffect(() => {
+    const aoFalhar = (e) => {
+      console.error("Falha não tratada:", e?.reason || e);
+      setToast({ msg: "Não foi possível concluir. Verifique sua conexão e tente de novo.", type: "error" });
+    };
+    window.addEventListener("unhandledrejection", aoFalhar);
+    return () => window.removeEventListener("unhandledrejection", aoFalhar);
+  }, []);
 
   const registrarLog = async (icone, descricao) => {
     try {
@@ -2820,6 +2832,7 @@ export default function App() {
 
   const mudarMes = async (m) => {
     setMesSel(m);
+    setSelCob([]);
     garantirMes(m);
     const snap = await getDoc(doc(db, "observacoes", `${condominioId}_${m}`));
     const texto = snap.exists() ? (snap.data().texto || "") : "";
@@ -2919,7 +2932,7 @@ export default function App() {
     const salvar = async (base64="") => {
       await setDoc(doc(db, "cobrancas", `${condominioId}_${moradorId}_${mesSel}`), { condominioId, moradorId, mes:mesSel, status:"pago", dataPagamento:dataPgto, obs:pagForm.obs, comprovante:base64, arquivoNome:pagForm.arquivoNome }, { merge:true });
       setModal(null); setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
-      showToast("Pagamento registrado! Recibo e e-mail enviados.");
+      let emailOk = false;
       if (morador) {
         gerarReciboPDF(morador, dataPgto, pagForm.obs);
         registrarLog("✅", `Pagamento registrado: ${morador.nome} (${morador.unidade}) — ${mesLabel(mesSel)} — R$ ${taxa.toFixed(2).replace(".",",")}`);
@@ -2935,12 +2948,49 @@ export default function App() {
             obs:            pagForm.obs ? `Observação: ${pagForm.obs}` : "",
             nome_condominio: condominio?.nome || "Condomínio",
           });
+          emailOk = true;
         } catch(e) {
           console.error("Erro ao enviar e-mail de confirmação:", e);
         }
       }
+      // Só afirma o que realmente aconteceu
+      showToast(emailOk
+        ? "Pagamento registrado. Recibo gerado e e-mail enviado ao morador."
+        : "Pagamento registrado e recibo gerado. O e-mail ao morador não saiu — avise por outro meio.",
+        emailOk ? "success" : "error");
     };
-    if (pagForm.arquivo) { const r=new FileReader(); r.onload=e=>salvar(e.target.result); r.readAsDataURL(pagForm.arquivo); } else salvar();
+    const salvarSeguro = async (base64="") => {
+      try { await salvar(base64); }
+      catch (e) {
+        console.error("Erro ao registrar pagamento:", e);
+        showToast("Não foi possível registrar o pagamento. Verifique sua conexão e tente de novo.", "error");
+      }
+    };
+    if (pagForm.arquivo) { const r=new FileReader(); r.onload=e=>salvarSeguro(e.target.result); r.readAsDataURL(pagForm.arquivo); } else salvarSeguro();
+  };
+
+  // Marca vários pagamentos de uma vez (conciliação de extrato).
+  // Não dispara e-mail: 20 envios de golpe viram spam e o síndico perde o controle de quem foi avisado.
+  const marcarSelecionadosPagos = async () => {
+    if (selCob.length === 0) return;
+    const dataPgto = new Date().toLocaleDateString("pt-BR");
+    const nomes = selCob.map(id => moradores.find(m => m.id === id)?.unidade || "?").join(", ");
+    if (!window.confirm(`Marcar ${selCob.length} cobrança(s) como paga(s) em ${mesLabel(mesSel)}?\n\nUnidades: ${nomes}\n\nOs moradores NÃO receberão e-mail automático por esta ação.`)) return;
+    try {
+      const batch = writeBatch(db);
+      selCob.forEach(moradorId => {
+        batch.set(doc(db, "cobrancas", `${condominioId}_${moradorId}_${mesSel}`),
+          { condominioId, moradorId, mes:mesSel, status:"pago", dataPagamento:dataPgto, obs:"Baixa em lote", comprovante:null, arquivoNome:null },
+          { merge:true });
+      });
+      await batch.commit();
+      registrarLog("✅", `Baixa em lote: ${selCob.length} pagamento(s) registrado(s) — ${mesLabel(mesSel)} (unidades: ${nomes})`);
+      showToast(`${selCob.length} pagamento(s) registrado(s). Nenhum e-mail foi enviado.`);
+      setSelCob([]);
+    } catch (e) {
+      console.error("Erro na baixa em lote:", e);
+      showToast("Não foi possível registrar os pagamentos. Verifique sua conexão e tente de novo.", "error");
+    }
   };
 
   const estornarPagamento = async (moradorId) => {
@@ -4017,11 +4067,18 @@ export default function App() {
     if (!m) return null;
     const enc = encargosCobranca(cob);
     return (
-      <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${cob.status==="pago"?D.success:cob.status==="atrasado"?D.danger:D.warning}`, marginBottom:10 }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
-          <div>
-            <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{m.unidade} — {m.nome}</div>
-            <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>{m.email}</div>
+      <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${selCob.includes(cob.moradorId)?D.primary:D.border}`, borderLeft:`3px solid ${cob.status==="pago"?D.success:cob.status==="atrasado"?D.danger:D.warning}`, marginBottom:10 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8, gap:10 }}>
+          <div style={{ display:"flex", alignItems:"flex-start", gap:10, minWidth:0 }}>
+            {!readOnly && cob.status !== "pago" && (
+              <input type="checkbox" checked={selCob.includes(cob.moradorId)}
+                onChange={e => setSelCob(prev => e.target.checked ? [...prev, cob.moradorId] : prev.filter(x => x !== cob.moradorId))}
+                style={{ width:18, height:18, marginTop:2, cursor:"pointer", accentColor:D.primary, flexShrink:0 }} />
+            )}
+            <div style={{ minWidth:0 }}>
+              <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{m.unidade} — {m.nome}</div>
+              <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2, overflow:"hidden", textOverflow:"ellipsis" }}>{m.email}</div>
+            </div>
           </div>
           <Badge status={cob.status} />
         </div>
@@ -4466,10 +4523,67 @@ export default function App() {
                   </div>
                 ) : null;
 
+                // Avisos: o que precisa da atenção do síndico hoje, sem ele ir procurar aba por aba
+                const DIAS = 86400000;
+                const agora = Date.now();
+                const diasDesde = (ts) => ts ? Math.floor((agora - ts) / DIAS) : 0;
+                const avisos = [];
+
+                const docsAtencao = documentos.filter(d => { const st = situacaoDoc(d.vencimento); return st.dias !== null && st.dias <= 30; });
+                const docsVencidos = docsAtencao.filter(d => (situacaoDoc(d.vencimento).dias ?? 0) < 0);
+                if (docsAtencao.length) avisos.push({
+                  icon:"alerta", cor: docsVencidos.length ? D.danger : D.warning, aba:"documentos",
+                  texto: docsVencidos.length
+                    ? `${docsVencidos.length} documento${docsVencidos.length>1?"s":""} vencido${docsVencidos.length>1?"s":""}${docsAtencao.length>docsVencidos.length ? ` e ${docsAtencao.length-docsVencidos.length} vencendo` : ""}`
+                    : `${docsAtencao.length} documento${docsAtencao.length>1?"s":""} vencendo em até 30 dias`,
+                });
+
+                const reservasPend = reservas.filter(r => r.status === "pendente");
+                if (reservasPend.length) avisos.push({
+                  icon:"reservas", cor:D.warning, aba:"reservas",
+                  texto:`${reservasPend.length} reserva${reservasPend.length>1?"s":""} aguardando sua aprovação`,
+                });
+
+                const ocorrParadas = ocorrencias.filter(o => o.status !== "resolvida" && diasDesde(o.timestamp) >= 7);
+                if (ocorrParadas.length) avisos.push({
+                  icon:"ocorrencias", cor:D.danger, aba:"ocorrencias",
+                  texto:`${ocorrParadas.length} ocorrência${ocorrParadas.length>1?"s":""} sem solução há mais de 7 dias`,
+                });
+
+                const entregasParadas = entregas.filter(e => e.status === "aguardando" && diasDesde(e.timestamp) >= 7);
+                if (entregasParadas.length) avisos.push({
+                  icon:"entregas", cor:D.warning, aba:"entregas",
+                  texto:`${entregasParadas.length} encomenda${entregasParadas.length>1?"s":""} parada${entregasParadas.length>1?"s":""} há mais de 7 dias`,
+                });
+
+                const atrasadosMes = cobMes.filter(c => c.status === "atrasado");
+                if (atrasadosMes.length) avisos.push({
+                  icon:"multa", cor:D.danger, aba:"cobrancas",
+                  texto:`${atrasadosMes.length} cobrança${atrasadosMes.length>1?"s":""} em atraso em ${mesLabel(mesSel)}`,
+                });
+
+                const avisosCard = avisos.length === 0 ? null : (
+                  <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.warning}`, overflow:"hidden" }}>
+                    <div style={{ padding: isMobile?"14px 16px 10px":"16px 22px 12px", display:"flex", alignItems:"center", gap:9 }}>
+                      <span style={{ color:D.warning, display:"flex" }}><NavIcon id="alerta" size={17} /></span>
+                      <span style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>Precisa da sua atenção</span>
+                      <span style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut }}>({avisos.length})</span>
+                    </div>
+                    {avisos.map((av, i) => (
+                      <button key={i} onClick={() => setAba(av.aba)}
+                        style={{ width:"100%", display:"flex", alignItems:"center", gap:11, padding: isMobile?"12px 16px":"12px 22px", background:"none", border:"none", borderTop:`1px solid ${D.border}`, cursor:"pointer", textAlign:"left", fontFamily:D.fontBody }}>
+                        <span style={{ width:30, height:30, borderRadius:8, background:D.muted, color:av.cor, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id={av.icon} size={15} /></span>
+                        <span style={{ flex:1, fontSize:13, color:D.text, minWidth:0 }}>{av.texto}</span>
+                        <span style={{ color:D.textMut, display:"flex", flexShrink:0, transform:"rotate(-90deg)" }}><NavIcon id="setaBaixo" size={15} /></span>
+                      </button>
+                    ))}
+                  </div>
+                );
+
                 if (isMobile) {
                   return (
                     <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                      {kpiStrip}{notaVazia}{chartCard}{inadimplCard}{cobrancasCard}{ocorrenciasCard}{atividadeCard}
+                      {kpiStrip}{notaVazia}{avisosCard}{chartCard}{inadimplCard}{cobrancasCard}{ocorrenciasCard}{atividadeCard}
                     </div>
                   );
                 }
@@ -4484,6 +4598,7 @@ export default function App() {
                         {ocorrenciasCard}
                       </div>
                       <div style={{ display:"flex", flexDirection:"column", gap:16, minWidth:0 }}>
+                        {avisosCard}
                         {inadimplCard}
                         {atividadeCard}
                       </div>
@@ -4639,6 +4754,20 @@ export default function App() {
                   </div>
                 )}
 
+                {selCob.length > 0 && !readOnly && (
+                  <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap", background:D.primary, color:"#fff", borderRadius:D.radius, padding:"12px 16px", marginBottom:14 }}>
+                    <span style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, flex:1, minWidth:140 }}>
+                      {selCob.length} {selCob.length===1?"cobrança selecionada":"cobranças selecionadas"}
+                    </span>
+                    <button onClick={marcarSelecionadosPagos} style={{ display:"flex", alignItems:"center", gap:7, padding:"8px 16px", background:"#fff", color:D.primary, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                      <NavIcon id="logCheck" size={15} /> Marcar como pagas
+                    </button>
+                    <button onClick={()=>setSelCob([])} style={{ padding:"8px 14px", background:"transparent", color:"#fff", border:"1px solid rgba(255,255,255,.4)", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                      Limpar
+                    </button>
+                  </div>
+                )}
+
                 {isMobile ? (
                   <div>{lista.map((cob,i) => <CobCard key={i} cob={cob} />)}</div>
                 ) : (
@@ -4651,6 +4780,18 @@ export default function App() {
                     <table style={{ width:"100%", borderCollapse:"collapse" }}>
                       <thead>
                         <tr style={{ background:D.muted }}>
+                          {!readOnly && (() => {
+                            const selecionaveis = lista.filter(c => c.status !== "pago").map(c => c.moradorId);
+                            const todosMarcados = selecionaveis.length > 0 && selecionaveis.every(id => selCob.includes(id));
+                            return (
+                              <th style={{ padding:"12px 8px 12px 16px", width:38, borderBottom:`1px solid ${D.border}` }}>
+                                <input type="checkbox" checked={todosMarcados} disabled={selecionaveis.length===0}
+                                  onChange={e => setSelCob(e.target.checked ? selecionaveis : [])}
+                                  title={selecionaveis.length===0 ? "Nada a selecionar" : "Selecionar todos os não pagos"}
+                                  style={{ width:16, height:16, cursor: selecionaveis.length===0?"default":"pointer", accentColor:D.primary }} />
+                              </th>
+                            );
+                          })()}
                           {["Unidade","Morador","Valor","Status","Data Pgto","Ações"].map(h => (
                             <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, borderBottom:`1px solid ${D.border}` }}>{h}</th>
                           ))}
@@ -4662,7 +4803,15 @@ export default function App() {
                           if (!m) return null;
                           const enc = encargosCobranca(cob);
                           return (
-                            <tr key={i} style={{ borderBottom:`1px solid ${D.border}` }}>
+                            <tr key={i} style={{ borderBottom:`1px solid ${D.border}`, background: selCob.includes(cob.moradorId) ? D.secondary : "transparent" }}>
+                              {!readOnly && (
+                                <td style={{ padding:"13px 8px 13px 16px", width:38 }}>
+                                  <input type="checkbox" checked={selCob.includes(cob.moradorId)} disabled={cob.status==="pago"}
+                                    onChange={e => setSelCob(prev => e.target.checked ? [...prev, cob.moradorId] : prev.filter(x => x !== cob.moradorId))}
+                                    title={cob.status==="pago" ? "Já está paga" : "Selecionar"}
+                                    style={{ width:16, height:16, cursor: cob.status==="pago"?"default":"pointer", accentColor:D.primary, opacity: cob.status==="pago"?.35:1 }} />
+                                </td>
+                              )}
                               <td style={{ padding:"13px 16px", fontWeight:600, color:D.text, fontSize:13 }}>{m.unidade}</td>
                               <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>{m.nome}</td>
                               <td style={{ padding:"13px 16px", fontSize:13, color:D.text }}>

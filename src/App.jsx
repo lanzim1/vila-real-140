@@ -2158,6 +2158,141 @@ const NavIcon = ({ id, size = 18 }) => (
     dangerouslySetInnerHTML={{ __html: NAV_ICON_PATHS[id] || "" }} />
 );
 
+/* ══════════════ CONSULTA POR DATA (componente único, usado em todas as abas) ══════════════ */
+
+const PERIODO_TUDO = { tipo:"tudo", valor:null };
+const MS_DIA = 86400000;
+const MESES_PT = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const MESES_ABREV = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const DIAS_SEMANA = ["D","S","T","Q","Q","S","S"];
+
+const inicioHoje = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); };
+const chaveDia = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+
+// Verifica se um timestamp cai dentro do período escolhido
+const noPeriodo = (ts, p) => {
+  if (!p || p.tipo === "tudo") return true;
+  if (!ts) return false;
+  const h0 = inicioHoje();
+  if (p.tipo === "hoje") return ts >= h0 && ts < h0 + MS_DIA;
+  if (p.tipo === "7d")   return ts >= h0 - 6 * MS_DIA;
+  if (p.tipo === "30d")  return ts >= h0 - 29 * MS_DIA;
+  if (p.tipo === "dia") {
+    const [a,m,d] = String(p.valor).split("-").map(Number);
+    const ini = new Date(a, m-1, d).setHours(0,0,0,0);
+    return ts >= ini && ts < ini + MS_DIA;
+  }
+  if (p.tipo === "mes") {
+    const [a,m] = String(p.valor).split("-").map(Number);
+    return ts >= new Date(a, m-1, 1).getTime() && ts < new Date(a, m, 1).getTime();
+  }
+  return true;
+};
+
+// Rótulo curto do período, para mostrar no botão
+const rotuloPeriodo = (p) => {
+  if (!p || p.tipo === "tudo") return "Escolher data";
+  if (p.tipo === "dia") { const [a,m,d] = String(p.valor).split("-").map(Number); return `${d} ${MESES_ABREV[m-1]}`; }
+  if (p.tipo === "mes") { const [a,m] = String(p.valor).split("-").map(Number); return `${MESES_ABREV[m-1]}/${a}`; }
+  return "Escolher data";
+};
+
+const BarraPeriodo = ({ periodo, setPeriodo, timestamps = [], total = 0, D, isMobile, rotuloItem = "registro" }) => {
+  const [aberto, setAberto] = useState(false);
+  const hojeD = new Date();
+  const [mesVista, setMesVista] = useState({ ano: hojeD.getFullYear(), mes: hojeD.getMonth() });
+
+  // Dias que possuem pelo menos um registro (para marcar com bolinha)
+  const diasComRegistro = new Set(timestamps.filter(Boolean).map(chaveDia));
+
+  const atalhos = [
+    { tipo:"hoje", label:"Hoje" },
+    { tipo:"7d",   label:"7 dias" },
+    { tipo:"30d",  label:"30 dias" },
+    { tipo:"tudo", label:"Tudo" },
+  ];
+  const ativoCal = periodo.tipo === "dia" || periodo.tipo === "mes";
+
+  const primeiroDiaSemana = new Date(mesVista.ano, mesVista.mes, 1).getDay();
+  const diasNoMes = new Date(mesVista.ano, mesVista.mes + 1, 0).getDate();
+  const celulas = [...Array(primeiroDiaSemana).fill(null), ...Array.from({length:diasNoMes}, (_,i) => i+1)];
+  const chaveMesVista = `${mesVista.ano}-${String(mesVista.mes+1).padStart(2,"0")}`;
+
+  const navegarMes = (delta) => {
+    const d = new Date(mesVista.ano, mesVista.mes + delta, 1);
+    setMesVista({ ano: d.getFullYear(), mes: d.getMonth() });
+  };
+
+  const btnBase = { display:"flex", alignItems:"center", gap:6, padding:"6px 14px", borderRadius:20, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, whiteSpace:"nowrap" };
+
+  return (
+    <div style={{ marginBottom:14 }}>
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+        {atalhos.map(a => {
+          const ativo = periodo.tipo === a.tipo;
+          return (
+            <button key={a.tipo} onClick={() => { setPeriodo({ tipo:a.tipo, valor:null }); setAberto(false); }}
+              style={{ ...btnBase, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec }}>
+              {a.label}
+            </button>
+          );
+        })}
+        <button onClick={() => setAberto(v => !v)}
+          style={{ ...btnBase, borderRadius:D.radiusSm, border: ativoCal?"none":`1px solid ${D.border}`, background: ativoCal?D.primary:D.bgCard, color: ativoCal?"#fff":D.textSec }}>
+          <NavIcon id="agenda" size={14} /> {rotuloPeriodo(periodo)}
+          <span style={{ display:"flex", transform: aberto?"rotate(180deg)":"none", transition:"transform .15s" }}><NavIcon id="setaBaixo" size={12} /></span>
+        </button>
+      </div>
+
+      {aberto && (
+        <div style={{ marginTop:10, background:D.bgCard, border:`1px solid ${D.border}`, borderRadius:D.radius, boxShadow:D.shadowMd || D.shadow, padding:14, maxWidth: isMobile?"100%":300 }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+            <button onClick={() => navegarMes(-1)} title="Mês anterior" style={{ width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, border:`1px solid ${D.border}`, borderRadius:7, cursor:"pointer", color:D.textSec, transform:"rotate(90deg)" }}><NavIcon id="setaCima" size={14} /></button>
+            <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, textTransform:"capitalize", letterSpacing:"-0.02em" }}>{MESES_PT[mesVista.mes]} {mesVista.ano}</span>
+            <button onClick={() => navegarMes(1)} title="Próximo mês" style={{ width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, border:`1px solid ${D.border}`, borderRadius:7, cursor:"pointer", color:D.textSec, transform:"rotate(90deg)" }}><NavIcon id="setaBaixo" size={14} /></button>
+          </div>
+
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2, marginBottom:4 }}>
+            {DIAS_SEMANA.map((d,i) => (
+              <div key={i} style={{ textAlign:"center", fontFamily:D.fontBody, fontSize:11, fontWeight:600, color:D.textMut, padding:"2px 0" }}>{d}</div>
+            ))}
+          </div>
+
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2 }}>
+            {celulas.map((dia, i) => {
+              if (dia === null) return <div key={`v${i}`} />;
+              const chave = `${chaveMesVista}-${String(dia).padStart(2,"0")}`;
+              const temReg = diasComRegistro.has(chave);
+              const selecionado = periodo.tipo === "dia" && periodo.valor === chave;
+              const ehHoje = chave === chaveDia(Date.now());
+              return (
+                <button key={chave} onClick={() => { setPeriodo({ tipo:"dia", valor:chave }); setAberto(false); }}
+                  style={{ position:"relative", aspectRatio:"1", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:1, border: ehHoje && !selecionado ? `1px solid ${D.accent}` : "1px solid transparent", background: selecionado?D.primary:"transparent", color: selecionado?"#fff":(temReg?D.text:D.textMut), borderRadius:7, cursor:"pointer", fontFamily:D.fontBody, fontSize:12, fontWeight: temReg?600:400, padding:0 }}>
+                  {dia}
+                  <span style={{ width:4, height:4, borderRadius:"50%", background: temReg ? (selecionado?"#fff":D.accent) : "transparent" }} />
+                </button>
+              );
+            })}
+          </div>
+
+          <button onClick={() => { setPeriodo({ tipo:"mes", valor:chaveMesVista }); setAberto(false); }}
+            style={{ width:"100%", marginTop:10, padding:"8px 12px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, textTransform:"capitalize" }}>
+            Ver {MESES_PT[mesVista.mes]} inteiro
+          </button>
+          <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, textAlign:"center", marginTop:8 }}>Bolinha marca dia com registro</div>
+        </div>
+      )}
+
+      {periodo.tipo !== "tudo" && (
+        <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:8 }}>
+          {total} {total === 1 ? rotuloItem : `${rotuloItem}s`} {periodo.tipo==="hoje" ? "hoje" : periodo.tipo==="7d" ? "nos últimos 7 dias" : periodo.tipo==="30d" ? "nos últimos 30 dias" : `em ${rotuloPeriodo(periodo)}`}
+          {total === 0 && <button onClick={() => setPeriodo(PERIODO_TUDO)} style={{ marginLeft:8, background:"none", border:"none", color:D.accent, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, textDecoration:"underline", padding:0 }}>ver tudo</button>}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Mapa: categoria de despesa → id do ícone de traço
 const CAT_ICON_ID = {
   agua:"despesas", luz:"catLuz", limpeza:"catLimpeza", portaria:"catPortaria",
@@ -2265,6 +2400,15 @@ export default function App() {
   const [filtroAcesso, setFiltroAcesso] = useState("todos");
   const [filtroDoc, setFiltroDoc] = useState("todos");
   const [filtroEvento, setFiltroEvento] = useState("todos");
+  // ── Consulta por data (um período por aba) ──
+  const [perLog, setPerLog]       = useState(PERIODO_TUDO);
+  const [perAcesso, setPerAcesso] = useState(PERIODO_TUDO);
+  const [perEntrega, setPerEntrega] = useState(PERIODO_TUDO);
+  const [perReserva, setPerReserva] = useState(PERIODO_TUDO);
+  const [perOcorr, setPerOcorr]   = useState(PERIODO_TUDO);
+  const [perComun, setPerComun]   = useState(PERIODO_TUDO);
+  const [perFundo, setPerFundo]   = useState(PERIODO_TUDO);
+  const [perEvento, setPerEvento] = useState(PERIODO_TUDO);
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -2896,7 +3040,7 @@ export default function App() {
     await addDoc(collection(db, "acessos"), {
       condominioId,
       ...novoAcesso,
-      dataEntrada: novoAcesso.dataEntrada || dataHoje,
+      dataEntrada: novoAcesso.dataEntrada ? (()=>{ const [an,me,di] = novoAcesso.dataEntrada.split("-"); return `${di}/${me}/${an}`; })() : dataHoje,
       horaEntrada: novoAcesso.horaEntrada || horaAgora,
       timestamp: Date.now(),
     });
@@ -4948,9 +5092,10 @@ export default function App() {
 
               {(() => {
                 const pend = reservas.filter(r=>r.status==="pendente");
-                const aprov = reservas.filter(r=>r.status==="aprovada");
-                const rejet = reservas.filter(r=>r.status==="rejeitada");
-                const hist = reservas.filter(r=>r.status!=="pendente");
+                const todoHist = reservas.filter(r=>r.status!=="pendente");
+                const hist = todoHist.filter(r => noPeriodo(r.timestamp, perReserva));
+                const aprov = hist.filter(r=>r.status==="aprovada");
+                const rejet = hist.filter(r=>r.status==="rejeitada");
 
                 const cards = [
                   { label:"Aguardando aprovação", valor: pend.length,  icon:"clock",    cor:D.warning },
@@ -5038,7 +5183,10 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                    {hist.length === 0 ? (
+                    {todoHist.length > 0 && (
+                      <BarraPeriodo periodo={perReserva} setPeriodo={setPerReserva} timestamps={todoHist.map(r=>r.timestamp)} total={hist.length} D={D} isMobile={isMobile} rotuloItem="reserva" />
+                    )}
+                    {todoHist.length === 0 ? (
                       <div style={{ background:D.bgCard, borderRadius:D.radius, padding:36, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
                         <div style={{ display:"flex", justifyContent:"center", marginBottom:10, color:D.textMut }}><NavIcon id="reservas" size={34} /></div>
                         <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhuma reserva aprovada ou rejeitada ainda.</div>
@@ -5140,19 +5288,20 @@ export default function App() {
             </div>
 
             {(() => {
-              const dentro = acessos.filter(a=>!a.horaSaida);
-              const sairam = acessos.filter(a=>!!a.horaSaida);
+              const noPer = acessos.filter(a => noPeriodo(a.timestamp, perAcesso));
+              const dentro = noPer.filter(a=>!a.horaSaida);
+              const sairam = noPer.filter(a=>!!a.horaSaida);
               const cards = [
-                { label:"Total de acessos",   valor: acessos.length, icon:"acPorta", cor:D.text },
+                { label:"Total de acessos",   valor: noPer.length,  icon:"acPorta", cor:D.text },
                 { label:"Ainda no condomínio", valor: dentro.length,  icon:"clock",   cor:D.warning },
                 { label:"Saíram",              valor: sairam.length,  icon:"logCheck",cor:D.success },
               ];
               const chips = [
-                { id:"todos",  label:"Todos",        cor:D.primary, n:acessos.length },
+                { id:"todos",  label:"Todos",        cor:D.primary, n:noPer.length },
                 { id:"dentro", label:"No condomínio", cor:D.warning, n:dentro.length },
                 { id:"sairam", label:"Saíram",        cor:D.success, n:sairam.length },
               ];
-              const lista = acessos.filter(a => filtroAcesso==="todos" || (filtroAcesso==="dentro" ? !a.horaSaida : !!a.horaSaida));
+              const lista = noPer.filter(a => filtroAcesso==="todos" || (filtroAcesso==="dentro" ? !a.horaSaida : !!a.horaSaida));
 
               return (
               <>
@@ -5173,6 +5322,8 @@ export default function App() {
                   </div>
                 ) : (
                   <>
+                    <BarraPeriodo periodo={perAcesso} setPeriodo={setPerAcesso} timestamps={acessos.map(a=>a.timestamp)} total={noPer.length} D={D} isMobile={isMobile} rotuloItem="acesso" />
+
                     {/* Filtros */}
                     <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
                       {chips.map(c => {
@@ -5252,7 +5403,14 @@ export default function App() {
               </div>
 
               {/* Lista de comunicados */}
-              {comunicados.length === 0 ? (
+              {(() => {
+                const comFiltrados = comunicados.filter(c => noPeriodo(c.timestamp, perComun));
+                return (
+                <>
+                {comunicados.length > 0 && (
+                  <BarraPeriodo periodo={perComun} setPeriodo={setPerComun} timestamps={comunicados.map(c=>c.timestamp)} total={comFiltrados.length} D={D} isMobile={isMobile} rotuloItem="comunicado" />
+                )}
+                {comunicados.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
                   <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="comunicados" size={36} /></div>
                   <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhum comunicado ainda</div>
@@ -5260,7 +5418,12 @@ export default function App() {
                 </div>
               ) : (
                 <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                  {comunicados.map(com => (
+                  {comFiltrados.length === 0 && (
+                    <div style={{ background:D.bgCard, borderRadius:D.radius, padding:32, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                      <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhum comunicado neste período.</div>
+                    </div>
+                  )}
+                  {comFiltrados.map(com => (
                     <div key={com.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:"18px 20px", boxShadow:D.shadow, border:`1px solid ${com.fixado ? D.accent : D.border}`, borderLeft:`4px solid ${com.fixado ? D.accent : D.border}` }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, marginBottom:8 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", minWidth:0 }}>
@@ -5280,6 +5443,9 @@ export default function App() {
                   ))}
                 </div>
               )}
+                </>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -5473,6 +5639,9 @@ export default function App() {
 
               {/* Histórico de movimentações */}
               <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>Movimentações</div>
+              {fundoMovs.length > 0 && (
+                <BarraPeriodo periodo={perFundo} setPeriodo={setPerFundo} timestamps={fundoMovs.map(m=>m.timestamp)} total={fundoMovs.filter(m=>noPeriodo(m.timestamp, perFundo)).length} D={D} isMobile={isMobile} rotuloItem="movimentação" />
+              )}
               {fundoMovs.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
                   <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="banco" size={36} /></div>
@@ -5481,10 +5650,13 @@ export default function App() {
                 </div>
               ) : (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
-                  {fundoMovs.map((m,i) => {
+                  {fundoMovs.filter(m=>noPeriodo(m.timestamp, perFundo)).length === 0 && (
+                    <div style={{ padding:28, textAlign:"center", fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhuma movimentação neste período.</div>
+                  )}
+                  {fundoMovs.filter(m=>noPeriodo(m.timestamp, perFundo)).map((m,i,arr) => {
                     const aporte = m.tipo==="aporte";
                     return (
-                    <div key={m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", borderBottom: i<fundoMovs.length-1?`1px solid ${D.border}`:"none", gap:12 }}>
+                    <div key={m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", borderBottom: i<arr.length-1?`1px solid ${D.border}`:"none", gap:12 }}>
                       <div style={{ display:"flex", alignItems:"center", gap:12, minWidth:0 }}>
                         <div style={{ width:34, height:34, borderRadius:9, background: aporte?D.successBg:D.dangerBg, color: aporte?D.success:D.danger, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id={aporte?"setaCima":"setaBaixo"} size={16} /></div>
                         <div style={{ minWidth:0 }}>
@@ -5513,7 +5685,8 @@ export default function App() {
         {/* ── Entregas ── */}
         {aba === "entregas" && podeUsar("entregas") && (() => {
           const aguardando = entregas.filter(e => e.status === "aguardando");
-          const retiradas  = entregas.filter(e => e.status === "retirada");
+          const todasRetiradas = entregas.filter(e => e.status === "retirada");
+          const retiradas = todasRetiradas.filter(e => noPeriodo(e.timestamp, perEntrega));
           return (
           <div>
             <TopBar title="Controle de Entregas" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
@@ -5588,7 +5761,10 @@ export default function App() {
                 <span style={{ width:8, height:8, borderRadius:"50%", background:D.success }} />
                 <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Já retiradas</span>
               </div>
-              {retiradas.length === 0 && aguardando.length === 0 ? (
+              {todasRetiradas.length > 0 && (
+                <BarraPeriodo periodo={perEntrega} setPeriodo={setPerEntrega} timestamps={todasRetiradas.map(e=>e.timestamp)} total={retiradas.length} D={D} isMobile={isMobile} rotuloItem="encomenda" />
+              )}
+              {todasRetiradas.length === 0 && aguardando.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
                   <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="entregas" size={36} /></div>
                   <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>Nenhuma encomenda registrada</div>
@@ -5718,12 +5894,13 @@ export default function App() {
             em_andamento: { rotulo:"Em andamento", icon:"servicos", cor:D.accent,  bg:D.secondary },
             resolvida:    { rotulo:"Resolvida",    icon:"logCheck", cor:D.success,  bg:D.successBg },
           };
-          const filtradas = filtroOcorrencia === "todas" ? ocorrencias : ocorrencias.filter(o => o.status === filtroOcorrencia);
+          const noPer = ocorrencias.filter(o => noPeriodo(o.timestamp, perOcorr));
+          const filtradas = filtroOcorrencia === "todas" ? noPer : noPer.filter(o => o.status === filtroOcorrencia);
           const cont = {
-            todas: ocorrencias.length,
-            aberta: ocorrencias.filter(o=>o.status==="aberta").length,
-            em_andamento: ocorrencias.filter(o=>o.status==="em_andamento").length,
-            resolvida: ocorrencias.filter(o=>o.status==="resolvida").length,
+            todas: noPer.length,
+            aberta: noPer.filter(o=>o.status==="aberta").length,
+            em_andamento: noPer.filter(o=>o.status==="em_andamento").length,
+            resolvida: noPer.filter(o=>o.status==="resolvida").length,
           };
           const filtros = [
             { id:"todas",        label:"Todas",        cor:D.primary, n:cont.todas },
@@ -5737,6 +5914,9 @@ export default function App() {
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Filtros */}
+              {ocorrencias.length > 0 && (
+                <BarraPeriodo periodo={perOcorr} setPeriodo={setPerOcorr} timestamps={ocorrencias.map(o=>o.timestamp)} total={noPer.length} D={D} isMobile={isMobile} rotuloItem="ocorrência" />
+              )}
               <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:16 }}>
                 {filtros.map(f => {
                   const ativo = filtroOcorrencia===f.id;
@@ -5987,8 +6167,10 @@ export default function App() {
                 const chips = [{ id:"todos", label:"Todos", cor:D.primary, n:eventos.length },
                   ...tiposPresentes.map(t => ({ id:t, label:t, cor:corTipo[t]||D.textSec, n:eventos.filter(e=>e.tipo===t).length }))];
                 const fil = (arr) => filtroEvento==="todos" ? arr : arr.filter(e=>e.tipo===filtroEvento);
+                const tsEv = (e) => parseData(e.data).getTime();
                 const prox = fil(proximos);
-                const pass = fil(passados);
+                const todosPass = fil(passados);
+                const pass = todosPass.filter(e => noPeriodo(tsEv(e), perEvento));
                 const primeiro = proximos[0];
 
                 return (
@@ -6018,7 +6200,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {prox.length === 0 && pass.length === 0 ? (
+                  {prox.length === 0 && todosPass.length === 0 ? (
                     <div style={{ background:D.bgCard, borderRadius:D.radius, padding:32, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
                       <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhum evento deste tipo.</div>
                     </div>
@@ -6035,15 +6217,22 @@ export default function App() {
                           </div>
                         </div>
                       )}
-                      {pass.length > 0 && (
+                      {todosPass.length > 0 && (
                         <div>
                           <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
                             <span style={{ width:8, height:8, borderRadius:"50%", background:D.textMut }} />
                             <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Eventos passados</span>
                           </div>
-                          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                            {pass.map(e => <CardEvento key={e.id} e={e} passado={true} />)}
-                          </div>
+                          <BarraPeriodo periodo={perEvento} setPeriodo={setPerEvento} timestamps={todosPass.map(tsEv)} total={pass.length} D={D} isMobile={isMobile} rotuloItem="evento" />
+                          {pass.length === 0 ? (
+                            <div style={{ background:D.bgCard, borderRadius:D.radius, padding:28, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+                              <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhum evento neste período.</div>
+                            </div>
+                          ) : (
+                            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                              {pass.map(e => <CardEvento key={e.id} e={e} passado={true} />)}
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
@@ -6079,8 +6268,9 @@ export default function App() {
                 <div style={{ color:D.textMut, fontSize:14, fontFamily:D.fontBody }}>Nenhuma atividade registrada ainda.<br/>As ações realizadas no sistema aparecerão aqui.</div>
               </div>
             ) : (() => {
-              // Filtro por tipo
-              const filtrados = logs.filter(l => filtroLog === "tudo" || tipoLog(l) === filtroLog);
+              // Filtro por período (data) e depois por tipo
+              const noPer = logs.filter(l => noPeriodo(l.timestamp, perLog));
+              const filtrados = noPer.filter(l => filtroLog === "tudo" || tipoLog(l) === filtroLog);
               // Agrupamento por data (logs já vêm ordenados por timestamp desc)
               const grupos = [];
               filtrados.forEach(l => {
@@ -6091,10 +6281,12 @@ export default function App() {
               });
               return (
                 <>
+                  <BarraPeriodo periodo={perLog} setPeriodo={setPerLog} timestamps={logs.map(l=>l.timestamp)} total={noPer.length} D={D} isMobile={isMobile} rotuloItem="registro" />
+
                   {/* Filtros por tipo */}
                   <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:18 }}>
                     {TIPOS_LOG.map(t => {
-                      const n = t.id === "tudo" ? logs.length : logs.filter(l => tipoLog(l) === t.id).length;
+                      const n = t.id === "tudo" ? noPer.length : noPer.filter(l => tipoLog(l) === t.id).length;
                       const ativo = filtroLog === t.id;
                       if (t.id !== "tudo" && n === 0) return null;
                       return (

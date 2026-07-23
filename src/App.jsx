@@ -2143,6 +2143,8 @@ const NAV_ICON_PATHS = {
   evSol:       '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
   fxCash:      '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
   fxMoeda:     '<circle cx="12" cy="12" r="9"/><path d="M14.8 9.4a3 3 0 0 0-2.8-1.4c-1.7 0-2.7.8-2.7 2 0 2.8 5.8 1.3 5.8 4 0 1.3-1.1 2.1-2.9 2.1a3.2 3.2 0 0 1-3-1.5"/><path d="M12 6.5v11"/>',
+  busca:       '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+  fechar:      '<path d="M18 6 6 18M6 6l12 12"/>',
   clock:       '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   catLuz:      '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
   catLimpeza:  '<path d="M12 3l1.6 4.8L18 9l-4.4 1.2L12 15l-1.6-4.8L6 9l4.4-1.2z"/><path d="M5 18l1.5 1.5M18 4l1 1"/>',
@@ -2195,6 +2197,30 @@ const rotuloPeriodo = (p) => {
   if (p.tipo === "dia") { const [a,m,d] = String(p.valor).split("-").map(Number); return `${d} ${MESES_ABREV[m-1]}`; }
   if (p.tipo === "mes") { const [a,m] = String(p.valor).split("-").map(Number); return `${MESES_ABREV[m-1]}/${a}`; }
   return "Escolher data";
+};
+
+/* ── Busca por texto (ignora acento e maiúscula) ── */
+const normalizarTexto = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+// Confere se algum dos campos do item contém o termo buscado
+const casaBusca = (item, termo, campos) => {
+  const t = normalizarTexto(termo).trim();
+  if (!t) return true;
+  return campos.some(c => normalizarTexto(item?.[c]).includes(t));
+};
+
+const CampoBusca = ({ valor, setValor, placeholder = "Buscar...", D, visivel = true }) => {
+  // Some quando a lista é curta, mas nunca some com busca ativa (não prende o usuário)
+  if (!visivel && !valor) return null;
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:9, background:D.bgCard, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, padding:"9px 12px", marginBottom:12 }}>
+      <span style={{ color:D.textMut, display:"flex", flexShrink:0 }}><NavIcon id="busca" size={16} /></span>
+      <input value={valor} onChange={e => setValor(e.target.value)} placeholder={placeholder}
+        style={{ flex:1, border:"none", outline:"none", background:"transparent", fontSize:13.5, fontFamily:D.fontBody, color:D.text, minWidth:0 }} />
+      {valor && (
+        <button onClick={() => setValor("")} title="Limpar busca" style={{ display:"flex", alignItems:"center", justifyContent:"center", width:22, height:22, background:D.muted, border:"none", borderRadius:6, color:D.textSec, cursor:"pointer", flexShrink:0 }}><NavIcon id="fechar" size={13} /></button>
+      )}
+    </div>
+  );
 };
 
 const BarraPeriodo = ({ periodo, setPeriodo, timestamps = [], total = 0, D, isMobile, rotuloItem = "registro" }) => {
@@ -2409,6 +2435,15 @@ export default function App() {
   const [perComun, setPerComun]   = useState(PERIODO_TUDO);
   const [perFundo, setPerFundo]   = useState(PERIODO_TUDO);
   const [perEvento, setPerEvento] = useState(PERIODO_TUDO);
+  // ── Busca por texto (uma por aba) ──
+  const [buscaLog, setBuscaLog]         = useState("");
+  const [buscaAcesso, setBuscaAcesso]   = useState("");
+  const [buscaEntrega, setBuscaEntrega] = useState("");
+  const [buscaReserva, setBuscaReserva] = useState("");
+  const [buscaOcorr, setBuscaOcorr]     = useState("");
+  const [buscaComun, setBuscaComun]     = useState("");
+  const [buscaDoc, setBuscaDoc]         = useState("");
+  const [fichaSecao, setFichaSecao]     = useState("cobrancas");
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -2943,7 +2978,7 @@ export default function App() {
   // Busca do topo: vai para a aba Moradores e abre o histórico do morador
   const abrirMoradorBusca = (m) => {
     setAba("moradores");
-    setModal({ type:"historico", data:m });
+    { setFichaSecao("cobrancas"); setModal({ type:"historico", data:m }); };
   };
 
   const salvarEdicaoMorador = async () => {
@@ -4760,7 +4795,7 @@ export default function App() {
                               </div>
                               {m.email && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.email}</div>}
                               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginTop:12 }}>
-                                <button onClick={() => setModal({ type:"historico", data:m })} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="histDoc" size={14} /> Histórico</button>
+                                <button onClick={() => { setFichaSecao("cobrancas"); setModal({ type:"historico", data:m }); }} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="histDoc" size={14} /> Histórico</button>
                                 <button onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="link" size={14} /> Link</button>
                                 {!readOnly && <>
                                   <button onClick={() => abrirEditar(m)} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logPencil" size={14} /> Editar</button>
@@ -4802,7 +4837,7 @@ export default function App() {
                                 <td style={{ padding:"12px 20px" }}>{cob ? <Badge status={cob.status} /> : <span style={{ color:D.textMut, fontSize:12 }}>—</span>}</td>
                                 <td style={{ padding:"12px 20px" }}>
                                   <div style={{ display:"flex", gap:6 }}>
-                                    <AcaoBtn icon="histDoc" titulo="Ver histórico" onClick={() => setModal({ type:"historico", data:m })} />
+                                    <AcaoBtn icon="histDoc" titulo="Ver histórico" onClick={() => { setFichaSecao("cobrancas"); setModal({ type:"historico", data:m }); }} />
                                     <AcaoBtn icon="link" titulo="Copiar link do portal" onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} />
                                     {!readOnly && <>
                                       <AcaoBtn icon="logPencil" titulo="Editar morador" onClick={() => abrirEditar(m)} />
@@ -5093,7 +5128,7 @@ export default function App() {
               {(() => {
                 const pend = reservas.filter(r=>r.status==="pendente");
                 const todoHist = reservas.filter(r=>r.status!=="pendente");
-                const hist = todoHist.filter(r => noPeriodo(r.timestamp, perReserva));
+                const hist = todoHist.filter(r => noPeriodo(r.timestamp, perReserva) && casaBusca(r, buscaReserva, ["area","nome","unidade","data","observacao"]));
                 const aprov = hist.filter(r=>r.status==="aprovada");
                 const rejet = hist.filter(r=>r.status==="rejeitada");
 
@@ -5183,6 +5218,9 @@ export default function App() {
                         </div>
                       )}
                     </div>
+                    {todoHist.length > 8 && (
+                      <CampoBusca valor={buscaReserva} setValor={setBuscaReserva} placeholder="Buscar por área, morador ou unidade..." D={D} visivel={true} />
+                    )}
                     {todoHist.length > 0 && (
                       <BarraPeriodo periodo={perReserva} setPeriodo={setPerReserva} timestamps={todoHist.map(r=>r.timestamp)} total={hist.length} D={D} isMobile={isMobile} rotuloItem="reserva" />
                     )}
@@ -5288,7 +5326,7 @@ export default function App() {
             </div>
 
             {(() => {
-              const noPer = acessos.filter(a => noPeriodo(a.timestamp, perAcesso));
+              const noPer = acessos.filter(a => noPeriodo(a.timestamp, perAcesso) && casaBusca(a, buscaAcesso, ["nome","empresa","motivo","unidade","dataEntrada"]));
               const dentro = noPer.filter(a=>!a.horaSaida);
               const sairam = noPer.filter(a=>!!a.horaSaida);
               const cards = [
@@ -5322,6 +5360,7 @@ export default function App() {
                   </div>
                 ) : (
                   <>
+                    <CampoBusca valor={buscaAcesso} setValor={setBuscaAcesso} placeholder="Buscar por nome, empresa ou unidade..." D={D} visivel={acessos.length > 8} />
                     <BarraPeriodo periodo={perAcesso} setPeriodo={setPerAcesso} timestamps={acessos.map(a=>a.timestamp)} total={noPer.length} D={D} isMobile={isMobile} rotuloItem="acesso" />
 
                     {/* Filtros */}
@@ -5404,9 +5443,10 @@ export default function App() {
 
               {/* Lista de comunicados */}
               {(() => {
-                const comFiltrados = comunicados.filter(c => noPeriodo(c.timestamp, perComun));
+                const comFiltrados = comunicados.filter(c => noPeriodo(c.timestamp, perComun) && casaBusca(c, buscaComun, ["titulo","mensagem","data"]));
                 return (
                 <>
+                <CampoBusca valor={buscaComun} setValor={setBuscaComun} placeholder="Buscar por título ou conteúdo..." D={D} visivel={comunicados.length > 8} />
                 {comunicados.length > 0 && (
                   <BarraPeriodo periodo={perComun} setPeriodo={setPerComun} timestamps={comunicados.map(c=>c.timestamp)} total={comFiltrados.length} D={D} isMobile={isMobile} rotuloItem="comunicado" />
                 )}
@@ -5484,7 +5524,8 @@ export default function App() {
                   { id:"vencendo", label:"Vencendo", cor:D.warning, n:vencendo.length },
                   { id:"vencidos", label:"Vencidos", cor:D.danger,  n:vencidos.length },
                 ];
-                const lista = filtroDoc==="emDia" ? emDia : filtroDoc==="vencendo" ? vencendo : filtroDoc==="vencidos" ? vencidos : comSit;
+                const listaBase = filtroDoc==="emDia" ? emDia : filtroDoc==="vencendo" ? vencendo : filtroDoc==="vencidos" ? vencidos : comSit;
+                const lista = listaBase.filter(d => casaBusca(d, buscaDoc, ["nome","categoria","obs"]));
 
                 return (
                 <>
@@ -5516,6 +5557,8 @@ export default function App() {
                     </div>
                   ) : (
                     <>
+                      <CampoBusca valor={buscaDoc} setValor={setBuscaDoc} placeholder="Buscar por nome ou categoria..." D={D} visivel={documentos.length > 8} />
+
                       {/* Filtros */}
                       <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
                         {chips.map(c => {
@@ -5684,8 +5727,9 @@ export default function App() {
 
         {/* ── Entregas ── */}
         {aba === "entregas" && podeUsar("entregas") && (() => {
-          const aguardando = entregas.filter(e => e.status === "aguardando");
-          const todasRetiradas = entregas.filter(e => e.status === "retirada");
+          const campoEnt = ["descricao","moradorNome","unidade","remetente","obs"];
+          const aguardando = entregas.filter(e => e.status === "aguardando" && casaBusca(e, buscaEntrega, campoEnt));
+          const todasRetiradas = entregas.filter(e => e.status === "retirada" && casaBusca(e, buscaEntrega, campoEnt));
           const retiradas = todasRetiradas.filter(e => noPeriodo(e.timestamp, perEntrega));
           return (
           <div>
@@ -5701,6 +5745,8 @@ export default function App() {
                   </button>
                 )}
               </div>
+
+              <CampoBusca valor={buscaEntrega} setValor={setBuscaEntrega} placeholder="Buscar por encomenda, morador ou unidade..." D={D} visivel={entregas.length > 8} />
 
               {/* Cards de resumo */}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
@@ -5894,7 +5940,7 @@ export default function App() {
             em_andamento: { rotulo:"Em andamento", icon:"servicos", cor:D.accent,  bg:D.secondary },
             resolvida:    { rotulo:"Resolvida",    icon:"logCheck", cor:D.success,  bg:D.successBg },
           };
-          const noPer = ocorrencias.filter(o => noPeriodo(o.timestamp, perOcorr));
+          const noPer = ocorrencias.filter(o => noPeriodo(o.timestamp, perOcorr) && casaBusca(o, buscaOcorr, ["titulo","descricao","nome","unidade","categoria","respostaSindico"]));
           const filtradas = filtroOcorrencia === "todas" ? noPer : noPer.filter(o => o.status === filtroOcorrencia);
           const cont = {
             todas: noPer.length,
@@ -5914,6 +5960,7 @@ export default function App() {
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Filtros */}
+              <CampoBusca valor={buscaOcorr} setValor={setBuscaOcorr} placeholder="Buscar por título, morador ou unidade..." D={D} visivel={ocorrencias.length > 8} />
               {ocorrencias.length > 0 && (
                 <BarraPeriodo periodo={perOcorr} setPeriodo={setPerOcorr} timestamps={ocorrencias.map(o=>o.timestamp)} total={noPer.length} D={D} isMobile={isMobile} rotuloItem="ocorrência" />
               )}
@@ -6269,7 +6316,7 @@ export default function App() {
               </div>
             ) : (() => {
               // Filtro por período (data) e depois por tipo
-              const noPer = logs.filter(l => noPeriodo(l.timestamp, perLog));
+              const noPer = logs.filter(l => noPeriodo(l.timestamp, perLog) && casaBusca(l, buscaLog, ["descricao","usuario","dataHora"]));
               const filtrados = noPer.filter(l => filtroLog === "tudo" || tipoLog(l) === filtroLog);
               // Agrupamento por data (logs já vêm ordenados por timestamp desc)
               const grupos = [];
@@ -6281,6 +6328,7 @@ export default function App() {
               });
               return (
                 <>
+                  <CampoBusca valor={buscaLog} setValor={setBuscaLog} placeholder="Buscar no histórico..." D={D} visivel={logs.length > 8} />
                   <BarraPeriodo periodo={perLog} setPeriodo={setPerLog} timestamps={logs.map(l=>l.timestamp)} total={noPer.length} D={D} isMobile={isMobile} rotuloItem="registro" />
 
                   {/* Filtros por tipo */}
@@ -6635,6 +6683,32 @@ export default function App() {
           .sort((a,b) => b.mes.localeCompare(a.mes));
         const totalPago   = cobMorador.filter(c=>c.status==="pago").length;
         const totalAtraso = cobMorador.filter(c=>c.status==="atrasado").length;
+        // Tudo que pertence a esta unidade/morador
+        const daUnidade = (r) => (r.moradorId && r.moradorId === m.id) || (r.unidade && m.unidade && normalizarTexto(r.unidade) === normalizarTexto(m.unidade));
+        const acessosMor   = acessos.filter(daUnidade);
+        const entregasMor  = entregas.filter(daUnidade);
+        const reservasMorF = reservas.filter(daUnidade);
+        const ocorrMor     = ocorrencias.filter(daUnidade);
+        const secoes = [
+          { id:"cobrancas",   label:"Cobranças",   n:cobMorador.length,   icon:"cobrancas"   },
+          { id:"acessos",     label:"Acessos",     n:acessosMor.length,   icon:"acessos"     },
+          { id:"entregas",    label:"Entregas",    n:entregasMor.length,  icon:"entregas"    },
+          { id:"reservas",    label:"Reservas",    n:reservasMorF.length, icon:"reservas"    },
+          { id:"ocorrencias", label:"Ocorrências", n:ocorrMor.length,     icon:"ocorrencias" },
+        ];
+        const sec = secoes.find(x => x.id === fichaSecao) ? fichaSecao : "cobrancas";
+        const linhaSimples = (chave, titulo, sub, direita, corD, iconId) => (
+          <div key={chave} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, padding:"11px 13px", background:D.bgCard, border:`1px solid ${D.border}`, borderRadius:D.radiusSm }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, minWidth:0 }}>
+              <div style={{ width:30, height:30, borderRadius:8, background:D.muted, color:D.accent, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id={iconId} size={15} /></div>
+              <div style={{ minWidth:0 }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{titulo}</div>
+                {sub && <div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec }}>{sub}</div>}
+              </div>
+            </div>
+            {direita && <span style={{ fontFamily:D.fontBody, fontSize:11.5, fontWeight:600, color:corD || D.textSec, flexShrink:0, whiteSpace:"nowrap" }}>{direita}</span>}
+          </div>
+        );
         return (
           <Modal title={`Histórico — ${m.nome}`} onClose={() => setModal(null)} isMobile={isMobile}>
             <div style={{ marginBottom:16, background:D.muted, borderRadius:D.radius, padding:"12px 16px", border:`1px solid ${D.border}` }}>
@@ -6654,7 +6728,40 @@ export default function App() {
                 <div style={{ fontSize:12 }}>📋 <b style={{color:"#1E3A5F"}}>{cobMorador.length}</b> meses no sistema</div>
               </div>
             </div>
-            <div style={{ display:"flex", flexDirection:"column", gap:8, maxHeight: isMobile ? "55vh" : "400px", overflowY:"auto" }}>
+            {/* Seções da ficha */}
+            <div style={{ display:"flex", gap:7, flexWrap:"wrap", marginBottom:14 }}>
+              {secoes.map(x => {
+                const ativo = sec === x.id;
+                return (
+                  <button key={x.id} onClick={() => setFichaSecao(x.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                    <NavIcon id={x.icon} size={13} /> {x.label} <span style={{ opacity:.65 }}>{x.n}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {sec !== "cobrancas" && (
+              <div style={{ display:"flex", flexDirection:"column", gap:8, maxHeight: isMobile ? "50vh" : "380px", overflowY:"auto" }}>
+                {sec === "acessos" && (acessosMor.length === 0
+                  ? <div style={{ color:D.textMut, fontSize:13, textAlign:"center", padding:20, fontFamily:D.fontBody }}>Nenhum acesso registrado para esta unidade.</div>
+                  : acessosMor.map(a => linhaSimples(a.id, a.nome, `${a.empresa ? a.empresa+" · " : ""}${a.motivo}`, a.horaSaida ? `${a.dataEntrada}` : "No condomínio", a.horaSaida ? D.textSec : D.warning, "acPorta")))}
+
+                {sec === "entregas" && (entregasMor.length === 0
+                  ? <div style={{ color:D.textMut, fontSize:13, textAlign:"center", padding:20, fontFamily:D.fontBody }}>Nenhuma encomenda para esta unidade.</div>
+                  : entregasMor.map(e => linhaSimples(e.id, e.descricao, e.remetente ? `Remetente: ${e.remetente}` : e.dataChegada, e.status === "retirada" ? "Retirada" : "Aguardando", e.status === "retirada" ? D.success : D.warning, "entregas")))}
+
+                {sec === "reservas" && (reservasMorF.length === 0
+                  ? <div style={{ color:D.textMut, fontSize:13, textAlign:"center", padding:20, fontFamily:D.fontBody }}>Nenhuma reserva desta unidade.</div>
+                  : reservasMorF.map(r => linhaSimples(r.id, r.area, `${r.data}${r.horario ? " · "+r.horario : ""}`, r.status === "aprovada" ? "Aprovada" : r.status === "rejeitada" ? "Rejeitada" : "Pendente", r.status === "aprovada" ? D.success : r.status === "rejeitada" ? D.danger : D.warning, "reservas")))}
+
+                {sec === "ocorrencias" && (ocorrMor.length === 0
+                  ? <div style={{ color:D.textMut, fontSize:13, textAlign:"center", padding:20, fontFamily:D.fontBody }}>Nenhuma ocorrência desta unidade.</div>
+                  : ocorrMor.map(o => linhaSimples(o.id, o.titulo, o.criadoEm, o.status === "resolvida" ? "Resolvida" : o.status === "em_andamento" ? "Em andamento" : "Aberta", o.status === "resolvida" ? D.success : o.status === "em_andamento" ? D.accent : D.warning, "ocorrencias")))}
+              </div>
+            )}
+
+            {sec === "cobrancas" && (
+            <div style={{ display:"flex", flexDirection:"column", gap:8, maxHeight: isMobile ? "50vh" : "380px", overflowY:"auto" }}>
               {cobMorador.length === 0 && (
                 <div style={{ color:"#9aa6b5", fontSize:13, textAlign:"center", padding:20 }}>Nenhum registro encontrado.</div>
               )}
@@ -6683,6 +6790,7 @@ export default function App() {
                 );
               })}
             </div>
+            )}
           </Modal>
         );
       })()}

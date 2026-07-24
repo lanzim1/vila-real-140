@@ -1636,13 +1636,14 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const [mesSel, setMesSel]       = useState(mesAtual());
   const [formReserva, setFormReserva] = useState({ area:"Churrasqueira", data:"", horario:"", observacao:"" });
   const [enviandoReserva, setEnviandoReserva] = useState(false);
-  const [msgReserva, setMsgReserva] = useState("");
+  const [msgReserva, setMsgReserva] = useState(null);
   const [ocorrenciasMor, setOcorrenciasMor] = useState([]);
   const [formOcorrencia, setFormOcorrencia] = useState({ titulo:"", categoria:"Manutenção", descricao:"" });
   const [enviandoOcorrencia, setEnviandoOcorrencia] = useState(false);
-  const [msgOcorrencia, setMsgOcorrencia] = useState("");
+  const [msgOcorrencia, setMsgOcorrencia] = useState(null);
   const [enquetesMor, setEnquetesMor] = useState([]);
   const [votosMor, setVotosMor] = useState([]);
+  const [secaoAberta, setSecaoAberta] = useState(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -1699,7 +1700,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   }, [morador?.condominioId]);
 
   const fazerReserva = async () => {
-    if (!formReserva.data || !formReserva.horario) { setMsgReserva("Preencha a data e o horário."); return; }
+    if (!formReserva.data || !formReserva.horario) { setMsgReserva({ texto:"Preencha a data e o horário.", ok:false }); return; }
     setEnviandoReserva(true);
     try {
       await addDoc(collection(db, "reservas"), {
@@ -1713,16 +1714,16 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
         criadoPor: "morador",
       });
       setFormReserva({ area:"Churrasqueira", data:"", horario:"", observacao:"" });
-      setMsgReserva("✅ Reserva solicitada! Aguarde aprovação do síndico.");
+      setMsgReserva({ texto:"Reserva solicitada! Aguarde a aprovação do síndico.", ok:true });
     } catch(e) {
-      setMsgReserva("Erro ao solicitar reserva. Tente novamente.");
+      setMsgReserva({ texto:"Não foi possível enviar. Verifique sua conexão e tente de novo.", ok:false });
     } finally {
       setEnviandoReserva(false);
     }
   };
 
   const abrirOcorrencia = async () => {
-    if (!formOcorrencia.titulo.trim() || !formOcorrencia.descricao.trim()) { setMsgOcorrencia("Preencha o título e a descrição."); return; }
+    if (!formOcorrencia.titulo.trim() || !formOcorrencia.descricao.trim()) { setMsgOcorrencia({ texto:"Preencha o título e a descrição.", ok:false }); return; }
     setEnviandoOcorrencia(true);
     try {
       await addDoc(collection(db, "ocorrencias"), {
@@ -1737,9 +1738,9 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
         timestamp: Date.now(),
       });
       setFormOcorrencia({ titulo:"", categoria:"Manutenção", descricao:"" });
-      setMsgOcorrencia("✅ Ocorrência registrada! O síndico irá avaliar.");
+      setMsgOcorrencia({ texto:"Ocorrência registrada. O síndico irá avaliar.", ok:true });
     } catch(e) {
-      setMsgOcorrencia("Erro ao registrar. Tente novamente.");
+      setMsgOcorrencia({ texto:"Não foi possível registrar. Verifique sua conexão e tente de novo.", ok:false });
     } finally {
       setEnviandoOcorrencia(false);
     }
@@ -1757,13 +1758,12 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   };
 
   if (!morador) return (
-    <div style={{ minHeight:"100vh", background:"#1E3A5F", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontFamily:D.fontBody }}>
+    <div style={{ minHeight:"100vh", background:D.sidebar, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontFamily:D.fontBody }}>
       Carregando...
     </div>
   );  const cobMes    = cobrancas.find(c => c.mes === mesSel);
   const totalPago = cobrancas.filter(c => c.status === "pago").length;
   const meses     = [...new Set([mesAtual(), ...cobrancas.map(c => c.mes)])].sort().reverse();
-  const statusCor = cobMes?.status === "pago" ? "#2E7D32" : cobMes?.status === "atrasado" ? "#B03A2E" : "#F57F17";
 
   // Taxa individual do morador (ou a padrão do condomínio)
   const taxaBase = (morador && morador.taxaCustom != null && !isNaN(morador.taxaCustom)) ? morador.taxaCustom : taxa;
@@ -1783,306 +1783,337 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     return { valorBase: taxaBase, multa, juros, diasAtraso, valorTotal: taxaBase + multa + juros };
   };
 
+  // ── Dados de apoio para o resumo e as etiquetas das seções ──
+  const extraPagaMor    = (extraId) => pagExtrasMor.some(p => p.extraId === extraId && p.moradorId === moradorId);
+  const extrasPendentes = extrasMor.filter(e => !extraPagaMor(e.id)).length;
+  const reservasPend    = reservasMor.filter(r => r.status === "pendente").length;
+  const ocorrAbertas    = ocorrenciasMor.filter(o => o.status !== "resolvida").length;
+  const enquetesAbertas = enquetesMor.filter(e => e.status === "aberta").length;
+  const encMes          = cobMes ? encargosPortal(cobMes) : null;
+  const corStatus       = cobMes?.status === "pago" ? D.success : cobMes?.status === "atrasado" ? D.danger : D.warning;
+  const rotuloStatus    = cobMes?.status === "pago" ? "Em dia" : cobMes?.status === "atrasado" ? "Em atraso" : "Aguardando pagamento";
+
+  // Uma seção por vez: o portal cabe numa tela e o morador não se perde rolando.
+  // É função (não componente) de propósito: componente criado aqui dentro seria
+  // recriado a cada tecla digitada e os campos perderiam o foco.
+  const abrirSecao = (id) => {
+    setSecaoAberta(a => a === id ? null : id);
+    if (id === "reservas") setMsgReserva(null);
+    if (id === "ocorrencias") setMsgOcorrencia(null);
+  };
+  const secao = (id, titulo, icone, etiqueta, corEtiqueta, conteudo) => {
+    const aberta = secaoAberta === id;
+    return (
+      <div key={id} style={{ background:D.bgCard, borderRadius:D.radius, border:`1px solid ${aberta?D.accent:D.border}`, boxShadow:D.shadow, marginBottom:10, overflow:"hidden" }}>
+        <button onClick={() => abrirSecao(id)}
+          style={{ display:"flex", alignItems:"center", gap:12, width:"100%", padding:"15px 16px", background:"none", border:"none", cursor:"pointer", textAlign:"left", fontFamily:D.fontBody }}>
+          <span style={{ width:34, height:34, borderRadius:9, background:D.muted, color:D.accent, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id={icone} size={17} /></span>
+          <span style={{ flex:1, fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, letterSpacing:"-0.02em", minWidth:0 }}>{titulo}</span>
+          {etiqueta ? (
+            <span style={{ background: corEtiqueta || D.accent, color:"#fff", fontSize:11.5, fontWeight:700, padding:"2px 9px", borderRadius:20, flexShrink:0 }}>{etiqueta}</span>
+          ) : null}
+          <span style={{ color:D.textMut, display:"flex", flexShrink:0, transform: aberta?"rotate(180deg)":"none", transition:"transform .18s" }}><NavIcon id="setaBaixo" size={16} /></span>
+        </button>
+        {aberta && <div style={{ padding:"0 16px 18px", borderTop:`1px solid ${D.border}` }}><div style={{ paddingTop:16 }}>{conteudo}</div></div>}
+      </div>
+    );
+  };
+
   return (
-    <div style={{ minHeight:"100vh", background:"#F0F4F8", fontFamily:D.fontBody }}>
+    <div style={{ minHeight:"100vh", background:D.bgApp, fontFamily:D.fontBody }}>
       {/* Cabeçalho */}
-      <div style={{ background:`linear-gradient(135deg, ${D.sidebar}, ${D.primary})`, padding: isMobile ? "24px 20px" : "32px 40px", color:"#fff" }}>
-        <div style={{ fontSize:13, opacity:.7, marginBottom:6 }}>🏢 {morador.condominioNome || "Condomínio"}</div>
-        <h1 style={{ fontFamily:D.fontDisplay, fontSize: isMobile?22:28, margin:"0 0 4px", fontWeight:700, letterSpacing:"-0.02em" }}>{morador.nome}</h1>
-        <div style={{ fontSize:14, opacity:.85 }}>{morador.unidade}{morador.proprietario ? ` · Prop: ${morador.proprietario}` : ""}</div>
-        {morador.email && <div style={{ fontSize:12, opacity:.7, marginTop:4 }}>📧 {morador.email}</div>}
+      <div style={{ background:`linear-gradient(135deg, ${D.sidebar}, ${D.primaryDk || D.primary})`, padding: isMobile ? "22px 20px" : "30px 40px", color:"#fff" }}>
+        <div style={{ maxWidth:640, margin:"0 auto" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:7, fontSize:12.5, opacity:.75, marginBottom:7 }}>
+            <NavIcon id="acEmpresa" size={14} /> {morador.condominioNome || "Condomínio"}
+          </div>
+          <h1 style={{ fontFamily:D.fontDisplay, fontSize: isMobile?22:28, margin:"0 0 4px", fontWeight:700, letterSpacing:"-0.02em" }}>{morador.nome}</h1>
+          <div style={{ fontSize:14, opacity:.85 }}>{morador.unidade}{morador.proprietario ? ` · Prop: ${morador.proprietario}` : ""}</div>
+        </div>
       </div>
 
-      <div style={{ padding: isMobile ? "20px 16px 40px" : "28px 40px 40px", maxWidth:640, margin:"0 auto" }}>
+      <div style={{ padding: isMobile ? "16px 14px 40px" : "24px 40px 40px", maxWidth:640, margin:"0 auto" }}>
 
-        {/* Situação do mês */}
-        <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, flexWrap:"wrap", gap:8 }}>
-            <span style={{ fontSize:14, fontWeight:700, color:"#1E3A5F" }}>Situação do mês</span>
-            <select value={mesSel} onChange={e=>setMesSel(e.target.value)} style={{ padding:"6px 10px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:13, color:"#1E3A5F", background:"#fff" }}>
-              {meses.map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
-            </select>
-          </div>
-          {cobMes ? (
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:D.muted, borderRadius:D.radius, padding:16, borderLeft:`4px solid ${statusCor}` }}>
-              <div>
-                <div style={{ fontSize:22, fontWeight:800, color:statusCor, textTransform:"capitalize" }}>{cobMes.status}</div>
-                {(() => {
-                  const enc = encargosPortal(cobMes);
-                  if (enc.multa > 0 || enc.juros > 0) {
-                    return (
-                      <>
-                        <div style={{ fontSize:13, color:"#6B7A8D", marginTop:4 }}>Taxa: R$ {enc.valorBase.toFixed(2).replace(".",",")} + multa R$ {enc.multa.toFixed(2).replace(".",",")} + juros R$ {enc.juros.toFixed(2).replace(".",",")} ({enc.diasAtraso} dias)</div>
-                        <div style={{ fontSize:16, fontWeight:800, color:"#B03A2E", marginTop:4 }}>Total: R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
-                      </>
-                    );
-                  }
-                  return <div style={{ fontSize:13, color:"#6B7A8D", marginTop:4 }}>Taxa: R$ {enc.valorBase.toFixed(2).replace(".",",")}</div>;
-                })()}
-                {cobMes.dataPagamento && <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>Pago em {cobMes.dataPagamento}</div>}
-                {cobMes.obs && <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2 }}>📝 {cobMes.obs}</div>}
-              </div>
-              <div style={{ fontSize:40, opacity:.3 }}>{cobMes.status==="pago"?"✅":cobMes.status==="atrasado"?"🚨":"⏳"}</div>
+        {/* ── Situação do mês: a pergunta que traz o morador aqui ── */}
+        <div style={{ background:D.primary, borderRadius:D.radiusXl || 16, padding: isMobile?"18px 18px 16px":"22px 24px 20px", color:"#fff", marginBottom:16, position:"relative", overflow:"hidden" }}>
+          <div style={{ position:"absolute", top:-40, right:-30, width:150, height:150, borderRadius:"50%", background:"rgba(255,255,255,.04)" }} />
+          <div style={{ position:"relative" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, marginBottom:12 }}>
+              <span style={{ fontSize:11.5, fontWeight:600, textTransform:"uppercase", letterSpacing:"1px", opacity:.7 }}>Situação do mês</span>
+              <select value={mesSel} onChange={e=>setMesSel(e.target.value)}
+                style={{ padding:"5px 9px", border:"1px solid rgba(255,255,255,.25)", borderRadius:8, fontSize:12, background:"rgba(255,255,255,.1)", color:"#fff", fontFamily:D.fontBody, cursor:"pointer" }}>
+                {meses.map(m => <option key={m} value={m} style={{ color:D.text }}>{mesLabel(m)}</option>)}
+              </select>
             </div>
-          ) : (
-            <div style={{ color:"#9aa6b5", fontSize:13, textAlign:"center", padding:16 }}>Ainda não há cobranças lançadas para você neste mês.</div>
-          )}
-        </div>
 
-        {/* Cobranças extras do morador */}
-        {(() => {
-          const extraPagaMor = (extraId) => pagExtrasMor.some(p => p.extraId === extraId && p.moradorId === moradorId);
-          if (extrasMor.length === 0) return null;
-          return (
-            <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
-              <div style={{ fontSize:14, fontWeight:700, color:"#1E3A5F", marginBottom:14 }}>➕ Cobranças extras</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                {extrasMor.map(extra => {
-                  const pago = extraPagaMor(extra.id);
-                  return (
-                    <div key={extra.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background: pago?D.successBg:D.warningBg, borderRadius:D.radiusSm, borderLeft:`4px solid ${pago?D.success:D.warning}` }}>
-                      <div>
-                        <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:13 }}>{extra.descricao}</div>
-                        <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{mesLabel(extra.mes)}</div>
-                      </div>
-                      <div style={{ textAlign:"right" }}>
-                        <div style={{ fontSize:13, fontWeight:700, color: pago?D.success:"#B45309", textTransform:"capitalize" }}>{pago?"Pago":"Pendente"}</div>
-                        <div style={{ fontSize:12, color:"#1E3A5F" }}>R$ {extra.valorUnitario.toFixed(2).replace(".",",")}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Resumo geral */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:20 }}>
-          {[
-            { label:"Pagamentos em dia", valor: totalPago,                                         icon:"✅", cor:"#2E7D32" },
-            { label:"Atrasados",         valor: cobrancas.filter(c=>c.status==="atrasado").length, icon:"🚨", cor:"#B03A2E" },
-            { label:"Meses no sistema",  valor: cobrancas.length,                                  icon:"📋", cor:"#2E6DA4" },
-          ].map((c,i) => (
-            <div key={i} style={{ background:D.bgCard, borderRadius:D.radius, padding:"14px 12px", boxShadow:D.shadow, border:`1px solid ${D.border}`, textAlign:"center", borderTop:`3px solid ${c.cor}` }}>
-              <div style={{ fontSize:20, marginBottom:4 }}>{c.icon}</div>
-              <div style={{ fontSize:20, fontWeight:800, color:c.cor }}>{c.valor}</div>
-              <div style={{ fontSize:10, color:"#6B7A8D", marginTop:2, lineHeight:1.4 }}>{c.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Histórico */}
-        <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
-          <div style={{ fontSize:14, fontWeight:700, color:"#1E3A5F", marginBottom:14 }}>📋 Histórico de pagamentos</div>
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {cobrancas.map((c,i) => {
-              const cor = c.status==="pago"?D.success:c.status==="atrasado"?D.danger:D.warning;
-              const enc = encargosPortal(c);
-              return (
-                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background: c.status==="pago"?D.successBg:c.status==="atrasado"?D.dangerBg:D.warningBg, borderRadius:D.radiusSm, borderLeft:`4px solid ${cor}` }}>
-                  <div>
-                    <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:13 }}>{mesLabel(c.mes)}</div>
-                    {c.dataPagamento && <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>Pago em {c.dataPagamento}</div>}
-                    {(enc.multa > 0 || enc.juros > 0) && <div style={{ fontSize:11, color:"#B03A2E", marginTop:2 }}>+ multa/juros ({enc.diasAtraso}d)</div>}
+            {cobMes ? (
+              <>
+                <div style={{ display:"flex", alignItems:"center", gap:9, marginBottom:6 }}>
+                  <span style={{ width:9, height:9, borderRadius:"50%", background:corStatus, flexShrink:0 }} />
+                  <span style={{ fontFamily:D.fontDisplay, fontSize: isMobile?24:28, fontWeight:700, letterSpacing:"-0.02em", lineHeight:1.1 }}>{rotuloStatus}</span>
+                </div>
+                <div style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:600, opacity:.95 }}>
+                  R$ {encMes.valorTotal.toFixed(2).replace(".",",")}
+                </div>
+                {(encMes.multa > 0 || encMes.juros > 0) && (
+                  <div style={{ fontSize:12, opacity:.75, marginTop:5 }}>
+                    Taxa R$ {encMes.valorBase.toFixed(2).replace(".",",")} + multa R$ {encMes.multa.toFixed(2).replace(".",",")} + juros R$ {encMes.juros.toFixed(2).replace(".",",")} ({encMes.diasAtraso} dias)
                   </div>
-                  <div style={{ textAlign:"right" }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:cor, textTransform:"capitalize" }}>{c.status}</div>
-                    <div style={{ fontSize:12, color:"#1E3A5F" }}>R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
+                )}
+                {cobMes.dataPagamento && <div style={{ fontSize:12.5, opacity:.8, marginTop:6 }}>Pago em {cobMes.dataPagamento}</div>}
+                {cobMes.obs && <div style={{ fontSize:12, opacity:.7, marginTop:4 }}>{cobMes.obs}</div>}
+              </>
+            ) : (
+              <div style={{ fontSize:14, opacity:.8, padding:"8px 0" }}>Ainda não há cobrança lançada para você neste mês.</div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Seções ── */}
+        {extrasMor.length > 0 && secao("extras", "Cobranças extras", "cobrancas",
+          extrasPendentes || null, D.warning,
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {extrasMor.map(extra => {
+              const pago = extraPagaMor(extra.id);
+              return (
+                <div key={extra.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, padding:"12px 14px", background:D.bgCard, border:`1px solid ${D.border}`, borderLeft:`3px solid ${pago?D.success:D.warning}`, borderRadius:D.radiusSm }}>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:D.text }}>{extra.descricao}</div>
+                    <div style={{ fontSize:11.5, color:D.textSec, marginTop:2 }}>{mesLabel(extra.mes)}</div>
+                  </div>
+                  <div style={{ textAlign:"right", flexShrink:0 }}>
+                    <span style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:11.5, fontWeight:600, color: pago?D.success:D.warning }}>
+                      <span style={{ width:6, height:6, borderRadius:"50%", background: pago?D.success:D.warning }} />{pago?"Pago":"Pendente"}
+                    </span>
+                    <div style={{ fontSize:13, fontWeight:600, color:D.text, marginTop:2 }}>R$ {extra.valorUnitario.toFixed(2).replace(".",",")}</div>
                   </div>
                 </div>
               );
             })}
-            {cobrancas.length === 0 && <div style={{ color:"#9aa6b5", fontSize:13, textAlign:"center", padding:16 }}>Nenhum registro encontrado.</div>}
           </div>
-        </div>
+        )}
 
-        {/* Comunicados do condomínio */}
-        {comunicadosMor.length > 0 && (
-          <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginTop:20 }}>
-            <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:16, letterSpacing:"-0.02em" }}>📢 Comunicados</div>
-            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-              {comunicadosMor.map(com => (
-                <div key={com.id} style={{ background: com.fixado ? D.secondary : D.muted, borderRadius:D.radiusSm, padding:"14px 16px", borderLeft:`3px solid ${com.fixado ? D.accent : D.border}` }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, flexWrap:"wrap" }}>
-                    {com.fixado && <span style={{ background:D.bgCard, color:D.accent, fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:10, fontFamily:D.fontBody }}>📌 Fixado</span>}
-                    <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>{com.titulo}</span>
-                  </div>
-                  <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.text, lineHeight:1.6, margin:"0 0 6px", whiteSpace:"pre-wrap" }}>{com.mensagem}</p>
-                  <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut }}>{com.data}</div>
+        {secao("historico", "Histórico de pagamentos", "histDoc", null, null,
+          <>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14 }}>
+              {[
+                { label:"Em dia",   valor: totalPago, cor:D.success },
+                { label:"Atrasados", valor: cobrancas.filter(c=>c.status==="atrasado").length, cor:D.danger },
+                { label:"Meses",    valor: cobrancas.length, cor:D.text },
+              ].map((c,i) => (
+                <div key={i} style={{ background:D.muted, borderRadius:D.radiusSm, padding:"11px 8px", textAlign:"center" }}>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:19, fontWeight:700, color:c.cor, lineHeight:1 }}>{c.valor}</div>
+                  <div style={{ fontSize:11, color:D.textSec, marginTop:4 }}>{c.label}</div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Reservas */}
-        <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginTop:20 }}>
-          <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:16, letterSpacing:"-0.02em" }}>📅 Reservar Churrasqueira</div>
-
-          {/* Formulário */}
-          <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:16, padding:16, background:D.muted, borderRadius:D.radiusSm }}>
-            <div>
-              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", display:"block", marginBottom:5 }}>Área</label>
-              <select value={formReserva.area} onChange={e=>setFormReserva(p=>({...p,area:e.target.value}))} style={{ display:"block", width:"100%", padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, background:"#fff", fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }}>
-                <option value="Churrasqueira">🔥 Churrasqueira</option>
-                <option value="Salão de Festas">🎉 Salão de Festas</option>
-                <option value="Espaço Gourmet">🍽️ Espaço Gourmet</option>
-              </select>
-            </div>
-            <div style={{ display:"flex", gap:10 }}>
-              <div style={{ flex:1 }}>
-                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", display:"block", marginBottom:5 }}>Data *</label>
-                <input type="date" value={formReserva.data} onChange={e=>setFormReserva(p=>({...p,data:e.target.value}))} min={new Date().toISOString().split("T")[0]} style={{ display:"block", width:"100%", padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
-              </div>
-              <div style={{ flex:1 }}>
-                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", display:"block", marginBottom:5 }}>Horário *</label>
-                <input value={formReserva.horario} onChange={e=>setFormReserva(p=>({...p,horario:e.target.value}))} placeholder="Ex: 14h às 22h" style={{ display:"block", width:"100%", padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", display:"block", marginBottom:5 }}>Observação</label>
-              <input value={formReserva.observacao} onChange={e=>setFormReserva(p=>({...p,observacao:e.target.value}))} placeholder="Nº de pessoas, ocasião..." style={{ display:"block", width:"100%", padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
-            </div>
-            {msgReserva && <div style={{ fontSize:12, color: msgReserva.startsWith("✅") ? D.success : D.danger, fontFamily:D.fontBody, fontWeight:500 }}>{msgReserva}</div>}
-            <button onClick={fazerReserva} disabled={enviandoReserva} style={{ padding:"10px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: enviandoReserva?"default":"pointer", fontFamily:D.fontBody, opacity: enviandoReserva?.7:1 }}>
-              {enviandoReserva ? "Enviando..." : "📅 Solicitar Reserva"}
-            </button>
-          </div>
-
-          {/* Minhas reservas */}
-          {reservasMor.length > 0 && (
-            <div>
-              <div style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", marginBottom:10 }}>Minhas reservas</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                {reservasMor.map((r,i) => {
-                  const cor = r.status==="aprovada"?D.success:r.status==="rejeitada"?D.danger:D.warning;
-                  const bg  = r.status==="aprovada"?D.successBg:r.status==="rejeitada"?D.dangerBg:D.warningBg;
-                  return (
-                    <div key={i} style={{ background:bg, borderRadius:D.radiusSm, padding:"12px 14px", borderLeft:`3px solid ${cor}` }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                        <div>
-                          <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>🔥 {r.area}</div>
-                          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>{r.data} · {r.horario}</div>
-                        </div>
-                        <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:cor, textTransform:"capitalize" }}>
-                          {r.status==="aprovada"?"✅ Aprovada":r.status==="rejeitada"?"❌ Rejeitada":"⏳ Pendente"}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Ocorrências / Reclamações */}
-        <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginTop:20 }}>
-          <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>🛎️ Abrir ocorrência</div>
-          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginBottom:16 }}>Relate um problema ou solicitação ao síndico (vazamento, barulho, manutenção, etc.).</div>
-
-          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Título *</label>
-          <input value={formOcorrencia.titulo} onChange={e=>setFormOcorrencia(p=>({...p,titulo:e.target.value}))} placeholder="Ex: Vazamento na garagem" style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text, marginBottom:14 }} />
-
-          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Categoria</label>
-          <select value={formOcorrencia.categoria} onChange={e=>setFormOcorrencia(p=>({...p,categoria:e.target.value}))} style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", background:"#fff", fontFamily:D.fontBody, color:D.text, marginBottom:14 }}>
-            <option>Manutenção</option>
-            <option>Barulho / Perturbação</option>
-            <option>Limpeza</option>
-            <option>Segurança</option>
-            <option>Área comum</option>
-            <option>Outra</option>
-          </select>
-
-          <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Descrição *</label>
-          <textarea value={formOcorrencia.descricao} onChange={e=>setFormOcorrencia(p=>({...p,descricao:e.target.value}))} rows={3} placeholder="Descreva o que está acontecendo..." style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text, resize:"vertical", lineHeight:1.5, marginBottom:14 }} />
-
-          {msgOcorrencia && <div style={{ fontFamily:D.fontBody, fontSize:13, color: msgOcorrencia.startsWith("✅")?D.success:D.danger, marginBottom:12 }}>{msgOcorrencia}</div>}
-
-          <button onClick={abrirOcorrencia} disabled={enviandoOcorrencia} style={{ width:"100%", padding:"12px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:700, cursor: enviandoOcorrencia?"default":"pointer", opacity: enviandoOcorrencia?.7:1, fontFamily:D.fontBody }}>
-            {enviandoOcorrencia ? "Enviando..." : "🛎️ Registrar ocorrência"}
-          </button>
-
-          {/* Minhas ocorrências */}
-          {ocorrenciasMor.length > 0 && (
-            <div style={{ marginTop:20 }}>
-              <div style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", marginBottom:10 }}>Minhas ocorrências</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                {ocorrenciasMor.map((o,i) => {
-                  const cor = o.status==="resolvida"?D.success:o.status==="em_andamento"?D.accent:D.warning;
-                  const bg  = o.status==="resolvida"?D.successBg:o.status==="em_andamento"?D.secondary:D.warningBg;
-                  const rotulo = o.status==="resolvida"?"✅ Resolvida":o.status==="em_andamento"?"🔧 Em andamento":"🕒 Aberta";
-                  return (
-                    <div key={i} style={{ background:bg, borderRadius:D.radiusSm, padding:"12px 14px", borderLeft:`3px solid ${cor}` }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10 }}>
-                        <div style={{ minWidth:0 }}>
-                          <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>{o.titulo}</div>
-                          <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>{o.categoria} · {o.criadoEm}</div>
-                        </div>
-                        <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:cor, whiteSpace:"nowrap" }}>{rotulo}</span>
-                      </div>
-                      {o.respostaSindico && (
-                        <div style={{ marginTop:8, background:"#fff", borderRadius:D.radiusSm, padding:"8px 10px", fontFamily:D.fontBody, fontSize:12, color:D.text }}>
-                          <b>Resposta do síndico:</b> {o.respostaSindico}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Enquetes / Votações */}
-        {enquetesMor.length > 0 && (
-          <div style={{ background:D.bgCard, borderRadius:D.radius, padding:20, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginTop:20 }}>
-            <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>🗳️ Enquetes</div>
-            <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginBottom:16 }}>Participe das votações do condomínio.</div>
-            <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-              {enquetesMor.map(enq => {
-                const meuVoto = votosMor.find(v => v.enqueteId === enq.id);
-                const aberta = enq.status === "aberta";
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {cobrancas.map((c,i) => {
+                const cor = c.status==="pago"?D.success:c.status==="atrasado"?D.danger:D.warning;
+                const enc = encargosPortal(c);
                 return (
-                  <div key={enq.id} style={{ border:`1px solid ${D.border}`, borderRadius:D.radius, padding:16 }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, flexWrap:"wrap" }}>
-                      <div style={{ minWidth:0 }}>
-                        <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:600, color:D.text }}>{enq.titulo}</div>
-                        {enq.descricao && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>{enq.descricao}</div>}
-                      </div>
-                      <span style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:600, color: aberta?D.success:D.textSec, background: aberta?D.successBg:D.muted, padding:"3px 10px", borderRadius:10, whiteSpace:"nowrap" }}>{aberta?"Aberta":"Encerrada"}</span>
+                  <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, padding:"12px 14px", background:D.bgCard, border:`1px solid ${D.border}`, borderLeft:`3px solid ${cor}`, borderRadius:D.radiusSm }}>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:600, color:D.text, textTransform:"capitalize" }}>{mesLabel(c.mes)}</div>
+                      {c.dataPagamento && <div style={{ fontSize:11.5, color:D.textSec, marginTop:2 }}>Pago em {c.dataPagamento}</div>}
+                      {(enc.multa > 0 || enc.juros > 0) && <div style={{ fontSize:11.5, color:D.danger, marginTop:2 }}>+ multa e juros ({enc.diasAtraso} dias)</div>}
                     </div>
-                    <div style={{ display:"flex", flexDirection:"column", gap:8, marginTop:14 }}>
-                      {enq.opcoes.map((op,idx) => {
-                        const escolhida = meuVoto?.opcao === op;
-                        return (
-                          <button key={idx} onClick={() => aberta && votarEnquete(enq, op)} disabled={!aberta} style={{
-                            display:"flex", justifyContent:"space-between", alignItems:"center",
-                            padding:"12px 14px", borderRadius:D.radiusSm, cursor: aberta?"pointer":"default",
-                            border:`1.5px solid ${escolhida?D.primary:D.border}`,
-                            background: escolhida?D.secondary:"#fff",
-                            fontFamily:D.fontBody, fontSize:14, color:D.text, fontWeight: escolhida?600:400, textAlign:"left",
-                          }}>
-                            <span>{op}</span>
-                            {escolhida && <span style={{ color:D.primary, fontWeight:700 }}>✓ Seu voto</span>}
-                          </button>
-                        );
-                      })}
+                    <div style={{ textAlign:"right", flexShrink:0 }}>
+                      <span style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:11.5, fontWeight:600, color:cor }}>
+                        <span style={{ width:6, height:6, borderRadius:"50%", background:cor }} />
+                        {c.status==="pago"?"Pago":c.status==="atrasado"?"Atrasado":"Pendente"}
+                      </span>
+                      <div style={{ fontSize:13, fontWeight:600, color:D.text, marginTop:2 }}>R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
                     </div>
-                    {aberta
-                      ? <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:8 }}>{meuVoto ? "Você pode trocar seu voto enquanto estiver aberta." : "Toque em uma opção para votar."}</div>
-                      : <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:8 }}>Votação encerrada.{meuVoto?` Seu voto: ${meuVoto.opcao}.`:" Você não votou."}</div>
-                    }
                   </div>
                 );
               })}
+              {cobrancas.length === 0 && <div style={{ color:D.textMut, fontSize:13, textAlign:"center", padding:16 }}>Nenhum registro encontrado.</div>}
             </div>
+          </>
+        )}
+
+        {comunicadosMor.length > 0 && secao("comunicados", "Comunicados", "comunicados",
+          comunicadosMor.length, D.accent,
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {comunicadosMor.map(com => (
+              <div key={com.id} style={{ background: com.fixado ? D.secondary : D.muted, borderRadius:D.radiusSm, padding:"14px 16px", borderLeft:`3px solid ${com.fixado ? D.accent : D.border}` }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, flexWrap:"wrap" }}>
+                  {com.fixado && <span style={{ display:"inline-flex", alignItems:"center", gap:5, background:D.bgCard, color:D.accent, fontSize:10.5, fontWeight:700, padding:"3px 9px", borderRadius:10 }}><NavIcon id="pin" size={11} /> Fixado</span>}
+                  <span style={{ fontFamily:D.fontDisplay, fontSize:14.5, fontWeight:600, color:D.text }}>{com.titulo}</span>
+                </div>
+                <p style={{ fontSize:13, color:D.text, lineHeight:1.6, margin:"0 0 6px", whiteSpace:"pre-wrap" }}>{com.mensagem}</p>
+                <div style={{ fontSize:11.5, color:D.textMut }}>{com.data}</div>
+              </div>
+            ))}
           </div>
         )}
 
-        <div style={{ marginTop:32, paddingTop:20, borderTop:`1px solid ${D.border}`, textAlign:"center" }}>
-          <p style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, lineHeight:1.6, margin:"0 0 8px", maxWidth:520, marginLeft:"auto", marginRight:"auto" }}>
+        {secao("reservas", "Reservar área comum", "reservas",
+          reservasPend || null, D.warning,
+          <>
+            <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom: reservasMor.length?18:0 }}>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", display:"block", marginBottom:5 }}>Área</label>
+                <select value={formReserva.area} onChange={e=>setFormReserva(p=>({...p,area:e.target.value}))} style={{ display:"block", width:"100%", padding:"10px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, background:"#fff", fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }}>
+                  <option value="Churrasqueira">Churrasqueira</option>
+                  <option value="Salão de Festas">Salão de Festas</option>
+                  <option value="Espaço Gourmet">Espaço Gourmet</option>
+                </select>
+              </div>
+              <div style={{ display:"flex", gap:10 }}>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", display:"block", marginBottom:5 }}>Data *</label>
+                  <input type="date" value={formReserva.data} onChange={e=>setFormReserva(p=>({...p,data:e.target.value}))} min={new Date().toISOString().split("T")[0]} style={{ display:"block", width:"100%", padding:"10px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", display:"block", marginBottom:5 }}>Horário *</label>
+                  <input value={formReserva.horario} onChange={e=>setFormReserva(p=>({...p,horario:e.target.value}))} placeholder="Ex: 14h às 22h" style={{ display:"block", width:"100%", padding:"10px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", display:"block", marginBottom:5 }}>Observação</label>
+                <input value={formReserva.observacao} onChange={e=>setFormReserva(p=>({...p,observacao:e.target.value}))} placeholder="Nº de pessoas, ocasião..." style={{ display:"block", width:"100%", padding:"10px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
+              </div>
+              {msgReserva && <div style={{ fontSize:12.5, color: msgReserva.ok ? D.success : D.danger, fontWeight:500 }}>{msgReserva.texto}</div>}
+              <button onClick={fazerReserva} disabled={enviandoReserva} style={{ padding:"12px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor: enviandoReserva?"default":"pointer", fontFamily:D.fontBody, opacity: enviandoReserva?.7:1 }}>
+                {enviandoReserva ? "Enviando..." : "Solicitar reserva"}
+              </button>
+            </div>
+
+            {reservasMor.length > 0 && (
+              <div>
+                <div style={{ fontSize:11.5, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", marginBottom:10 }}>Minhas reservas</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {reservasMor.map((r,i) => {
+                    const cor = r.status==="aprovada"?D.success:r.status==="rejeitada"?D.danger:D.warning;
+                    return (
+                      <div key={i} style={{ background:D.bgCard, border:`1px solid ${D.border}`, borderLeft:`3px solid ${cor}`, borderRadius:D.radiusSm, padding:"12px 14px", display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10 }}>
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:600, color:D.text }}>{r.area}</div>
+                          <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>{r.data}{r.horario?` · ${r.horario}`:""}</div>
+                        </div>
+                        <span style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:11.5, fontWeight:600, color:cor, flexShrink:0, whiteSpace:"nowrap" }}>
+                          <span style={{ width:6, height:6, borderRadius:"50%", background:cor }} />
+                          {r.status==="aprovada"?"Aprovada":r.status==="rejeitada"?"Rejeitada":"Pendente"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {secao("ocorrencias", "Ocorrências e reclamações", "ocorrencias",
+          ocorrAbertas || null, D.warning,
+          <>
+            <div style={{ fontSize:12.5, color:D.textSec, marginBottom:14 }}>Relate um problema ou solicitação ao síndico (vazamento, barulho, manutenção).</div>
+
+            <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Título *</label>
+            <input value={formOcorrencia.titulo} onChange={e=>setFormOcorrencia(p=>({...p,titulo:e.target.value}))} placeholder="Ex: Vazamento na garagem" style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text, marginBottom:14 }} />
+
+            <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Categoria</label>
+            <select value={formOcorrencia.categoria} onChange={e=>setFormOcorrencia(p=>({...p,categoria:e.target.value}))} style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", background:"#fff", fontFamily:D.fontBody, color:D.text, marginBottom:14 }}>
+              <option>Manutenção</option>
+              <option>Barulho / Perturbação</option>
+              <option>Limpeza</option>
+              <option>Segurança</option>
+              <option>Área comum</option>
+              <option>Outra</option>
+            </select>
+
+            <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Descrição *</label>
+            <textarea value={formOcorrencia.descricao} onChange={e=>setFormOcorrencia(p=>({...p,descricao:e.target.value}))} rows={3} placeholder="Descreva o que está acontecendo..." style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text, resize:"vertical", lineHeight:1.5, marginBottom:14 }} />
+
+            {msgOcorrencia && <div style={{ fontSize:13, color: msgOcorrencia.ok ? D.success : D.danger, marginBottom:12 }}>{msgOcorrencia.texto}</div>}
+
+            <button onClick={abrirOcorrencia} disabled={enviandoOcorrencia} style={{ width:"100%", padding:"12px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor: enviandoOcorrencia?"default":"pointer", opacity: enviandoOcorrencia?.7:1, fontFamily:D.fontBody }}>
+              {enviandoOcorrencia ? "Enviando..." : "Registrar ocorrência"}
+            </button>
+
+            {ocorrenciasMor.length > 0 && (
+              <div style={{ marginTop:20 }}>
+                <div style={{ fontSize:11.5, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px", marginBottom:10 }}>Minhas ocorrências</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {ocorrenciasMor.map((o,i) => {
+                    const cor = o.status==="resolvida"?D.success:o.status==="em_andamento"?D.accent:D.warning;
+                    const rot = o.status==="resolvida"?"Resolvida":o.status==="em_andamento"?"Em andamento":"Aberta";
+                    return (
+                      <div key={i} style={{ background:D.bgCard, border:`1px solid ${D.border}`, borderLeft:`3px solid ${cor}`, borderRadius:D.radiusSm, padding:"12px 14px" }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10 }}>
+                          <div style={{ minWidth:0 }}>
+                            <div style={{ fontSize:13, fontWeight:600, color:D.text }}>{o.titulo}</div>
+                            <div style={{ fontSize:12, color:D.textSec, marginTop:2 }}>{o.categoria} · {o.criadoEm}</div>
+                          </div>
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:11.5, fontWeight:600, color:cor, whiteSpace:"nowrap", flexShrink:0 }}>
+                            <span style={{ width:6, height:6, borderRadius:"50%", background:cor }} />{rot}
+                          </span>
+                        </div>
+                        {o.respostaSindico && (
+                          <div style={{ marginTop:9, background:D.muted, borderRadius:D.radiusSm, padding:"9px 11px", fontSize:12.5, color:D.text, lineHeight:1.5 }}>
+                            <b>Resposta do síndico:</b> {o.respostaSindico}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {enquetesMor.length > 0 && secao("enquetes", "Enquetes e votações", "enquetes",
+          enquetesAbertas || null, D.success,
+          <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+            {enquetesMor.map(enq => {
+              const meuVoto = votosMor.find(v => v.enqueteId === enq.id);
+              const aberta = enq.status === "aberta";
+              return (
+                <div key={enq.id} style={{ border:`1px solid ${D.border}`, borderRadius:D.radius, padding:16 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, flexWrap:"wrap" }}>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontSize:14.5, fontWeight:600, color:D.text }}>{enq.titulo}</div>
+                      {enq.descricao && <div style={{ fontSize:12.5, color:D.textSec, marginTop:2 }}>{enq.descricao}</div>}
+                    </div>
+                    <span style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:11.5, fontWeight:600, color: aberta?D.success:D.textSec, background: aberta?D.successBg:D.muted, padding:"3px 10px 3px 8px", borderRadius:20, whiteSpace:"nowrap" }}>
+                      <span style={{ width:6, height:6, borderRadius:"50%", background: aberta?D.success:D.textMut }} />{aberta?"Aberta":"Encerrada"}
+                    </span>
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:8, marginTop:14 }}>
+                    {enq.opcoes.map((op,idx) => {
+                      const escolhida = meuVoto?.opcao === op;
+                      return (
+                        <button key={idx} onClick={() => aberta && votarEnquete(enq, op)} disabled={!aberta} style={{
+                          display:"flex", justifyContent:"space-between", alignItems:"center", gap:10,
+                          padding:"12px 14px", borderRadius:D.radiusSm, cursor: aberta?"pointer":"default",
+                          border:`1.5px solid ${escolhida?D.primary:D.border}`,
+                          background: escolhida?D.secondary:"#fff",
+                          fontFamily:D.fontBody, fontSize:14, color:D.text, fontWeight: escolhida?600:400, textAlign:"left",
+                        }}>
+                          <span style={{ minWidth:0 }}>{op}</span>
+                          {escolhida && <span style={{ display:"inline-flex", alignItems:"center", gap:5, color:D.primary, fontWeight:700, fontSize:12, flexShrink:0 }}><NavIcon id="logCheck" size={14} /> Seu voto</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize:11.5, color:D.textMut, marginTop:9 }}>
+                    {aberta
+                      ? (meuVoto ? "Você pode trocar seu voto enquanto estiver aberta." : "Toque em uma opção para votar.")
+                      : `Votação encerrada.${meuVoto?` Seu voto: ${meuVoto.opcao}.`:" Você não votou."}`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Rodapé */}
+        <div style={{ marginTop:28, paddingTop:20, borderTop:`1px solid ${D.border}`, textAlign:"center" }}>
+          {morador.email && <div style={{ fontSize:12, color:D.textMut, marginBottom:10 }}>{morador.email}</div>}
+          <p style={{ fontSize:12, color:D.textMut, lineHeight:1.6, margin:"0 0 8px", maxWidth:520, marginLeft:"auto", marginRight:"auto" }}>
             Seus dados são tratados pela administração do condomínio para fins de gestão condominial, conforme a LGPD.
           </p>
           <button onClick={()=>setDocLegal("privacidade")} style={{ background:"none", border:"none", color:D.accent, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, textDecoration:"underline" }}>

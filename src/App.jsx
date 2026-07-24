@@ -173,13 +173,19 @@ const D = {
 };
 
 // ── Toast ──
-const Toast = ({ msg, type, onClose }) => {
-  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, []);
+const Toast = ({ msg, type, onClose, acao, rotuloAcao }) => {
+  // Com ação de desfazer o toast fica mais tempo: 3,5s não dá pra ler e decidir.
+  useEffect(() => { const t = setTimeout(onClose, acao ? 8000 : 3500); return () => clearTimeout(t); }, []);
   const bg = type === "error" ? D.danger : D.primary;
   return (
     <div style={{ position:"fixed", bottom:88, right:16, left:16, background:bg, color:"#fff", padding:"14px 18px", borderRadius:12, fontSize:14, zIndex:9999, boxShadow:D.shadowMd, display:"flex", alignItems:"center", gap:10 }}>
       <span style={{ width:22, height:22, borderRadius:"50%", background:"rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontSize:11, fontWeight:700 }}>{type==="error"?"✕":"✓"}</span>
       <span style={{ flex:1, lineHeight:1.5 }}>{msg}</span>
+      {acao && (
+        <button onClick={() => { acao(); onClose(); }} style={{ background:"#fff", color:bg, border:"none", cursor:"pointer", fontSize:13, fontWeight:700, borderRadius:8, padding:"7px 14px", flexShrink:0, fontFamily:D.fontBody }}>
+          {rotuloAcao || "Desfazer"}
+        </button>
+      )}
       <button onClick={onClose} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", cursor:"pointer", fontSize:16, borderRadius:6, width:26, height:26, display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
     </div>
   );
@@ -1308,7 +1314,7 @@ const AdminPanel = ({ onSair }) => {
     if (!novoGasto.descricao || !novoGasto.valor) { showToast("Preencha descrição e valor.", "error"); return; }
     await addDoc(collection(db, "gastos_mysindi"), {
       descricao: novoGasto.descricao.trim(),
-      valor: parseFloat(novoGasto.valor) || 0,
+      valor: paraNumero(novoGasto.valor) || 0,
       mes: novoGasto.mes,
       criadoEm: new Date().toLocaleDateString("pt-BR"),
     });
@@ -1432,7 +1438,7 @@ const AdminPanel = ({ onSair }) => {
             <h3 style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, margin:"0 0 14px", letterSpacing:"-0.02em" }}>Registrar gasto — {mesLabelAdmin(mesFiltro)}</h3>
             <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:16 }}>
               <input value={novoGasto.descricao} onChange={e=>setNovoGasto(p=>({...p,descricao:e.target.value}))} placeholder="Descrição (ex: Firebase, Vercel...)" style={{ flex: isMobile?"1 1 100%":"2 1 200px", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
-              <input type="number" value={novoGasto.valor} onChange={e=>setNovoGasto(p=>({...p,valor:e.target.value}))} placeholder="Valor (R$)" style={{ flex: isMobile?"1 1 100%":"1 1 100px", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
+              <input type="text" inputMode="decimal" value={novoGasto.valor} onChange={e=>setNovoGasto(p=>({...p,valor:e.target.value}))} placeholder="Valor (R$)" style={{ flex: isMobile?"1 1 100%":"1 1 100px", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontFamily:D.fontBody, color:D.text, boxSizing:"border-box" }} />
               <select value={novoGasto.mes} onChange={e=>setNovoGasto(p=>({...p,mes:e.target.value}))} style={{ flex: isMobile?"1 1 100%":"1 1 120px", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontFamily:D.fontBody, color:D.text, background:"#fff" }}>
                 {mesesGasto().map(m => <option key={m} value={m}>{mesLabelAdmin(m)}</option>)}
               </select>
@@ -2199,6 +2205,32 @@ const rotuloPeriodo = (p) => {
   return "Escolher data";
 };
 
+/* ── Valores em dinheiro: aceita o jeito brasileiro de digitar ──
+   parseFloat("1.500,00") devolve 1.5 — um erro de dinheiro esperando acontecer.
+   Aqui "1.500,00", "1500,50", "1500.50" e "R$ 200" viram o número certo. */
+const paraNumero = (v) => {
+  if (typeof v === "number") return v;
+  let t = String(v ?? "").trim().replace(/r\$/gi, "").replace(/\s/g, "");
+  if (!t) return NaN;
+  const temVirgula = t.includes(","), temPonto = t.includes(".");
+  if (temVirgula && temPonto) {
+    // O separador que vier por último é o decimal
+    t = t.lastIndexOf(",") > t.lastIndexOf(".")
+      ? t.replace(/\./g, "").replace(",", ".")
+      : t.replace(/,/g, "");
+  } else if (temVirgula) {
+    t = t.replace(",", ".");
+  } else if (temPonto) {
+    // "1.500" é milhar; "1500.50" é decimal. 3 dígitos depois do ponto = milhar.
+    const partes = t.split(".");
+    if (partes.length > 2 || (partes.length === 2 && partes[1].length === 3)) t = partes.join("");
+  }
+  const n = parseFloat(t);
+  return Number.isFinite(n) ? n : NaN;
+};
+// Valor válido = número real e maior que zero
+const valorValido = (v) => { const n = paraNumero(v); return Number.isFinite(n) && n > 0; };
+
 /* ── Busca por texto (ignora acento e maiúscula) ── */
 const normalizarTexto = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 // Confere se algum dos campos do item contém o termo buscado
@@ -2620,6 +2652,35 @@ export default function App() {
     return () => window.removeEventListener("unhandledrejection", aoFalhar);
   }, []);
 
+  // Exclusão com desfazer: guarda o documento antes de apagar e devolve pelo mesmo id.
+  // Substitui o padrão "window.confirm + sumiu pra sempre" nas remoções simples.
+  const removerComDesfazer = async (colecao, id, rotulo) => {
+    try {
+      const ref = doc(db, colecao, id);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) { showToast("Este registro já não existe.", "error"); return; }
+      const backup = snap.data();
+      await deleteDoc(ref);
+      setToast({
+        msg: `${rotulo} removido.`,
+        type: "success",
+        rotuloAcao: "Desfazer",
+        acao: async () => {
+          try {
+            await setDoc(doc(db, colecao, id), backup);
+            showToast(`${rotulo} restaurado.`);
+          } catch (e) {
+            console.error("Erro ao restaurar:", e);
+            showToast("Não foi possível restaurar. Verifique sua conexão.", "error");
+          }
+        },
+      });
+    } catch (e) {
+      console.error("Erro ao remover:", e);
+      showToast("Não foi possível remover. Verifique sua conexão e tente de novo.", "error");
+    }
+  };
+
   const registrarLog = async (icone, descricao) => {
     try {
       await addDoc(collection(db, "logs"), {
@@ -2677,6 +2738,49 @@ export default function App() {
   const despCat = (tipo) => CATS_DESPESA[tipo] || CATS_DESPESA.outro;
 
   // ── Exportação CSV (abre no Excel / Google Sheets) ──
+  // Backup completo em JSON: tudo do condomínio num arquivo só, para guardar fora do sistema.
+  // Serve de seguro caso a conta do Firebase seja perdida ou algo seja apagado por engano.
+  const [gerandoBackup, setGerandoBackup] = useState(false);
+  const exportarBackupCompleto = async () => {
+    if (gerandoBackup) return;
+    setGerandoBackup(true);
+    try {
+      const colecoes = ["moradores","cobrancas","cobrancas_extras","pag_extras","despesas","servicos",
+        "receitas","acessos","reservas","entregas","comunicados","ocorrencias","enquetes",
+        "documentos","fundo_movs","eventos","observacoes","logs"];
+      const dados = {};
+      let totalDocs = 0;
+      for (const col of colecoes) {
+        const snap = await getDocs(query(collection(db, col), where("condominioId","==",condominioId)));
+        dados[col] = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        totalDocs += snap.docs.length;
+      }
+      const snapCond = await getDoc(doc(db, "condominios", condominioId));
+      const backup = {
+        geradoEm: new Date().toISOString(),
+        geradoPor: user?.email || "",
+        condominioId,
+        condominio: snapCond.exists() ? snapCond.data() : null,
+        totalRegistros: totalDocs,
+        dados,
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type:"application/json;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `backup-${condominioId}-${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`Backup gerado: ${totalDocs} registros de ${colecoes.length} áreas.`);
+      registrarLog("💾", `Backup completo exportado (${totalDocs} registros)`);
+    } catch (e) {
+      console.error("Erro ao gerar backup:", e);
+      showToast("Não foi possível gerar o backup. Verifique sua conexão e tente de novo.", "error");
+    } finally {
+      setGerandoBackup(false);
+    }
+  };
+
   const exportarCSV = (nomeArquivo, colunas, linhas) => {
     // Escapa cada célula: usa ; como separador (padrão Excel BR) e aspas quando necessário
     const escapa = (v) => {
@@ -3006,9 +3110,15 @@ export default function App() {
   // ── Moradores ──
   const adicionarMorador = async () => {
     if (!novoMorador.nome || !novoMorador.unidade || !novoMorador.email) { showToast("Preencha nome, unidade e e-mail.", "error"); return; }
+    if (!novoMorador.email.includes("@") || !novoMorador.email.includes(".")) { showToast("E-mail parece inválido. Confira antes de salvar.", "error"); return; }
+    // Duplicidade: mesma unidade ou mesmo e-mail já cadastrado
+    const jaUnidade = moradores.find(m => normalizarTexto(m.unidade) === normalizarTexto(novoMorador.unidade));
+    if (jaUnidade && !window.confirm(`A unidade ${novoMorador.unidade} já está cadastrada para ${jaUnidade.nome}.\n\nCadastrar assim mesmo? (útil só se houver dois responsáveis pelo mesmo apartamento)`)) return;
+    const jaEmail = moradores.find(m => normalizarTexto(m.email) === normalizarTexto(novoMorador.email));
+    if (jaEmail) { showToast(`Este e-mail já é do morador ${jaEmail.nome} (${jaEmail.unidade}). Use outro.`, "error"); return; }
     // taxaCustom: número se preenchido, null se vazio (usa a taxa padrão)
-    const taxaCustom = novoMorador.taxaCustom !== "" && !isNaN(parseFloat(novoMorador.taxaCustom))
-      ? parseFloat(novoMorador.taxaCustom) : null;
+    const taxaCustom = novoMorador.taxaCustom !== "" && valorValido(novoMorador.taxaCustom)
+      ? paraNumero(novoMorador.taxaCustom) : null;
     const dados = { ...novoMorador, taxaCustom, condominioId };
     const ref = await addDoc(collection(db, "moradores"), dados);
     await setDoc(doc(db, "cobrancas", `${condominioId}_${ref.id}_${mesSel}`), { condominioId, moradorId:ref.id, mes:mesSel, status:"pendente", comprovante:null, dataPagamento:null, obs:"" });
@@ -3017,12 +3127,51 @@ export default function App() {
   };
 
   const removerMorador = async (id) => {
-    await deleteDoc(doc(db, "moradores", id));
-    const snap = await getDocs(query(collection(db, "cobrancas"), where("moradorId","==",id)));
-    const batch = writeBatch(db); snap.forEach(d => batch.delete(d.ref));
-    if (!snap.empty) await batch.commit();
-    registrarLog("🗑️", `Morador removido: ID ${id}`);
-    showToast("Morador removido.", "error");
+    const m = moradores.find(x => x.id === id);
+    if (!m) return;
+    try {
+      // Guarda tudo antes de apagar, para conseguir desfazer
+      const snapMor = await getDoc(doc(db, "moradores", id));
+      const backupMor = snapMor.exists() ? snapMor.data() : null;
+      const snap = await getDocs(query(collection(db, "cobrancas"), where("moradorId","==",id)));
+      const backupCob = snap.docs.map(d => ({ id:d.id, dados:d.data() }));
+
+      const nPagos = backupCob.filter(c => c.dados?.status === "pago").length;
+      const aviso = `Remover ${m.nome} (${m.unidade})?\n\n`
+        + `Isto também apaga ${backupCob.length} registro(s) de cobrança`
+        + (nPagos ? `, incluindo ${nPagos} pagamento(s) já quitado(s)` : "")
+        + `.\n\nVocê terá alguns segundos para desfazer.`;
+      if (!window.confirm(aviso)) return;
+
+      await deleteDoc(doc(db, "moradores", id));
+      const batch = writeBatch(db); snap.forEach(d => batch.delete(d.ref));
+      if (!snap.empty) await batch.commit();
+      registrarLog("🗑️", `Morador removido: ${m.nome} (${m.unidade}) — ${backupCob.length} cobrança(s) junto`);
+
+      setToast({
+        msg: `${m.nome} removido${backupCob.length ? ` com ${backupCob.length} cobrança(s)` : ""}.`,
+        type: "error",
+        rotuloAcao: "Desfazer",
+        acao: async () => {
+          try {
+            if (backupMor) await setDoc(doc(db, "moradores", id), backupMor);
+            if (backupCob.length) {
+              const b2 = writeBatch(db);
+              backupCob.forEach(c => b2.set(doc(db, "cobrancas", c.id), c.dados));
+              await b2.commit();
+            }
+            registrarLog("↩️", `Remoção desfeita: ${m.nome} (${m.unidade}) restaurado`);
+            showToast(`${m.nome} foi restaurado com o histórico.`);
+          } catch (e) {
+            console.error("Erro ao restaurar morador:", e);
+            showToast("Não foi possível restaurar. Verifique sua conexão.", "error");
+          }
+        },
+      });
+    } catch (e) {
+      console.error("Erro ao remover morador:", e);
+      showToast("Não foi possível remover o morador. Verifique sua conexão e tente de novo.", "error");
+    }
   };
 
   // Busca do topo: vai para a aba Moradores e abre o histórico do morador
@@ -3037,8 +3186,8 @@ export default function App() {
     }
     const { id, ...dados } = editMorador;
     // Converte taxaCustom (string do input) para número ou null
-    dados.taxaCustom = (dados.taxaCustom !== "" && dados.taxaCustom != null && !isNaN(parseFloat(dados.taxaCustom)))
-      ? parseFloat(dados.taxaCustom) : null;
+    dados.taxaCustom = (dados.taxaCustom !== "" && dados.taxaCustom != null && !isNaN(paraNumero(dados.taxaCustom)))
+      ? paraNumero(dados.taxaCustom) : null;
     await setDoc(doc(db, "moradores", id), dados, { merge:true });
     registrarLog("✏️", `Morador editado: ${editMorador.nome} (${editMorador.unidade})`);
     setEditMorador(null); setModal(null); showToast("Morador atualizado com sucesso!");
@@ -3047,6 +3196,7 @@ export default function App() {
   // ── Despesas ──
   const adicionarDespesa = () => {
     if (!novaDespesa.valor || !novaDespesa.mes) { showToast("Preencha o valor e o mês.", "error"); return; }
+    if (!valorValido(novaDespesa.valor)) { showToast("Informe um valor maior que zero. Ex: 1.500,00", "error"); return; }
     // Monta a lista de meses: só o escolhido, ou até dezembro do mesmo ano se recorrente
     const mesesAlvo = [];
     if (novaDespesa.recorrente) {
@@ -3064,7 +3214,7 @@ export default function App() {
         const nomeComp = mesAlvo === novaDespesa.mes ? novaDespesa.arquivoNome : "";
         await addDoc(collection(db, "despesas"), {
           condominioId, tipo:novaDespesa.tipo, descricao:novaDespesa.descricao,
-          valor:parseFloat(novaDespesa.valor)||0, mes:mesAlvo, status:"pendente",
+          valor:paraNumero(novaDespesa.valor)||0, mes:mesAlvo, status:"pendente",
           dataPagamento:null, comprovante:comp, arquivoNome:nomeComp,
           recorrente: novaDespesa.recorrente || false,
         });
@@ -3099,8 +3249,8 @@ export default function App() {
 
   const concluirServico = async (id) => {
     const s = servicos.find(x=>x.id===id);
-    await setDoc(doc(db,"servicos",id), { status:"concluido", dataInicio:concluirForm.dataInicio, dataFim:concluirForm.dataFim, valorMaterial:parseFloat(concluirForm.valorMaterial)||0, valorMaoDeObra:parseFloat(concluirForm.valorMaoDeObra)||0, obsConclusao:concluirForm.obs }, { merge:true });
-    registrarLog("✅", `Serviço concluído: ${s?.titulo||id} — Total: R$ ${((parseFloat(concluirForm.valorMaterial)||0)+(parseFloat(concluirForm.valorMaoDeObra)||0)).toFixed(2).replace(".",",")}`);
+    await setDoc(doc(db,"servicos",id), { status:"concluido", dataInicio:concluirForm.dataInicio, dataFim:concluirForm.dataFim, valorMaterial:paraNumero(concluirForm.valorMaterial)||0, valorMaoDeObra:paraNumero(concluirForm.valorMaoDeObra)||0, obsConclusao:concluirForm.obs }, { merge:true });
+    registrarLog("✅", `Serviço concluído: ${s?.titulo||id} — Total: R$ ${((paraNumero(concluirForm.valorMaterial)||0)+(paraNumero(concluirForm.valorMaoDeObra)||0)).toFixed(2).replace(".",",")}`);
     setConcluirForm({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" }); setModal(null); showToast("Serviço concluído!");
   };
   const reabrirServico = async (id) => {
@@ -3142,8 +3292,7 @@ export default function App() {
   };
 
   const removerAcesso = async (id) => {
-    await deleteDoc(doc(db, "acessos", id));
-    showToast("Registro removido.", "error");
+    await removerComDesfazer("acessos", id, "Registro");
   };
 
   // ── Reservas ──
@@ -3182,8 +3331,7 @@ export default function App() {
   };
 
   const removerReserva = async (id) => {
-    await deleteDoc(doc(db, "reservas", id));
-    showToast("Reserva removida.", "error");
+    await removerComDesfazer("reservas", id, "Reserva");
   };
 
   // ── Comunicados ──
@@ -3211,8 +3359,7 @@ export default function App() {
   };
 
   const removerComunicado = async (id) => {
-    await deleteDoc(doc(db, "comunicados", id));
-    showToast("Comunicado removido.", "error");
+    await removerComDesfazer("comunicados", id, "Comunicado");
   };
 
   // ── Documentos ──
@@ -3244,13 +3391,12 @@ export default function App() {
   };
 
   const removerDocumento = async (id) => {
-    await deleteDoc(doc(db, "documentos", id));
-    showToast("Documento removido.", "error");
+    await removerComDesfazer("documentos", id, "Documento");
   };
 
   // ── Fundo de Reserva ──
   const registrarMovFundo = async () => {
-    const valor = parseFloat(novaMovFundo.valor) || 0;
+    const valor = paraNumero(novaMovFundo.valor) || 0;
     if (valor <= 0) { showToast("Informe um valor válido.", "error"); return; }
     if (!novaMovFundo.descricao.trim()) { showToast("Informe uma descrição.", "error"); return; }
     await addDoc(collection(db, "fundo_movs"), {
@@ -3268,8 +3414,7 @@ export default function App() {
   };
 
   const removerMovFundo = async (id) => {
-    await deleteDoc(doc(db, "fundo_movs", id));
-    showToast("Movimentação removida.", "error");
+    await removerComDesfazer("fundo_movs", id, "Movimentação");
   };
 
   const salvarPercentualFundo = async (pct) => {
@@ -3280,7 +3425,7 @@ export default function App() {
   // ── Cobranças extras / rateios ──
   const criarCobrancaExtra = async () => {
     if (!novaCobExtra.descricao.trim()) { showToast("Informe a descrição da cobrança.", "error"); return; }
-    const valorInformado = parseFloat(novaCobExtra.valor) || 0;
+    const valorInformado = paraNumero(novaCobExtra.valor) || 0;
     if (valorInformado <= 0) { showToast("Informe um valor válido.", "error"); return; }
     const nUnidades = moradores.length;
     if (nUnidades === 0) { showToast("Cadastre moradores antes de criar uma cobrança.", "error"); return; }
@@ -3333,7 +3478,7 @@ export default function App() {
   // ── Receitas avulsas (fluxo de caixa) ──
   const adicionarReceita = async () => {
     if (!novaReceita.descricao.trim()) { showToast("Informe a descrição da receita.", "error"); return; }
-    const valor = parseFloat(novaReceita.valor) || 0;
+    const valor = paraNumero(novaReceita.valor) || 0;
     if (valor <= 0) { showToast("Informe um valor válido.", "error"); return; }
     await addDoc(collection(db, "receitas"), {
       condominioId,
@@ -3351,8 +3496,7 @@ export default function App() {
   };
 
   const removerReceita = async (id) => {
-    await deleteDoc(doc(db, "receitas", id));
-    showToast("Receita removida.", "error");
+    await removerComDesfazer("receitas", id, "Receita");
   };
 
   // ── Ocorrências / reclamações ──
@@ -3368,8 +3512,7 @@ export default function App() {
   };
 
   const removerOcorrencia = async (id) => {
-    await deleteDoc(doc(db, "ocorrencias", id));
-    showToast("Ocorrência removida.", "error");
+    await removerComDesfazer("ocorrencias", id, "Ocorrência");
   };
 
   // ── Enquetes / votações ──
@@ -3480,8 +3623,7 @@ export default function App() {
   };
 
   const removerEntrega = async (id) => {
-    await deleteDoc(doc(db, "entregas", id));
-    showToast("Registro removido.", "error");
+    await removerComDesfazer("entregas", id, "Registro");
   };
 
   // ── Agenda / Eventos ──
@@ -3505,8 +3647,7 @@ export default function App() {
   };
 
   const removerEvento = async (id) => {
-    await deleteDoc(doc(db, "eventos", id));
-    showToast("Evento removido.", "error");
+    await removerComDesfazer("eventos", id, "Evento");
   };
 
   // Calcula situação do vencimento de um documento
@@ -3669,7 +3810,13 @@ export default function App() {
         enviados, total: destinatarios.length
       });
 
-      showToast(`✅ ${enviados} e-mail(s) enviado(s) com sucesso!`);
+      const falhas = destinatarios.length - enviados;
+      showToast(
+        falhas === 0
+          ? `${enviados} e-mail(s) enviado(s) com sucesso.`
+          : `${enviados} de ${destinatarios.length} e-mail(s) enviado(s). ${falhas} falhou(ram) — avise esses moradores por outro meio.`,
+        falhas === 0 ? "success" : "error"
+      );
     } catch (err) {
       console.error("Erro no envio:", err);
       showToast("Erro ao enviar e-mails. Verifique o EmailJS.", "error");
@@ -4948,7 +5095,7 @@ export default function App() {
                                 <button onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="link" size={14} /> Link</button>
                                 {!readOnly && <>
                                   <button onClick={() => abrirEditar(m)} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logPencil" size={14} /> Editar</button>
-                                  <button onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>
+                                  <button onClick={() => { removerMorador(m.id); }} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>
                                 </>}
                               </div>
                             </div>
@@ -4990,7 +5137,7 @@ export default function App() {
                                     <AcaoBtn icon="link" titulo="Copiar link do portal" onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} />
                                     {!readOnly && <>
                                       <AcaoBtn icon="logPencil" titulo="Editar morador" onClick={() => abrirEditar(m)} />
-                                      <AcaoBtn icon="logTrash" cor={D.danger} titulo="Remover morador" onClick={() => { if(window.confirm(`Remover ${m.nome}?`)) removerMorador(m.id); }} />
+                                      <AcaoBtn icon="logTrash" cor={D.danger} titulo="Remover morador" onClick={() => { removerMorador(m.id); }} />
                                     </>}
                                   </div>
                                 </td>
@@ -6589,7 +6736,7 @@ export default function App() {
                   <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>Taxa mensal</span>
                 </div>
                 <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Valor (R$)</label>
-                <input type="number" value={taxa} onChange={e=>setTaxa(parseFloat(e.target.value)||0)} style={{ display:"block", width:"100%", padding:"12px 14px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:16, color:D.text, marginTop:8, boxSizing:"border-box", fontFamily:D.fontBody }} />
+                <input type="text" inputMode="decimal" value={taxa} onChange={e=>setTaxa(paraNumero(e.target.value)||0)} style={{ display:"block", width:"100%", padding:"12px 14px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:16, color:D.text, marginTop:8, boxSizing:"border-box", fontFamily:D.fontBody }} />
 
                 <hr style={{ margin:"22px 0", border:"none", borderTop:`1px solid ${D.border}` }} />
 
@@ -6660,6 +6807,20 @@ export default function App() {
             <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
               <h3 style={{ color:D.text, margin:"0 0 4px", fontSize:15, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Ações</h3>
               <p style={{ color:D.textSec, fontSize:12.5, margin:"0 0 20px" }}>Estas ações têm efeito imediato e não fazem parte do salvamento acima.</p>
+
+              {/* Backup completo */}
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                <span style={{ color:D.accent, display:"flex" }}><NavIcon id="download" size={17} /></span>
+                <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>Backup completo</span>
+              </div>
+              <p style={{ color:D.textSec, fontSize:12, margin:"0 0 12px" }}>
+                Baixa um arquivo com <b>tudo</b> deste condomínio — moradores, cobranças, despesas, documentos, histórico. Guarde em local seguro (nuvem pessoal, pendrive). É o seu seguro caso algo seja apagado por engano.
+              </p>
+              <button onClick={exportarBackupCompleto} disabled={gerandoBackup} style={{ display:"flex", alignItems:"center", gap:7, padding:"10px 18px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: gerandoBackup?"default":"pointer", opacity: gerandoBackup?.6:1, fontFamily:D.fontBody, marginBottom:22, width: isMobile?"100%":"auto", justifyContent:"center" }}>
+                <NavIcon id="download" size={15} /> {gerandoBackup ? "Gerando backup..." : "Baixar backup completo"}
+              </button>
+
+              <div style={{ height:1, background:D.border, margin:"0 0 22px" }} />
 
               {/* Iniciar cobrança — marco zero */}
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
@@ -6814,7 +6975,7 @@ export default function App() {
             </div>
             <div>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Taxa individual (opcional)</label>
-              <input type="number" value={novoMorador.taxaCustom} onChange={e=>setNovoMorador(p=>({...p,taxaCustom:e.target.value}))} placeholder={`Padrão: R$ ${taxa.toFixed(2).replace(".",",")}`} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+              <input type="text" inputMode="decimal" value={novoMorador.taxaCustom} onChange={e=>setNovoMorador(p=>({...p,taxaCustom:e.target.value}))} placeholder={`Padrão: R$ ${taxa.toFixed(2).replace(".",",")}`} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
               <p style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, margin:"5px 0 0" }}>Deixe em branco para usar a taxa padrão do condomínio. Preencha se esta unidade paga um valor diferente.</p>
             </div>
           </div>
@@ -6988,7 +7149,7 @@ export default function App() {
             </div>
             <div>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Taxa individual (opcional)</label>
-              <input type="number" value={editMorador.taxaCustom} onChange={e=>setEditMorador(p=>({...p,taxaCustom:e.target.value}))} placeholder={`Padrão: R$ ${taxa.toFixed(2).replace(".",",")}`} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+              <input type="text" inputMode="decimal" value={editMorador.taxaCustom} onChange={e=>setEditMorador(p=>({...p,taxaCustom:e.target.value}))} placeholder={`Padrão: R$ ${taxa.toFixed(2).replace(".",",")}`} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
               <p style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, margin:"5px 0 0" }}>Deixe em branco para usar a taxa padrão do condomínio.</p>
             </div>
           </div>
@@ -7201,7 +7362,7 @@ export default function App() {
             <div style={{ display:"flex", gap:12 }}>
               <div style={{ flex:1 }}>
                 <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Valor *</label>
-                <input type="number" value={novaReceita.valor} onChange={e=>setNovaReceita(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+                <input type="text" inputMode="decimal" value={novaReceita.valor} onChange={e=>setNovaReceita(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
               </div>
               <div style={{ flex:1 }}>
                 <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Mês *</label>
@@ -7217,7 +7378,7 @@ export default function App() {
       )}
 
       {modal?.type === "novaCobExtra" && (() => {
-        const valorInf = parseFloat(novaCobExtra.valor) || 0;
+        const valorInf = paraNumero(novaCobExtra.valor) || 0;
         const nUn = moradores.length || 1;
         const previa = novaCobExtra.modo === "rateio" ? (valorInf / nUn) : valorInf;
         return (
@@ -7241,7 +7402,7 @@ export default function App() {
             <div style={{ display:"flex", gap:12 }}>
               <div style={{ flex:1 }}>
                 <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>{novaCobExtra.modo==="rateio"?"Valor total *":"Valor por unidade *"}</label>
-                <input type="number" value={novaCobExtra.valor} onChange={e=>setNovaCobExtra(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+                <input type="text" inputMode="decimal" value={novaCobExtra.valor} onChange={e=>setNovaCobExtra(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
               </div>
               <div style={{ flex:1 }}>
                 <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Mês *</label>
@@ -7306,7 +7467,7 @@ export default function App() {
             </div>
             <div>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Valor (R$) *</label>
-              <input type="number" value={novaMovFundo.valor} onChange={e=>setNovaMovFundo(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              <input type="text" inputMode="decimal" value={novaMovFundo.valor} onChange={e=>setNovaMovFundo(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
             </div>
             <div>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Descrição *</label>
@@ -7508,7 +7669,7 @@ export default function App() {
           <div style={{ display:"flex", gap:10 }}>
             <div style={{ flex:1 }}>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Valor *</label>
-              <input type="number" value={novaDespesa.valor} onChange={e=>setNovaDespesa(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
+              <input type="text" inputMode="decimal" value={novaDespesa.valor} onChange={e=>setNovaDespesa(p=>({...p,valor:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text, fontFamily:D.fontBody }} />
             </div>
             <div style={{ flex:1 }}>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Mês *</label>
@@ -7567,11 +7728,11 @@ export default function App() {
           <div style={{ display:"flex", gap:10, marginBottom:14 }}>
             <div style={{ flex:1 }}>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Material (R$)</label>
-              <input type="number" value={concluirForm.valorMaterial} onChange={e=>setConcluirForm(p=>({...p,valorMaterial:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
+              <input type="text" inputMode="decimal" value={concluirForm.valorMaterial} onChange={e=>setConcluirForm(p=>({...p,valorMaterial:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
             </div>
             <div style={{ flex:1 }}>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Mão de obra (R$)</label>
-              <input type="number" value={concluirForm.valorMaoDeObra} onChange={e=>setConcluirForm(p=>({...p,valorMaoDeObra:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
+              <input type="text" inputMode="decimal" value={concluirForm.valorMaoDeObra} onChange={e=>setConcluirForm(p=>({...p,valorMaoDeObra:e.target.value}))} placeholder="0,00" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text }} />
             </div>
           </div>
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Observações</label>
@@ -7583,7 +7744,7 @@ export default function App() {
         </Modal>
       )}
 
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      {toast && <Toast msg={toast.msg} type={toast.type} acao={toast.acao} rotuloAcao={toast.rotuloAcao} onClose={() => setToast(null)} />}
     </div>
   );
 }

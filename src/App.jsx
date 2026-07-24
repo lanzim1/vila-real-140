@@ -2931,6 +2931,9 @@ export default function App() {
 
   const garantirMes = async (mes) => {
     if (!condominioId) return;
+    // Abrir o portal do morador (ou entrar como visitante) NÃO pode gerar cobrança.
+    // Antes, abrir um link de portal criava cobranças para todos os moradores.
+    if (portalMoradorId || readOnly) return;
     // Não gera cobranças para meses anteriores ao início da cobrança (marco zero)
     const mesInicio = marcoZero ? marcoZero.slice(0,7) : null; // ex: "2026-08"
     if (mesInicio && mes < mesInicio) return;
@@ -2945,6 +2948,7 @@ export default function App() {
   // ── Marcar vencidas como "atrasado" e corrigir as anteriores ao marco zero ──
   const atualizarAtrasados = async () => {
     if (!condominioId) return;
+    if (portalMoradorId || readOnly) return;  // leitura não altera status de cobrança
     const hoje = new Date();
     hoje.setHours(0,0,0,0);
     const mz = marcoZero ? new Date(marcoZero + "T00:00:00") : null;
@@ -3005,11 +3009,13 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Portal do morador e visitante são somente leitura: não geram nem alteram cobrança
+    if (portalMoradorId || readOnly) return;
     if (user && condominioId && moradores.length > 0) {
       garantirMes(mesSel);
       atualizarAtrasados();
     }
-  }, [user, condominioId, moradores.length, cobrancas.length, diaVencimento, marcoZero]);
+  }, [user, condominioId, moradores.length, cobrancas.length, diaVencimento, marcoZero, readOnly]);
 
   const mudarMes = async (m) => {
     setMesSel(m);

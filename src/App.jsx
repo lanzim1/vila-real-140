@@ -2240,23 +2240,16 @@ const casaBusca = (item, termo, campos) => {
   return campos.some(c => normalizarTexto(item?.[c]).includes(t));
 };
 
-const CampoBusca = ({ valor, setValor, placeholder = "Buscar...", D, visivel = true }) => {
-  // Some quando a lista é curta, mas nunca some com busca ativa (não prende o usuário)
-  if (!visivel && !valor) return null;
-  return (
-    <div style={{ display:"flex", alignItems:"center", gap:9, background:D.bgCard, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, padding:"9px 12px", marginBottom:12 }}>
-      <span style={{ color:D.textMut, display:"flex", flexShrink:0 }}><NavIcon id="busca" size={16} /></span>
-      <input value={valor} onChange={e => setValor(e.target.value)} placeholder={placeholder}
-        style={{ flex:1, border:"none", outline:"none", background:"transparent", fontSize:13.5, fontFamily:D.fontBody, color:D.text, minWidth:0 }} />
-      {valor && (
-        <button onClick={() => setValor("")} title="Limpar busca" style={{ display:"flex", alignItems:"center", justifyContent:"center", width:22, height:22, background:D.muted, border:"none", borderRadius:6, color:D.textSec, cursor:"pointer", flexShrink:0 }}><NavIcon id="fechar" size={13} /></button>
-      )}
-    </div>
-  );
-};
 
-const BarraPeriodo = ({ periodo, setPeriodo, timestamps = [], total = 0, D, isMobile, rotuloItem = "registro" }) => {
+const BarraFiltros = ({
+  periodo, setPeriodo, timestamps = [], total = 0, D, isMobile, rotuloItem = "registro",
+  // Linha 1 (opcionais): busca e seletor de categoria
+  busca, setBusca, placeholderBusca = "Buscar...", mostrarBusca = false,
+  tipos = null, tipoAtivo, setTipo, rotuloTipo = "Todos",
+  mostrarPeriodo = true,
+}) => {
   const [aberto, setAberto] = useState(false);
+  const [tipoAberto, setTipoAberto] = useState(false);
   const hojeD = new Date();
   const [mesVista, setMesVista] = useState({ ano: hojeD.getFullYear(), mes: hojeD.getMonth() });
 
@@ -2267,7 +2260,7 @@ const BarraPeriodo = ({ periodo, setPeriodo, timestamps = [], total = 0, D, isMo
     { tipo:"hoje", label:"Hoje" },
     { tipo:"7d",   label:"7 dias" },
     { tipo:"30d",  label:"30 dias" },
-    { tipo:"tudo", label:"Tudo" },
+    { tipo:"tudo", label:"Qualquer data" },
   ];
   const ativoCal = periodo.tipo === "dia" || periodo.tipo === "mes";
 
@@ -2283,8 +2276,59 @@ const BarraPeriodo = ({ periodo, setPeriodo, timestamps = [], total = 0, D, isMo
 
   const btnBase = { display:"flex", alignItems:"center", gap:6, padding:"6px 14px", borderRadius:20, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, whiteSpace:"nowrap" };
 
+  const opcaoAtiva = tipos ? (tipos.find(t => t.id === tipoAtivo) || tipos[0]) : null;
+  const tipoFiltrando = tipos && opcaoAtiva && opcaoAtiva.id !== tipos[0].id;
+
   return (
-    <div style={{ marginBottom:14 }}>
+    <div style={{ marginBottom:16 }}>
+      {/* Linha 1 — busca e categoria */}
+      {(mostrarBusca || tipos) && (
+        <div style={{ display:"flex", gap:8, alignItems:"stretch", marginBottom:10, flexDirection: isMobile?"column":"row" }}>
+          {mostrarBusca && (
+            <div style={{ flex:1, display:"flex", alignItems:"center", gap:9, background:D.bgCard, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, padding:"9px 12px", minWidth:0 }}>
+              <span style={{ color:D.textMut, display:"flex", flexShrink:0 }}><NavIcon id="busca" size={16} /></span>
+              <input value={busca} onChange={e => setBusca(e.target.value)} placeholder={placeholderBusca}
+                style={{ flex:1, border:"none", outline:"none", background:"transparent", fontSize:13.5, fontFamily:D.fontBody, color:D.text, minWidth:0 }} />
+              {busca && (
+                <button onClick={() => setBusca("")} title="Limpar busca" style={{ display:"flex", alignItems:"center", justifyContent:"center", width:22, height:22, background:D.muted, border:"none", borderRadius:6, color:D.textSec, cursor:"pointer", flexShrink:0 }}><NavIcon id="fechar" size={13} /></button>
+              )}
+            </div>
+          )}
+
+          {tipos && (
+            <div style={{ position:"relative", flexShrink:0 }}>
+              <button onClick={() => { setTipoAberto(v=>!v); setAberto(false); }}
+                style={{ display:"flex", alignItems:"center", gap:8, width: isMobile?"100%":"auto", justifyContent:"space-between", padding:"9px 12px", background: tipoFiltrando?D.primary:D.bgCard, color: tipoFiltrando?"#fff":D.text, border: tipoFiltrando?"1px solid transparent":`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody, whiteSpace:"nowrap" }}>
+                <span style={{ display:"flex", alignItems:"center", gap:7 }}>
+                  {tipoFiltrando && <span style={{ width:7, height:7, borderRadius:"50%", background:"#fff" }} />}
+                  {tipoFiltrando ? opcaoAtiva.label : rotuloTipo}
+                  <span style={{ opacity:.65 }}>{opcaoAtiva?.n}</span>
+                </span>
+                <span style={{ display:"flex", transform: tipoAberto?"rotate(180deg)":"none", transition:"transform .15s" }}><NavIcon id="setaBaixo" size={13} /></span>
+              </button>
+              {tipoAberto && (
+                <div style={{ position:"absolute", top:"calc(100% + 6px)", right:0, left: isMobile?0:"auto", minWidth:190, background:D.bgCard, border:`1px solid ${D.border}`, borderRadius:D.radius, boxShadow:D.shadowMd || D.shadow, padding:6, zIndex:60 }}>
+                  {tipos.map(t => {
+                    const at = (tipoAtivo || tipos[0].id) === t.id;
+                    return (
+                      <button key={t.id} onClick={() => { setTipo(t.id); setTipoAberto(false); }}
+                        style={{ display:"flex", alignItems:"center", gap:9, width:"100%", padding:"9px 11px", background: at?D.secondary:"transparent", border:"none", borderRadius:D.radiusSm, cursor:"pointer", fontFamily:D.fontBody, fontSize:13, color:D.text, textAlign:"left" }}>
+                        <span style={{ width:8, height:8, borderRadius:"50%", background: t.cor || D.textMut, flexShrink:0 }} />
+                        <span style={{ flex:1 }}>{t.label}</span>
+                        <span style={{ color:D.textMut, fontSize:12 }}>{t.n}</span>
+                        {at && <span style={{ color:D.accent, display:"flex" }}><NavIcon id="logCheck" size={14} /></span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Linha 2 — período */}
+      {mostrarPeriodo && (<>
       <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
         {atalhos.map(a => {
           const ativo = periodo.tipo === a.tipo;
@@ -2295,7 +2339,7 @@ const BarraPeriodo = ({ periodo, setPeriodo, timestamps = [], total = 0, D, isMo
             </button>
           );
         })}
-        <button onClick={() => setAberto(v => !v)}
+        <button onClick={() => { setAberto(v => !v); setTipoAberto(false); }}
           style={{ ...btnBase, borderRadius:D.radiusSm, border: ativoCal?"none":`1px solid ${D.border}`, background: ativoCal?D.primary:D.bgCard, color: ativoCal?"#fff":D.textSec }}>
           <NavIcon id="agenda" size={14} /> {rotuloPeriodo(periodo)}
           <span style={{ display:"flex", transform: aberto?"rotate(180deg)":"none", transition:"transform .15s" }}><NavIcon id="setaBaixo" size={12} /></span>
@@ -2341,7 +2385,9 @@ const BarraPeriodo = ({ periodo, setPeriodo, timestamps = [], total = 0, D, isMo
         </div>
       )}
 
-      {periodo.tipo !== "tudo" && (
+      </>)}
+
+      {mostrarPeriodo && periodo.tipo !== "tudo" && (
         <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:8 }}>
           {total} {total === 1 ? rotuloItem : `${rotuloItem}s`} {periodo.tipo==="hoje" ? "hoje" : periodo.tipo==="7d" ? "nos últimos 7 dias" : periodo.tipo==="30d" ? "nos últimos 30 dias" : `em ${rotuloPeriodo(periodo)}`}
           {total === 0 && <button onClick={() => setPeriodo(PERIODO_TUDO)} style={{ marginLeft:8, background:"none", border:"none", color:D.accent, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, textDecoration:"underline", padding:0 }}>ver tudo</button>}
@@ -5500,25 +5546,15 @@ export default function App() {
                   <div>
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, marginBottom:12, flexWrap:"wrap" }}>
                       <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Histórico de reservas</span>
-                      {hist.length > 0 && (
-                        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                          {chips.map(c => {
-                            const ativo = filtroReserva===c.id;
-                            return (
-                              <button key={c.id} onClick={()=>setFiltroReserva(c.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 12px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
-                                {c.id!=="todas" && <span style={{ width:6, height:6, borderRadius:"50%", background: ativo?"#fff":c.cor }} />}
-                                {c.label} <span style={{ opacity:.6 }}>{c.n}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+
                     </div>
-                    {todoHist.length > 8 && (
-                      <CampoBusca valor={buscaReserva} setValor={setBuscaReserva} placeholder="Buscar por área, morador ou unidade..." D={D} visivel={true} />
-                    )}
                     {todoHist.length > 0 && (
-                      <BarraPeriodo periodo={perReserva} setPeriodo={setPerReserva} timestamps={todoHist.map(r=>r.timestamp)} total={hist.length} D={D} isMobile={isMobile} rotuloItem="reserva" />
+                      <BarraFiltros
+                        periodo={perReserva} setPeriodo={setPerReserva}
+                        timestamps={todoHist.map(r=>r.timestamp)} total={hist.length}
+                        rotuloItem="reserva" D={D} isMobile={isMobile}
+                        busca={buscaReserva} setBusca={setBuscaReserva} placeholderBusca="Buscar por área, morador ou unidade..." mostrarBusca={todoHist.length > 8}
+                        tipos={chips} tipoAtivo={filtroReserva} setTipo={setFiltroReserva} rotuloTipo="Todas" />
                     )}
                     {todoHist.length === 0 ? (
                       <div style={{ background:D.bgCard, borderRadius:D.radius, padding:36, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
@@ -5656,21 +5692,12 @@ export default function App() {
                   </div>
                 ) : (
                   <>
-                    <CampoBusca valor={buscaAcesso} setValor={setBuscaAcesso} placeholder="Buscar por nome, empresa ou unidade..." D={D} visivel={acessos.length > 8} />
-                    <BarraPeriodo periodo={perAcesso} setPeriodo={setPerAcesso} timestamps={acessos.map(a=>a.timestamp)} total={noPer.length} D={D} isMobile={isMobile} rotuloItem="acesso" />
-
-                    {/* Filtros */}
-                    <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
-                      {chips.map(c => {
-                        const ativo = filtroAcesso===c.id;
-                        return (
-                          <button key={c.id} onClick={()=>setFiltroAcesso(c.id)} style={{ display:"flex", alignItems:"center", gap:7, padding:"6px 14px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
-                            {c.id!=="todos" && <span style={{ width:7, height:7, borderRadius:"50%", background: ativo?"#fff":c.cor }} />}
-                            {c.label} <span style={{ opacity:.6 }}>{c.n}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <BarraFiltros
+                      periodo={perAcesso} setPeriodo={setPerAcesso}
+                      timestamps={acessos.map(a=>a.timestamp)} total={noPer.length}
+                      rotuloItem="acesso" D={D} isMobile={isMobile}
+                      busca={buscaAcesso} setBusca={setBuscaAcesso} placeholderBusca="Buscar por nome, empresa ou unidade..." mostrarBusca={acessos.length > 8}
+                      tipos={chips} tipoAtivo={filtroAcesso} setTipo={setFiltroAcesso} rotuloTipo="Todos" />
 
                     <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
                       {lista.map((a) => {
@@ -5742,9 +5769,9 @@ export default function App() {
                 const comFiltrados = comunicados.filter(c => noPeriodo(c.timestamp, perComun) && casaBusca(c, buscaComun, ["titulo","mensagem","data"]));
                 return (
                 <>
-                <CampoBusca valor={buscaComun} setValor={setBuscaComun} placeholder="Buscar por título ou conteúdo..." D={D} visivel={comunicados.length > 8} />
+                
                 {comunicados.length > 0 && (
-                  <BarraPeriodo periodo={perComun} setPeriodo={setPerComun} timestamps={comunicados.map(c=>c.timestamp)} total={comFiltrados.length} D={D} isMobile={isMobile} rotuloItem="comunicado" />
+                  <BarraFiltros periodo={perComun} setPeriodo={setPerComun} timestamps={comunicados.map(c=>c.timestamp)} total={comFiltrados.length} D={D} isMobile={isMobile} rotuloItem="comunicado" busca={buscaComun} setBusca={setBuscaComun} placeholderBusca="Buscar por título ou conteúdo..." mostrarBusca={comunicados.length > 8} />
                 )}
                 {comunicados.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
@@ -5853,20 +5880,11 @@ export default function App() {
                     </div>
                   ) : (
                     <>
-                      <CampoBusca valor={buscaDoc} setValor={setBuscaDoc} placeholder="Buscar por nome ou categoria..." D={D} visivel={documentos.length > 8} />
-
-                      {/* Filtros */}
-                      <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
-                        {chips.map(c => {
-                          const ativo = filtroDoc===c.id;
-                          return (
-                            <button key={c.id} onClick={()=>setFiltroDoc(c.id)} style={{ display:"flex", alignItems:"center", gap:7, padding:"6px 14px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
-                              {c.id!=="todos" && <span style={{ width:7, height:7, borderRadius:"50%", background: ativo?"#fff":c.cor }} />}
-                              {c.label} <span style={{ opacity:.6 }}>{c.n}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <BarraFiltros
+                        periodo={PERIODO_TUDO} setPeriodo={()=>{}} mostrarPeriodo={false}
+                        timestamps={[]} total={0} D={D} isMobile={isMobile}
+                        busca={buscaDoc} setBusca={setBuscaDoc} placeholderBusca="Buscar por nome ou categoria..." mostrarBusca={true}
+                        tipos={chips} tipoAtivo={filtroDoc} setTipo={setFiltroDoc} rotuloTipo="Todos" />
 
                       {lista.length === 0 ? (
                         <div style={{ background:D.bgCard, borderRadius:D.radius, padding:32, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
@@ -5979,7 +5997,7 @@ export default function App() {
               {/* Histórico de movimentações */}
               <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12, letterSpacing:"-0.02em" }}>Movimentações</div>
               {fundoMovs.length > 0 && (
-                <BarraPeriodo periodo={perFundo} setPeriodo={setPerFundo} timestamps={fundoMovs.map(m=>m.timestamp)} total={fundoMovs.filter(m=>noPeriodo(m.timestamp, perFundo)).length} D={D} isMobile={isMobile} rotuloItem="movimentação" />
+                <BarraFiltros periodo={perFundo} setPeriodo={setPerFundo} timestamps={fundoMovs.map(m=>m.timestamp)} total={fundoMovs.filter(m=>noPeriodo(m.timestamp, perFundo)).length} D={D} isMobile={isMobile} rotuloItem="movimentação" />
               )}
               {fundoMovs.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
@@ -6042,7 +6060,7 @@ export default function App() {
                 )}
               </div>
 
-              <CampoBusca valor={buscaEntrega} setValor={setBuscaEntrega} placeholder="Buscar por encomenda, morador ou unidade..." D={D} visivel={entregas.length > 8} />
+              
 
               {/* Cards de resumo */}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
@@ -6104,7 +6122,7 @@ export default function App() {
                 <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Já retiradas</span>
               </div>
               {todasRetiradas.length > 0 && (
-                <BarraPeriodo periodo={perEntrega} setPeriodo={setPerEntrega} timestamps={todasRetiradas.map(e=>e.timestamp)} total={retiradas.length} D={D} isMobile={isMobile} rotuloItem="encomenda" />
+                <BarraFiltros periodo={perEntrega} setPeriodo={setPerEntrega} timestamps={todasRetiradas.map(e=>e.timestamp)} total={retiradas.length} D={D} isMobile={isMobile} rotuloItem="encomenda" busca={buscaEntrega} setBusca={setBuscaEntrega} placeholderBusca="Buscar por encomenda, morador ou unidade..." mostrarBusca={entregas.length > 8} />
               )}
               {todasRetiradas.length === 0 && aguardando.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
@@ -6256,21 +6274,12 @@ export default function App() {
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Filtros */}
-              <CampoBusca valor={buscaOcorr} setValor={setBuscaOcorr} placeholder="Buscar por título, morador ou unidade..." D={D} visivel={ocorrencias.length > 8} />
-              {ocorrencias.length > 0 && (
-                <BarraPeriodo periodo={perOcorr} setPeriodo={setPerOcorr} timestamps={ocorrencias.map(o=>o.timestamp)} total={noPer.length} D={D} isMobile={isMobile} rotuloItem="ocorrência" />
-              )}
-              <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:16 }}>
-                {filtros.map(f => {
-                  const ativo = filtroOcorrencia===f.id;
-                  return (
-                    <button key={f.id} onClick={()=>setFiltroOcorrencia(f.id)} style={{ display:"flex", alignItems:"center", gap:7, padding:"6px 14px", borderRadius:20, border: ativo?"none":`1px solid ${D.border}`, background: ativo?D.primary:D.bgCard, color: ativo?"#fff":D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
-                      {f.id!=="todas" && <span style={{ width:7, height:7, borderRadius:"50%", background: ativo?"#fff":f.cor }} />}
-                      {f.label} <span style={{ opacity:.6 }}>{f.n}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <BarraFiltros
+                periodo={perOcorr} setPeriodo={setPerOcorr}
+                timestamps={ocorrencias.map(o=>o.timestamp)} total={noPer.length}
+                rotuloItem="ocorrência" D={D} isMobile={isMobile}
+                busca={buscaOcorr} setBusca={setBuscaOcorr} placeholderBusca="Buscar por título, morador ou unidade..." mostrarBusca={ocorrencias.length > 8}
+                tipos={filtros} tipoAtivo={filtroOcorrencia} setTipo={setFiltroOcorrencia} rotuloTipo="Todas" />
 
               {filtradas.length === 0 ? (
                 <div style={{ background:D.bgCard, borderRadius:D.radius, padding:40, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
@@ -6566,7 +6575,7 @@ export default function App() {
                             <span style={{ width:8, height:8, borderRadius:"50%", background:D.textMut }} />
                             <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Eventos passados</span>
                           </div>
-                          <BarraPeriodo periodo={perEvento} setPeriodo={setPerEvento} timestamps={todosPass.map(tsEv)} total={pass.length} D={D} isMobile={isMobile} rotuloItem="evento" />
+                          <BarraFiltros periodo={perEvento} setPeriodo={setPerEvento} timestamps={todosPass.map(tsEv)} total={pass.length} D={D} isMobile={isMobile} rotuloItem="evento" />
                           {pass.length === 0 ? (
                             <div style={{ background:D.bgCard, borderRadius:D.radius, padding:28, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
                               <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Nenhum evento neste período.</div>
@@ -6624,22 +6633,15 @@ export default function App() {
               });
               return (
                 <>
-                  <CampoBusca valor={buscaLog} setValor={setBuscaLog} placeholder="Buscar no histórico..." D={D} visivel={logs.length > 8} />
-                  <BarraPeriodo periodo={perLog} setPeriodo={setPerLog} timestamps={logs.map(l=>l.timestamp)} total={noPer.length} D={D} isMobile={isMobile} rotuloItem="registro" />
-
-                  {/* Filtros por tipo */}
-                  <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:18 }}>
-                    {TIPOS_LOG.map(t => {
-                      const n = t.id === "tudo" ? noPer.length : noPer.filter(l => tipoLog(l) === t.id).length;
-                      const ativo = filtroLog === t.id;
-                      if (t.id !== "tudo" && n === 0) return null;
-                      return (
-                        <button key={t.id} onClick={() => setFiltroLog(t.id)} style={{ padding:"6px 14px", borderRadius:20, border: ativo ? "none" : `1px solid ${D.border}`, background: ativo ? D.primary : D.bgCard, color: ativo ? "#fff" : D.textSec, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
-                          {t.label} <span style={{ opacity:.65 }}>{n}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <BarraFiltros
+                    periodo={perLog} setPeriodo={setPerLog}
+                    timestamps={logs.map(l=>l.timestamp)} total={noPer.length}
+                    rotuloItem="registro" D={D} isMobile={isMobile}
+                    busca={buscaLog} setBusca={setBuscaLog} placeholderBusca="Buscar no histórico..." mostrarBusca={logs.length > 8}
+                    tipos={TIPOS_LOG.filter(t => t.id === "tudo" || noPer.some(l => tipoLog(l) === t.id))
+                            .map(t => ({ id:t.id, label:t.label, cor: t.id==="tudo"?D.primary:D.accent,
+                                         n: t.id==="tudo" ? noPer.length : noPer.filter(l => tipoLog(l) === t.id).length }))}
+                    tipoAtivo={filtroLog} setTipo={setFiltroLog} rotuloTipo="Todos os tipos" />
 
                   {filtrados.length === 0 ? (
                     <div style={{ background:D.bgCard, borderRadius:12, padding:32, textAlign:"center", boxShadow:D.shadow, border:`1px solid ${D.border}`, color:D.textMut, fontSize:13, fontFamily:D.fontBody }}>

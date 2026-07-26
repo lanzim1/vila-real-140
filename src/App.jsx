@@ -271,10 +271,11 @@ const UpgradeCard = ({ recurso, planoNecessario, isMobile }) => {
 };
 
 // ── Top Bar ──
-const TopBar = ({ title, user, readOnly, nPendentes, moradores, onBuscar, onConfig, onPlano }) => {
+const TopBar = ({ title, user, readOnly, nPendentes, moradores, onBuscar, onConfig, onPlano, avisos, onIrPara }) => {
   const isMobile = useIsMobile();
   const [q, setQ] = useState("");
   const [menuAberto, setMenuAberto] = useState(false);
+  const [avisosAberto, setAvisosAberto] = useState(false);
   const hoje = new Date().toLocaleDateString("pt-BR", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
   const prefixo = user?.email ? user.email.split("@")[0] : "Usuário";
   const nome = prefixo.charAt(0).toUpperCase() + prefixo.slice(1);
@@ -323,17 +324,40 @@ const TopBar = ({ title, user, readOnly, nPendentes, moradores, onBuscar, onConf
           </div>
         )}
 
-        {/* Sino de notificações */}
-        <div style={{ position:"relative", display:"flex", alignItems:"center" }} title={`${nPendentes||0} cobrança(s) pendente(s)`}>
-          <span style={{ fontSize:19, opacity:.8 }}>🔔</span>
-          {nPendentes > 0 && (
-            <span style={{ position:"absolute", top:-6, right:-8, background:D.danger, color:"#fff", fontFamily:D.fontBody, fontSize:10, fontWeight:700, minWidth:16, height:16, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 4px", border:`2px solid ${D.bgCard}` }}>{nPendentes > 99 ? "99+" : nPendentes}</span>
+        {/* Sino de avisos: mostra tudo que precisa de atenção, de qualquer aba */}
+        {!readOnly && (
+        <div style={{ position:"relative" }}>
+          <button onClick={() => { setAvisosAberto(v=>!v); setMenuAberto(false); }} title={`${avisos?.length||0} aviso(s)`}
+            style={{ position:"relative", display:"flex", alignItems:"center", background:"none", border:"none", cursor:"pointer", padding:6, color: avisosAberto?D.accent:D.textSec }}>
+            <NavIcon id="sino" size={20} />
+            {avisos?.length > 0 && (
+              <span style={{ position:"absolute", top:0, right:0, background:D.danger, color:"#fff", fontFamily:D.fontBody, fontSize:10, fontWeight:700, minWidth:16, height:16, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 4px", border:`2px solid ${D.bgCard}` }}>{avisos.length > 99 ? "99+" : avisos.length}</span>
+            )}
+          </button>
+          {avisosAberto && (
+            <div style={{ position:"absolute", top:"calc(100% + 8px)", right: isMobile?-60:0, width: isMobile?290:340, background:D.bgCard, border:`1px solid ${D.border}`, borderRadius:D.radius, boxShadow:D.shadowMd || D.shadow, overflow:"hidden", zIndex:70, maxHeight:400, display:"flex", flexDirection:"column" }}>
+              <div style={{ padding:"12px 16px", borderBottom:`1px solid ${D.border}`, fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>
+                Avisos {avisos?.length ? `(${avisos.length})` : ""}
+              </div>
+              <div style={{ overflowY:"auto" }}>
+                {(!avisos || avisos.length === 0) ? (
+                  <div style={{ padding:"22px 16px", textAlign:"center", fontFamily:D.fontBody, fontSize:13, color:D.textMut }}>Tudo em dia. Nenhum aviso no momento.</div>
+                ) : avisos.map((av, i) => (
+                  <button key={i} onClick={() => { onIrPara && onIrPara(av.aba); setAvisosAberto(false); }}
+                    style={{ width:"100%", display:"flex", alignItems:"center", gap:11, padding:"12px 16px", background:"none", border:"none", borderBottom: i<avisos.length-1?`1px solid ${D.border}`:"none", cursor:"pointer", textAlign:"left", fontFamily:D.fontBody }}>
+                    <span style={{ width:30, height:30, borderRadius:8, background:D.muted, color:av.cor, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id={av.icon} size={15} /></span>
+                    <span style={{ flex:1, fontSize:12.5, color:D.text, minWidth:0, lineHeight:1.4 }}>{av.texto}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
+        )}
 
         {/* Perfil + menu */}
         <div style={{ position:"relative" }}>
-          <button onClick={()=>setMenuAberto(v=>!v)} style={{ display:"flex", alignItems:"center", gap:10, background:"none", border:"none", cursor:"pointer", padding:"4px 6px 4px 4px", borderRadius:D.radiusSm, fontFamily:D.fontBody }}>
+          <button onClick={()=>{ setMenuAberto(v=>!v); setAvisosAberto(false); }} style={{ display:"flex", alignItems:"center", gap:10, background:"none", border:"none", cursor:"pointer", padding:"4px 6px 4px 4px", borderRadius:D.radiusSm, fontFamily:D.fontBody }}>
             <div style={{ width:36, height:36, borderRadius:"50%", background:D.primary, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, flexShrink:0 }}>{inicial}</div>
             {!isMobile && (
               <div style={{ lineHeight:1.25, textAlign:"left" }}>
@@ -2180,6 +2204,7 @@ const NAV_ICON_PATHS = {
   evSol:       '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
   fxCash:      '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
   fxMoeda:     '<circle cx="12" cy="12" r="9"/><path d="M14.8 9.4a3 3 0 0 0-2.8-1.4c-1.7 0-2.7.8-2.7 2 0 2.8 5.8 1.3 5.8 4 0 1.3-1.1 2.1-2.9 2.1a3.2 3.2 0 0 1-3-1.5"/><path d="M12 6.5v11"/>',
+  sino:        '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   busca:       '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
   fechar:      '<path d="M18 6 6 18M6 6l12 12"/>',
   clock:       '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
@@ -2772,6 +2797,80 @@ export default function App() {
   };
 
   const cobMes = cobrancas.filter(c => c.mes === mesSel);
+
+  // ── Central de avisos: tudo que precisa da atenção do síndico, disponível em qualquer aba ──
+  const avisos = (() => {
+    if (!condominioId || readOnly) return [];
+    const DIAS = 86400000;
+    const agora = Date.now();
+    const diasDesde = (ts) => ts ? Math.floor((agora - ts) / DIAS) : 0;
+    const parseDataBR = (d) => { if (!d) return null; const [dd,mm,aa] = d.split("/").map(Number); return aa ? new Date(aa,mm-1,dd).getTime() : null; };
+    const lista = [];
+
+    // 1) Documentos vencidos ou vencendo em 30 dias
+    const docsAtencao = documentos.filter(d => { const st = situacaoDoc(d.vencimento); return st.dias !== null && st.dias <= 30; });
+    const docsVencidos = docsAtencao.filter(d => (situacaoDoc(d.vencimento).dias ?? 0) < 0);
+    if (docsAtencao.length) lista.push({
+      icon:"alerta", cor: docsVencidos.length ? D.danger : D.warning, aba:"documentos",
+      texto: docsVencidos.length
+        ? `${docsVencidos.length} documento${docsVencidos.length>1?"s":""} vencido${docsVencidos.length>1?"s":""}${docsAtencao.length>docsVencidos.length ? ` e ${docsAtencao.length-docsVencidos.length} vencendo` : ""}`
+        : `${docsAtencao.length} documento${docsAtencao.length>1?"s":""} vencendo em até 30 dias`,
+    });
+
+    // 2) Reservas aguardando aprovação
+    const reservasPend = reservas.filter(r => r.status === "pendente");
+    if (reservasPend.length) lista.push({ icon:"reservas", cor:D.warning, aba:"reservas", texto:`${reservasPend.length} reserva${reservasPend.length>1?"s":""} aguardando sua aprovação` });
+
+    // 3) Ocorrências sem solução há mais de 7 dias
+    const ocorrParadas = ocorrencias.filter(o => o.status !== "resolvida" && diasDesde(o.timestamp) >= 7);
+    if (ocorrParadas.length) lista.push({ icon:"ocorrencias", cor:D.danger, aba:"ocorrencias", texto:`${ocorrParadas.length} ocorrência${ocorrParadas.length>1?"s":""} sem solução há mais de 7 dias` });
+
+    // 4) Encomendas paradas há mais de 7 dias
+    const entregasParadas = entregas.filter(e => e.status === "aguardando" && diasDesde(e.timestamp) >= 7);
+    if (entregasParadas.length) lista.push({ icon:"entregas", cor:D.warning, aba:"entregas", texto:`${entregasParadas.length} encomenda${entregasParadas.length>1?"s":""} parada${entregasParadas.length>1?"s":""} há mais de 7 dias` });
+
+    // 5) Cobranças já em atraso no mês selecionado
+    const atrasadosMes = cobMes.filter(c => c.status === "atrasado");
+    if (atrasadosMes.length) lista.push({ icon:"multa", cor:D.danger, aba:"cobrancas", texto:`${atrasadosMes.length} cobrança${atrasadosMes.length>1?"s":""} em atraso em ${mesLabel(mesSel)}` });
+
+    // 6) Cobranças pendentes vencendo nos próximos 3 dias (avisa ANTES de virar atraso)
+    const hojeYMD = mesAtual();
+    if (mesSel === hojeYMD) {
+      const [ay, am] = mesSel.split("-").map(Number);
+      const vencimento = new Date(ay, am-1, diaVencimento, 23, 59, 59).getTime();
+      const diasParaVencer = Math.ceil((vencimento - agora) / DIAS);
+      const pendentesMes = cobMes.filter(c => c.status === "pendente");
+      if (diasParaVencer >= 1 && diasParaVencer <= 3 && pendentesMes.length) {
+        lista.push({ icon:"clock", cor:D.warning, aba:"cobrancas", texto:`${pendentesMes.length} cobrança${pendentesMes.length>1?"s":""} vence${pendentesMes.length>1?"m":""} em ${diasParaVencer===0?"hoje":diasParaVencer===1?"1 dia":`${diasParaVencer} dias`}` });
+      }
+    }
+
+    // 7) Despesas do mês atual ainda não pagas
+    const despesasPendMes = despesas.filter(d => d.mes === hojeYMD && d.status === "pendente");
+    if (despesasPendMes.length) lista.push({ icon:"despesas", cor:D.warning, aba:"despesas", texto:`${despesasPendMes.length} despesa${despesasPendMes.length>1?"s":""} de ${mesLabel(hojeYMD)} ainda não paga${despesasPendMes.length>1?"s":""}` });
+
+    // 8) Serviços pendentes há mais de 14 dias
+    const servicosParados = servicos.filter(s => s.status === "pendente" && (() => { const t = parseDataBR(s.dataAbertura); return t ? Math.floor((agora-t)/DIAS) >= 14 : false; })());
+    if (servicosParados.length) lista.push({ icon:"servicos", cor:D.warning, aba:"servicos", texto:`${servicosParados.length} serviço${servicosParados.length>1?"s":""} pendente${servicosParados.length>1?"s":""} há mais de 14 dias` });
+
+    // 9) Visitante/prestador sem saída registrada há mais de 24h (provável esquecimento)
+    const acessosEsquecidos = acessos.filter(a => !a.horaSaida && diasDesde(a.timestamp) >= 1);
+    if (acessosEsquecidos.length) lista.push({ icon:"acPorta", cor:D.danger, aba:"acessos", texto:`${acessosEsquecidos.length} acesso${acessosEsquecidos.length>1?"s":""} sem saída registrada há mais de 24h` });
+
+    // 10) Enquete aberta há mais de 30 dias sem encerrar
+    const enquetesParadas = enquetes.filter(e => e.status === "aberta" && diasDesde(e.timestamp) >= 30);
+    if (enquetesParadas.length) lista.push({ icon:"enquetes", cor:D.textSec, aba:"enquetes", texto:`${enquetesParadas.length} enquete${enquetesParadas.length>1?"s":""} aberta${enquetesParadas.length>1?"s":""} há mais de 30 dias` });
+
+    // 11) Assinatura perto de vencer ou expirada (não se aplica a cortesia)
+    if (infoAssinatura.estado === "expirado") {
+      lista.push({ icon:"assinatura", cor:D.danger, aba:"config", texto:"Sua assinatura expirou — algumas funções podem ficar limitadas" });
+    } else if (infoAssinatura.estado === "trial" && infoAssinatura.diasRestantes <= 5) {
+      lista.push({ icon:"assinatura", cor:D.warning, aba:"config", texto:`Teste grátis termina em ${infoAssinatura.diasRestantes} dia${infoAssinatura.diasRestantes!==1?"s":""}` });
+    }
+
+    return lista;
+  })();
+
   const pagos      = cobMes.filter(c => c.status === "pago").length;
   const pendentes  = cobMes.filter(c => c.status === "pendente").length;
   const atrasados  = cobMes.filter(c => c.status === "atrasado").length;
@@ -4489,7 +4588,7 @@ export default function App() {
         {/* ── Dashboard ── */}
         {aba === "dashboard" && (
           <div>
-            <TopBar title="Visão Geral" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Visão Geral" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile ? "16px 14px 80px" : "24px 28px 40px" }}>
 
               {/* Setup wizard — condomínio novo sem moradores */}
@@ -4753,45 +4852,7 @@ export default function App() {
                   </div>
                 ) : null;
 
-                // Avisos: o que precisa da atenção do síndico hoje, sem ele ir procurar aba por aba
-                const DIAS = 86400000;
-                const agora = Date.now();
-                const diasDesde = (ts) => ts ? Math.floor((agora - ts) / DIAS) : 0;
-                const avisos = [];
-
-                const docsAtencao = documentos.filter(d => { const st = situacaoDoc(d.vencimento); return st.dias !== null && st.dias <= 30; });
-                const docsVencidos = docsAtencao.filter(d => (situacaoDoc(d.vencimento).dias ?? 0) < 0);
-                if (docsAtencao.length) avisos.push({
-                  icon:"alerta", cor: docsVencidos.length ? D.danger : D.warning, aba:"documentos",
-                  texto: docsVencidos.length
-                    ? `${docsVencidos.length} documento${docsVencidos.length>1?"s":""} vencido${docsVencidos.length>1?"s":""}${docsAtencao.length>docsVencidos.length ? ` e ${docsAtencao.length-docsVencidos.length} vencendo` : ""}`
-                    : `${docsAtencao.length} documento${docsAtencao.length>1?"s":""} vencendo em até 30 dias`,
-                });
-
-                const reservasPend = reservas.filter(r => r.status === "pendente");
-                if (reservasPend.length) avisos.push({
-                  icon:"reservas", cor:D.warning, aba:"reservas",
-                  texto:`${reservasPend.length} reserva${reservasPend.length>1?"s":""} aguardando sua aprovação`,
-                });
-
-                const ocorrParadas = ocorrencias.filter(o => o.status !== "resolvida" && diasDesde(o.timestamp) >= 7);
-                if (ocorrParadas.length) avisos.push({
-                  icon:"ocorrencias", cor:D.danger, aba:"ocorrencias",
-                  texto:`${ocorrParadas.length} ocorrência${ocorrParadas.length>1?"s":""} sem solução há mais de 7 dias`,
-                });
-
-                const entregasParadas = entregas.filter(e => e.status === "aguardando" && diasDesde(e.timestamp) >= 7);
-                if (entregasParadas.length) avisos.push({
-                  icon:"entregas", cor:D.warning, aba:"entregas",
-                  texto:`${entregasParadas.length} encomenda${entregasParadas.length>1?"s":""} parada${entregasParadas.length>1?"s":""} há mais de 7 dias`,
-                });
-
-                const atrasadosMes = cobMes.filter(c => c.status === "atrasado");
-                if (atrasadosMes.length) avisos.push({
-                  icon:"multa", cor:D.danger, aba:"cobrancas",
-                  texto:`${atrasadosMes.length} cobrança${atrasadosMes.length>1?"s":""} em atraso em ${mesLabel(mesSel)}`,
-                });
-
+                // O card usa a mesma lista central (calculada uma vez, no nível do App)
                 const avisosCard = avisos.length === 0 ? null : (
                   <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.warning}`, overflow:"hidden" }}>
                     <div style={{ padding: isMobile?"14px 16px 10px":"16px 22px 12px", display:"flex", alignItems:"center", gap:9 }}>
@@ -4845,7 +4906,7 @@ export default function App() {
         {/* ── Cobranças ── */}
         {aba === "cobrancas" && (
           <div>
-            <TopBar title="Cobranças" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Cobranças" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -5086,7 +5147,7 @@ export default function App() {
         {/* ── Moradores ── */}
         {aba === "moradores" && (
           <div>
-            <TopBar title="Moradores" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Moradores" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ações */}
@@ -5240,7 +5301,7 @@ export default function App() {
 
         {aba === "despesas" && (
           <div>
-            <TopBar title="Água e Luz" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Água e Luz" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -5390,14 +5451,14 @@ export default function App() {
         {/* Trava de plano: abas bloqueadas para planos inferiores */}
         {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas","agenda","fluxoCaixa","ocorrencias","enquetes"].includes(aba) && !podeUsar(aba) && (
           <div>
-            <TopBar title={{servicos:"Serviços e Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa",ocorrencias:"Ocorrências",enquetes:"Enquetes"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title={{servicos:"Serviços e Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa",ocorrencias:"Ocorrências",enquetes:"Enquetes"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <UpgradeCard recurso={aba} planoNecessario={RECURSO_PLANO[aba]} isMobile={isMobile} />
           </div>
         )}
 
         {aba === "servicos" && podeUsar("servicos") && (
           <div>
-            <TopBar title="Serviços e Manutenção" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Serviços e Manutenção" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -5501,7 +5562,7 @@ export default function App() {
         {/* ── Reservas ── */}
         {aba === "reservas" && podeUsar("reservas") && (
           <div>
-            <TopBar title="Reservas" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Reservas" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {(() => {
@@ -5680,7 +5741,7 @@ export default function App() {
         {/* ── Acessos ── */}
         {aba === "acessos" && podeUsar("acessos") && (
           <div>
-            <TopBar title="Controle de Acessos" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Controle de Acessos" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -5786,7 +5847,7 @@ export default function App() {
         {/* ── Comunicados ── */}
         {aba === "comunicados" && podeUsar("comunicados") && (
           <div>
-            <TopBar title="Comunicados" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Comunicados" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ação */}
@@ -5853,7 +5914,7 @@ export default function App() {
         {/* ── Documentos ── */}
         {aba === "documentos" && podeUsar("documentos") && (
           <div>
-            <TopBar title="Documentos" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Documentos" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ação */}
@@ -5978,7 +6039,7 @@ export default function App() {
           const aporteSugerido= arrecadadoMes * (pctFundo/100);
           return (
           <div>
-            <TopBar title="Fundo de Reserva" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Fundo de Reserva" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Saldo do fundo — hero */}
@@ -6084,7 +6145,7 @@ export default function App() {
           const retiradas = todasRetiradas.filter(e => noPeriodo(e.timestamp, perEntrega));
           return (
           <div>
-            <TopBar title="Controle de Entregas" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Controle de Entregas" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Cabeçalho + ação */}
@@ -6201,7 +6262,7 @@ export default function App() {
           const votosDaEnquete = (enqId) => votos.filter(v => v.enqueteId === enqId);
           return (
           <div>
-            <TopBar title="Enquetes" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Enquetes" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
@@ -6307,7 +6368,7 @@ export default function App() {
           ];
           return (
           <div>
-            <TopBar title="Ocorrências" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Ocorrências" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Filtros */}
@@ -6387,7 +6448,7 @@ export default function App() {
 
           return (
           <div>
-            <TopBar title="Fluxo de Caixa" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Fluxo de Caixa" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               {/* Saldo atual */}
@@ -6533,7 +6594,7 @@ export default function App() {
 
           return (
           <div>
-            <TopBar title="Agenda" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Agenda" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
@@ -6637,7 +6698,7 @@ export default function App() {
         {/* ── Histórico ── */}
         {aba === "historico" && podeUsar("historico") && (
           <div>
-            <TopBar title="Histórico de Atividades" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Histórico de Atividades" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
@@ -6717,7 +6778,7 @@ export default function App() {
         {/* ── Configurações ── */}
         {aba === "config" && (
           <div>
-            <TopBar title="Configurações" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} />
+            <TopBar title="Configurações" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Configurações</h2>
             <p style={{ color:"#6B7A8D", margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>

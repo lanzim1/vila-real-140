@@ -6722,8 +6722,9 @@ export default function App() {
             <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Configurações</h2>
             <p style={{ color:"#6B7A8D", margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>
 
-            {/* Card de assinatura */}
-            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
+            {/* Card de assinatura — PLANO */}
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.accent}`, marginBottom:20 }}>
+              <div style={{ fontFamily:D.fontBody, fontSize:10.5, fontWeight:700, color:D.accent, textTransform:"uppercase", letterSpacing:"1px", marginBottom:8 }}>Plano</div>
               <h3 style={{ color:D.text, margin:"0 0 16px", fontSize:14, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em", display:"flex", alignItems:"center", gap:8 }}><span style={{ color:D.accent, display:"flex" }}><NavIcon id="assinatura" size={17} /></span> Sua assinatura</h3>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
                 <div>
@@ -6765,7 +6766,8 @@ export default function App() {
                   (parseFloat(jurosPercentMes)||0) !== (parseFloat(condominio?.jurosPercentMes)||0)
                 ));
               return (
-              <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
+              <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.warning}`, marginBottom:20 }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:10.5, fontWeight:700, color:D.warning, textTransform:"uppercase", letterSpacing:"1px", marginBottom:8 }}>Financeiro</div>
                 <h3 style={{ color:D.text, margin:"0 0 4px", fontSize:15, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Parâmetros de cobrança</h3>
                 <p style={{ color:D.textSec, fontSize:12.5, margin:"0 0 20px" }}>Ajuste os valores e clique em salvar no fim do card.</p>
 
@@ -6843,9 +6845,34 @@ export default function App() {
             })()}
 
             {/* Card de AÇÕES */}
-            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, marginBottom:20 }}>
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.danger}`, marginBottom:20 }}>
+              <div style={{ fontFamily:D.fontBody, fontSize:10.5, fontWeight:700, color:D.danger, textTransform:"uppercase", letterSpacing:"1px", marginBottom:8 }}>Ações</div>
               <h3 style={{ color:D.text, margin:"0 0 4px", fontSize:15, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Ações</h3>
               <p style={{ color:D.textSec, fontSize:12.5, margin:"0 0 20px" }}>Estas ações têm efeito imediato e não fazem parte do salvamento acima.</p>
+
+              {/* Iniciar cobrança — marco zero (a única ação de fato irreversível do card) */}
+              <div style={{ background:D.dangerBg, border:`1px solid #FECACA`, borderRadius:D.radius, padding:"16px 18px" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                  <span style={{ color:D.danger, display:"flex" }}><NavIcon id="iniciarCobranca" size={17} /></span>
+                  <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>Iniciar cobrança a partir do próximo mês</span>
+                  <span style={{ marginLeft:"auto", fontSize:9.5, fontWeight:700, color:D.danger, background:"#fff", padding:"3px 9px", borderRadius:20, whiteSpace:"nowrap", flexShrink:0 }}>IRREVERSÍVEL</span>
+                </div>
+                <p style={{ color:D.textSec, fontSize:12, margin:"0 0 12px" }}>
+                  Define o <b>mês que vem</b> como o primeiro mês de cobrança. As cobranças pendentes de meses anteriores (deste mês pra trás) são <b>removidas</b>, e o sistema passa a gerar e cobrar somente a partir do próximo mês. Não mexe no dia de vencimento nem em pagamentos já registrados. Ideal para o início da operação.
+                </p>
+                {marcoZero && (
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginBottom:12, background:"#fff", padding:"10px 12px", borderRadius:D.radiusSm, border:`1px solid ${D.border}` }}>
+                    Cobrança ativa a partir de: <b>{(() => { const [y,m]=marcoZero.split("-"); return mesLabel(`${y}-${m}`); })()}</b>
+                  </div>
+                )}
+                {!readOnly && (
+                  <button onClick={() => { if(window.confirm("Iniciar a cobrança só a partir do mês que vem?\n\n• As cobranças pendentes deste mês e anteriores serão REMOVIDAS\n• O sistema passa a cobrar a partir do próximo mês\n• Pagamentos já registrados e o dia de vencimento NÃO são afetados")) zerarAtrasados(); }} style={{ padding:"11px 20px", background:D.danger, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                    Iniciar cobrança no próximo mês
+                  </button>
+                )}
+              </div>
+
+              <hr style={{ margin:"24px 0", border:"none", borderTop:`1px solid ${D.border}` }} />
 
               {/* Backup completo */}
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
@@ -6860,27 +6887,6 @@ export default function App() {
               </button>
 
               <div style={{ height:1, background:D.border, margin:"0 0 22px" }} />
-
-              {/* Iniciar cobrança — marco zero */}
-              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-                <span style={{ color:D.accent, display:"flex" }}><NavIcon id="iniciarCobranca" size={17} /></span>
-                <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>Iniciar cobrança a partir do próximo mês</span>
-              </div>
-              <p style={{ color:D.textSec, fontSize:12, margin:"0 0 12px" }}>
-                Define o <b>mês que vem</b> como o primeiro mês de cobrança. As cobranças pendentes de meses anteriores (deste mês pra trás) são <b>removidas</b>, e o sistema passa a gerar e cobrar somente a partir do próximo mês. Não mexe no dia de vencimento nem em pagamentos já registrados. Ideal para o início da operação.
-              </p>
-              {marcoZero && (
-                <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginBottom:12, background:D.muted, padding:"10px 12px", borderRadius:D.radiusSm }}>
-                  Cobrança ativa a partir de: <b>{(() => { const [y,m]=marcoZero.split("-"); return mesLabel(`${y}-${m}`); })()}</b>
-                </div>
-              )}
-              {!readOnly && (
-                <button onClick={() => { if(window.confirm("Iniciar a cobrança só a partir do mês que vem?\n\n• As cobranças pendentes deste mês e anteriores serão REMOVIDAS\n• O sistema passa a cobrar a partir do próximo mês\n• Pagamentos já registrados e o dia de vencimento NÃO são afetados")) zerarAtrasados(); }} style={{ padding:"11px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
-                  Iniciar cobrança no próximo mês
-                </button>
-              )}
-
-              <hr style={{ margin:"24px 0", border:"none", borderTop:`1px solid ${D.border}` }} />
 
               {/* Disparar e-mails */}
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
@@ -6911,8 +6917,9 @@ export default function App() {
               )}
             </div>
 
-            {/* Card de INFO */}
-            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}` }}>
+            {/* Card de INFO — CONTA */}
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.textMut}` }}>
+              <div style={{ fontFamily:D.fontBody, fontSize:10.5, fontWeight:700, color:D.textMut, textTransform:"uppercase", letterSpacing:"1px", marginBottom:8 }}>Conta</div>
               <h3 style={{ color:D.text, margin:"0 0 12px", fontSize:15, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em", display:"flex", alignItems:"center", gap:8 }}><span style={{ color:D.accent, display:"flex" }}><NavIcon id="moradores" size={17} /></span> Conta conectada</h3>
               <div style={{ fontSize:13, color:D.textSec, lineHeight:1.8, background:D.muted, borderRadius:D.radiusSm, padding:"12px 16px", border:`1px solid ${D.border}` }}>
                 <div>E-mail: <b style={{color:D.text}}>{user?.email}</b></div>

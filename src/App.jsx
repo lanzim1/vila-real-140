@@ -2853,6 +2853,9 @@ export default function App() {
   const [multaPercent, setMultaPercent]         = useState(2);
   const [jurosPercentMes, setJurosPercentMes]   = useState(1);
   const [marcoZero, setMarcoZero]               = useState(null);
+  // Enquanto a config do condomínio não chega do Firestore, marcoZero é null — e agir nesse
+  // momento gerava cobrança de mês que não deveria ser cobrado. Só operamos após carregar.
+  const [configCarregada, setConfigCarregada]   = useState(false);
   const [enviandoEmails, setEnviandoEmails] = useState(false);
   const [mesSel, setMesSel]         = useState(mesAtual);
   const [toast, setToast]           = useState(null);
@@ -3064,6 +3067,9 @@ export default function App() {
         setMultaPercent(data.multaPercent ?? 2);
         setJurosPercentMes(data.jurosPercentMes ?? 1);
         setMarcoZero(data.marcoZero ?? null);
+        setConfigCarregada(true);
+      } else {
+        setConfigCarregada(true); // condomínio sem documento: também é um estado conhecido
       }
     });
     // Observações: doc com id composto condominioId_mes
@@ -3400,6 +3406,7 @@ export default function App() {
     // Abrir o portal do morador (ou entrar como visitante) NÃO pode gerar cobrança.
     // Antes, abrir um link de portal criava cobranças para todos os moradores.
     if (portalMoradorId || readOnly) return;
+    if (!configCarregada) return;  // sem a config, não dá para saber o que pode ser cobrado
     // Não gera cobranças para meses anteriores ao início da cobrança (marco zero)
     const mesInicio = marcoZero ? marcoZero.slice(0,7) : null; // ex: "2026-08"
     if (mesInicio && mes < mesInicio) return;
@@ -3415,6 +3422,7 @@ export default function App() {
   const atualizarAtrasados = async () => {
     if (!condominioId) return;
     if (portalMoradorId || readOnly) return;  // leitura não altera status de cobrança
+    if (!configCarregada) return;
     const hoje = new Date();
     hoje.setHours(0,0,0,0);
     const mz = marcoZero ? new Date(marcoZero + "T00:00:00") : null;
@@ -3427,8 +3435,9 @@ export default function App() {
       const antesDoMarco = mz && venc < mz; // venceu antes do início da contagem
       const ref = doc(db, "cobrancas", c.id);
       if (antesDoMarco) {
-        // Antes do marco zero não conta como atraso: garante "pendente"
-        if (c.status === "atrasado") { batch.set(ref, { status:"pendente" }, { merge:true }); mudou = true; }
+        // Antes do marco zero a cobrança não deveria nem existir: o síndico definiu que
+        // esses meses não são cobrados. Remove (nunca mexe em cobrança PAGA — isso é histórico).
+        batch.delete(ref); mudou = true;
       } else if (c.status === "pendente" && hoje > venc) {
         // A partir do marco zero, marca atraso normalmente
         batch.set(ref, { status:"atrasado" }, { merge:true }); mudou = true;
@@ -3477,11 +3486,14 @@ export default function App() {
   useEffect(() => {
     // Portal do morador e visitante são somente leitura: não geram nem alteram cobrança
     if (portalMoradorId || readOnly) return;
+    // Espera a config chegar: agir com marcoZero ainda indefinido recriava cobranças
+    // de meses que o síndico tinha acabado de limpar.
+    if (!configCarregada) return;
     if (user && condominioId && moradores.length > 0) {
       garantirMes(mesSel);
       atualizarAtrasados();
     }
-  }, [user, condominioId, moradores.length, cobrancas.length, diaVencimento, marcoZero, readOnly]);
+  }, [user, condominioId, moradores.length, cobrancas.length, diaVencimento, marcoZero, readOnly, configCarregada]);
 
   const mudarMes = async (m) => {
     setMesSel(m);

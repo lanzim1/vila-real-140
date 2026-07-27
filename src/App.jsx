@@ -3454,33 +3454,53 @@ export default function App() {
     const marcoStr = `${proxMesData.getFullYear()}-${String(proxMesData.getMonth()+1).padStart(2,"0")}-01`;
     const proxMesYM = `${proxMesData.getFullYear()}-${String(proxMesData.getMonth()+1).padStart(2,"0")}`;
     const mesAtualYM = mesAtual();
-    // 1. Define o marco zero (NÃO altera o dia de vencimento)
-    try { await setDoc(doc(db, "condominios", condominioId), { marcoZero: marcoStr }, { merge:true }); } catch(e) {}
     const mesInicio = marcoStr.slice(0,7); // ex: "2026-08" — 1º mês que será cobrado
-    // 2. Remove cobranças NÃO pagas de meses anteriores ao início (junho, julho, etc.)
-    let removidas = 0;
-    for (const c of cobrancas) {
-      if (c.mes < mesInicio && c.status !== "pago") {
-        try { await deleteDoc(doc(db, "cobrancas", c.id)); removidas++; } catch(e) {}
-      }
+
+    // 1. Define o marco zero. Se isto falhar, nada mais faz sentido: aborta e avisa.
+    //    Antes o erro era engolido e o botão dizia "Pronto!" mesmo sem ter gravado nada.
+    try {
+      await setDoc(doc(db, "condominios", condominioId), { marcoZero: marcoStr }, { merge:true });
+    } catch (e) {
+      console.error("Erro ao gravar o marco de início da cobrança:", e);
+      showToast("Não foi possível salvar o início da cobrança. Verifique sua conexão e as permissões do Firebase.", "error");
+      return;
     }
-    // 3. Qualquer atrasado remanescente (de agosto em diante, se houver) volta a pendente
-    let n = 0;
+
+    // 2. Remove cobranças NÃO pagas de meses anteriores ao início
+    const alvo = cobrancas.filter(c => c.mes < mesInicio && c.status !== "pago");
+    let removidas = 0, falhas = 0;
+    for (const c of alvo) {
+      try { await deleteDoc(doc(db, "cobrancas", c.id)); removidas++; }
+      catch (e) { falhas++; console.error(`Erro ao remover cobrança ${c.id}:`, e); }
+    }
+
+    // 3. Qualquer atrasado remanescente (do marco em diante) volta a pendente
     for (const c of cobrancas) {
       if (c.mes >= mesInicio && c.status === "atrasado") {
-        try { await setDoc(doc(db, "cobrancas", c.id), { status:"pendente" }, { merge:true }); n++; } catch(e) {}
+        try { await setDoc(doc(db, "cobrancas", c.id), { status:"pendente" }, { merge:true }); }
+        catch (e) { falhas++; console.error(`Erro ao reverter cobrança ${c.id}:`, e); }
       }
     }
-    // 4. Observação do mês atual
+
+    // 4. Observação do mês atual (não crítica: se falhar, segue)
     try {
       await setDoc(doc(db, "observacoes", `${condominioId}_${mesAtualYM}`), {
         condominioId, mes: mesAtualYM,
         texto: `Início de operação: as cobranças começam em ${mesLabel(proxMesYM)}. Meses anteriores não são cobrados.`,
         atualizadoEm: new Date().toLocaleString("pt-BR"),
       }, { merge:true });
-    } catch(e) {}
-    registrarLog("🔄", `Cobranças anteriores removidas (${removidas}) — cobrança inicia em ${mesLabel(proxMesYM)}`);
-    showToast(`Pronto! ${removidas} cobrança(s) anterior(es) removida(s). A cobrança começa em ${mesLabel(proxMesYM)}.`);
+    } catch (e) { console.error("Erro ao salvar a observação do mês:", e); }
+
+    registrarLog("🔄", `Início da cobrança definido para ${mesLabel(proxMesYM)} — ${removidas} cobrança(s) removida(s)${falhas?`, ${falhas} falha(s)`:""}`);
+
+    // Relato honesto do que realmente aconteceu
+    if (falhas > 0) {
+      showToast(`${removidas} cobrança(s) removida(s), mas ${falhas} falhou(ram). Recarregue a página e tente de novo.`, "error");
+    } else if (alvo.length === 0) {
+      showToast(`Início da cobrança definido para ${mesLabel(proxMesYM)}. Não havia cobrança anterior para remover.`);
+    } else {
+      showToast(`Pronto! ${removidas} cobrança(s) anterior(es) removida(s). A cobrança começa em ${mesLabel(proxMesYM)}.`);
+    }
   };
 
   useEffect(() => {
@@ -7721,11 +7741,28 @@ export default function App() {
                 <p style={{ color:D.textSec, fontSize:12, margin:"0 0 12px" }}>
                   Define o <b>mês que vem</b> como o primeiro mês de cobrança. As cobranças pendentes de meses anteriores (deste mês pra trás) são <b>removidas</b>, e o sistema passa a gerar e cobrar somente a partir do próximo mês. Não mexe no dia de vencimento nem em pagamentos já registrados. Ideal para o início da operação.
                 </p>
-                {marcoZero && (
-                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginBottom:12, background:"#fff", padding:"10px 12px", borderRadius:D.radiusSm, border:`1px solid ${D.border}` }}>
-                    Cobrança ativa a partir de: <b>{(() => { const [y,m]=marcoZero.split("-"); return mesLabel(`${y}-${m}`); })()}</b>
-                  </div>
-                )}
+                {/* Estado real: mostra o marco gravado e denuncia cobrança que não deveria existir */}
+                {(() => {
+                  const mesInicio = marcoZero ? marcoZero.slice(0,7) : null;
+                  const orfas = mesInicio ? cobrancas.filter(c => c.mes < mesInicio && c.status !== "pago") : [];
+                  return (
+                    <div style={{ marginBottom:12 }}>
+                      <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, background:"#fff", padding:"10px 12px", borderRadius:D.radiusSm, border:`1px solid ${D.border}` }}>
+                        {marcoZero
+                          ? <>Cobrança ativa a partir de: <b>{(() => { const [y,m]=marcoZero.split("-"); return mesLabel(`${y}-${m}`); })()}</b></>
+                          : <>Nenhum início definido ainda — o sistema cobra todos os meses cadastrados.</>}
+                      </div>
+                      {orfas.length > 0 && (
+                        <div style={{ display:"flex", alignItems:"center", gap:9, background:D.warningBg, border:`1px solid #FDE68A`, borderRadius:D.radiusSm, padding:"10px 12px", marginTop:8 }}>
+                          <span style={{ color:D.warning, display:"flex", flexShrink:0 }}><NavIcon id="alerta" size={15} /></span>
+                          <span style={{ fontFamily:D.fontBody, fontSize:12, color:"#92400E" }}>
+                            Ainda existem <b>{orfas.length}</b> cobrança(s) de meses anteriores ao início ({[...new Set(orfas.map(c=>mesLabel(c.mes)))].join(", ")}). Clique no botão abaixo para limpar.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 {!readOnly && (
                   <button onClick={() => { if(window.confirm("Iniciar a cobrança só a partir do mês que vem?\n\n• As cobranças pendentes deste mês e anteriores serão REMOVIDAS\n• O sistema passa a cobrar a partir do próximo mês\n• Pagamentos já registrados e o dia de vencimento NÃO são afetados")) zerarAtrasados(); }} style={{ padding:"11px 20px", background:D.danger, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
                     Iniciar cobrança no próximo mês

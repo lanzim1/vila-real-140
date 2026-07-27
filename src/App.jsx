@@ -1789,16 +1789,25 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
       setAcessoNegado(false);
       setMorador({ id:d.id, ...dados });
     });
-    const u2 = onSnapshot(
-      query(collection(db, "cobrancas"), where("moradorId","==",moradorId)),
-      s => setCobrancas(s.docs.map(d => d.data()).sort((a,b) => b.mes.localeCompare(a.mes)))
-    );
-    const u3 = onSnapshot(
-      query(collection(db, "reservas"), where("moradorId","==",moradorId)),
-      s => setReservasMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
-    );
-    return () => { u1(); u2(); u3(); };
+    return () => { u1(); };
   }, [moradorId]);
+
+  // Cobranças do morador — filtradas TAMBÉM pelo condomínio.
+  // Antes buscava só por moradorId: cobranças órfãs (sem condominioId ou de outro
+  // condomínio) apareciam no portal e o síndico nem sabia que existiam.
+  useEffect(() => {
+    if (!moradorId || !morador?.condominioId) return;
+    const doCond = (arr) => arr.filter(x => x.condominioId === morador.condominioId);
+    const uCob = onSnapshot(
+      query(collection(db, "cobrancas"), where("moradorId","==",moradorId)),
+      s => setCobrancas(doCond(s.docs.map(d => ({ id:d.id, ...d.data() }))).sort((a,b) => b.mes.localeCompare(a.mes)))
+    );
+    const uRes = onSnapshot(
+      query(collection(db, "reservas"), where("moradorId","==",moradorId)),
+      s => setReservasMor(doCond(s.docs.map(d => ({ id:d.id, ...d.data() }))).sort((a,b) => b.timestamp - a.timestamp))
+    );
+    return () => { uCob(); uRes(); };
+  }, [moradorId, morador?.condominioId]);
 
   // Documentos que o síndico liberou para os moradores (convenção, regimento, atas...)
   useEffect(() => {
@@ -1833,7 +1842,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     // Ocorrências deste morador
     const u5e = onSnapshot(
       query(collection(db, "ocorrencias"), where("moradorId","==",moradorId)),
-      s => setOcorrenciasMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
+      s => setOcorrenciasMor(s.docs.map(d => ({ id:d.id, ...d.data() })).filter(o => o.condominioId === morador?.condominioId).sort((a,b) => b.timestamp - a.timestamp))
     );
     // Enquetes do condomínio e votos deste morador
     const u6e = onSnapshot(
@@ -3447,6 +3456,46 @@ export default function App() {
   };
 
   // ── Zerar atrasos: este mês limpo, contagem começa no mês que vem ──
+  // Cobranças órfãs: têm moradorId de um morador daqui, mas condominioId ausente ou de outro
+  // condomínio. O síndico nunca as via (a lista dele filtra por condominioId), mas o portal
+  // do morador as exibia. Esta rotina varre por morador e limpa o que não pertence a este condomínio.
+  const [limpandoOrfas, setLimpandoOrfas] = useState(false);
+  const limparCobrancasOrfas = async () => {
+    if (!condominioId || limpandoOrfas) return;
+    setLimpandoOrfas(true);
+    try {
+      const orfas = [];
+      for (const m of moradores) {
+        const snap = await getDocs(query(collection(db, "cobrancas"), where("moradorId", "==", m.id)));
+        snap.forEach(d => {
+          const c = d.data();
+          if (c.condominioId !== condominioId) orfas.push({ id:d.id, unidade:m.unidade, mes:c.mes, cond:c.condominioId || "(vazio)" });
+        });
+      }
+      if (orfas.length === 0) {
+        showToast("Nenhuma cobrança órfã encontrada. Está tudo consistente.");
+        return;
+      }
+      const resumo = orfas.slice(0, 8).map(o => `${o.unidade} — ${o.mes} (condomínio: ${o.cond})`).join("\n");
+      if (!window.confirm(
+        `Encontradas ${orfas.length} cobrança(s) que não pertencem a este condomínio:\n\n${resumo}` +
+        (orfas.length > 8 ? `\n...e mais ${orfas.length - 8}` : "") +
+        `\n\nEssas cobranças aparecem no portal do morador mas não no seu painel. Remover?`
+      )) return;
+
+      const batch = writeBatch(db);
+      orfas.forEach(o => batch.delete(doc(db, "cobrancas", o.id)));
+      await batch.commit();
+      registrarLog("🧹", `Limpeza: ${orfas.length} cobrança(s) órfã(s) removida(s)`);
+      showToast(`${orfas.length} cobrança(s) órfã(s) removida(s).`);
+    } catch (e) {
+      console.error("Erro ao limpar cobranças órfãs:", e);
+      showToast("Não foi possível concluir a limpeza. Verifique sua conexão e tente de novo.", "error");
+    } finally {
+      setLimpandoOrfas(false);
+    }
+  };
+
   const zerarAtrasados = async () => {
     if (!condominioId) return;
     const hoje = new Date();
@@ -7771,6 +7820,20 @@ export default function App() {
               </div>
 
               <hr style={{ margin:"24px 0", border:"none", borderTop:`1px solid ${D.border}` }} />
+
+              {/* Verificação de consistência */}
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                <span style={{ color:D.accent, display:"flex" }}><NavIcon id="busca" size={17} /></span>
+                <span style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text }}>Verificar cobranças inconsistentes</span>
+              </div>
+              <p style={{ color:D.textSec, fontSize:12, margin:"0 0 12px", lineHeight:1.6 }}>
+                Procura cobranças que aparecem no portal do morador mas não no seu painel — normalmente sobras de testes ou de versões antigas do sistema. Mostra o que encontrar antes de remover.
+              </p>
+              <button onClick={limparCobrancasOrfas} disabled={limpandoOrfas} style={{ display:"flex", alignItems:"center", gap:7, padding:"10px 18px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: limpandoOrfas?"default":"pointer", opacity: limpandoOrfas?.6:1, fontFamily:D.fontBody, marginBottom:22, width: isMobile?"100%":"auto", justifyContent:"center" }}>
+                <NavIcon id="busca" size={15} /> {limpandoOrfas ? "Verificando..." : "Verificar e limpar"}
+              </button>
+
+              <hr style={{ margin:"0 0 24px", border:"none", borderTop:`1px solid ${D.border}` }} />
 
               {/* Backup completo */}
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>

@@ -88,6 +88,9 @@ const modoVisitante = typeof window !== "undefined" &&
 const portalMoradorId = typeof window !== "undefined"
   ? new URLSearchParams(window.location.search).get("morador")
   : null;
+const portalToken = typeof window !== "undefined"
+  ? new URLSearchParams(window.location.search).get("t")
+  : null;
 
 // condomínio passado no link do morador/visitante (ex: ?cond=vilareal140&morador=ID)
 const condParam = typeof window !== "undefined"
@@ -243,7 +246,7 @@ const UpgradeCard = ({ recurso, planoNecessario, isMobile }) => {
   return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"60vh", padding: isMobile?"20px":"40px" }}>
       <div style={{ background:D.bgCard, borderRadius:D.radiusXl, border:`1px solid ${D.border}`, boxShadow:D.shadow, padding: isMobile?"32px 24px":"48px 40px", maxWidth:460, textAlign:"center" }}>
-        <div style={{ width:64, height:64, borderRadius:16, background:D.secondary, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", fontSize:30 }}>🔒</div>
+        <div style={{ width:64, height:64, borderRadius:16, background:D.secondary, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", color:D.accent }}><NavIcon id="lock" size={30} /></div>
         <div style={{ display:"inline-block", background: p.cor||D.accent, color:"#fff", fontSize:12, fontWeight:700, padding:"4px 14px", borderRadius:20, marginBottom:16, fontFamily:D.fontBody }}>
           Plano {p.nome}
         </div>
@@ -743,6 +746,24 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
       // 1. Cria a conta (faz login automático)
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
       const uid = cred.user.uid;
+
+      // 1b. Se este e-mail foi convidado por um síndico, entra no condomínio dele
+      //     com o papel definido no convite — em vez de criar um condomínio novo.
+      const convSnap = await getDoc(doc(db, "convites", email.trim().toLowerCase()));
+      if (convSnap.exists() && convSnap.data().condominioId) {
+        const conv = convSnap.data();
+        await setDoc(doc(db, "usuarios", uid), {
+          email: email.trim(),
+          nome: nomeSindico.trim(),
+          condominioId: conv.condominioId,
+          papel: conv.papel || "sindico",
+          criadoEm: new Date().toLocaleDateString("pt-BR"),
+          aceitouTermos: true, aceitouTermosEm: new Date().toISOString(),
+        });
+        await deleteDoc(doc(db, "convites", email.trim().toLowerCase())).catch(()=>{});
+        return; // o onAuthStateChanged assume daqui
+      }
+
       const condId = gerarCondId(nomeCond);
       const plano = planoPorTamanho(numApt);
       const aceiteEm = new Date().toISOString();
@@ -960,7 +981,6 @@ const LandingPage = ({ onEntrar, onCadastrar }) => {
     { nome:"Avançado", preco:249, precoAnual:2490, apt:"51 a 100 apartamentos", destaque:false, resumo:"Gestão completa, do zero ao fim.", recursos:["Tudo do Padrão +","Comunicados e avisos","Ocorrências e enquetes","Controle de entregas","Fundo de reserva","Documentos e agenda","Suporte via WhatsApp"] },
   ];
 
-  const btnPrimario = (extra={}) => ({ padding:"14px 28px", background:D.primary, border:"none", borderRadius:D.radius, color:"#fff", fontSize:16, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody, boxShadow:"0 8px 24px rgba(26,46,64,0.28)", ...extra });
 
   return (
     <div style={{ fontFamily:D.fontBody, background:D.bgApp, minHeight:"100vh" }}>
@@ -1648,6 +1668,92 @@ const AdminPanel = ({ onSair }) => {
 
 // ── App Principal ──
 // ── Portal do Morador ──
+// Recibo de pagamento em PDF. No nível de módulo para ser usado tanto pelo síndico
+// quanto pelo portal do morador, sem duplicar código.
+const gerarReciboPDF = (morador, dataPagamento, obs, { mesSel, taxa, nomeCondominio }) => {
+  const docPdf  = new jsPDF();
+  const AZUL    = [30, 58, 95];
+  const DOURADO = [201, 147, 58];
+  const numRecibo = `${mesSel.replace("-","")}-${morador.id?.slice(0,6).toUpperCase() || "000000"}`;
+
+  // Cabeçalho
+  docPdf.setFillColor(...AZUL);
+  docPdf.rect(0, 0, 210, 38, "F");
+  docPdf.setTextColor(255,255,255);
+  docPdf.setFontSize(18);
+  docPdf.setFont("helvetica","bold");
+  docPdf.text(nomeCondominio, 14, 16);
+  docPdf.setFontSize(10);
+  docPdf.setFont("helvetica","normal");
+  docPdf.text("Recibo de Pagamento de Taxa Condominial", 14, 26);
+  docPdf.setTextColor(...DOURADO);
+  docPdf.text(`Nº ${numRecibo}`, 14, 33);
+
+  // Corpo
+  docPdf.setTextColor(30,30,30);
+  let y = 52;
+  docPdf.setFontSize(11);
+  docPdf.setFont("helvetica","bold");
+  docPdf.text("DADOS DO MORADOR", 14, y); y += 7;
+  docPdf.setDrawColor(201,147,58);
+  docPdf.setLineWidth(0.5);
+  docPdf.line(14, y, 196, y); y += 8;
+
+  const campos = [
+    ["Nome",             morador.nome],
+    ["Unidade",          morador.unidade],
+    ["E-mail",           morador.email],
+    ["Telefone",         morador.telefone || "—"],
+  ];
+  docPdf.setFont("helvetica","normal");
+  docPdf.setFontSize(10);
+  campos.forEach(([label, valor]) => {
+    docPdf.setFont("helvetica","bold");   docPdf.text(`${label}:`, 14, y);
+    docPdf.setFont("helvetica","normal"); docPdf.text(valor, 60, y);
+    y += 8;
+  });
+
+  y += 6;
+  docPdf.setFont("helvetica","bold");
+  docPdf.setFontSize(11);
+  docPdf.text("DADOS DO PAGAMENTO", 14, y); y += 7;
+  docPdf.line(14, y, 196, y); y += 8;
+
+  const pagCampos = [
+    ["Referência",       mesLabelEmail(mesSel)],
+    ["Valor pago",       `R$ ${taxa.toFixed(2).replace(".",",")}`],
+    ["Data do pagamento",dataPagamento],
+    ["Vencimento",       formatarDataBR(dataVencimentoMes(mesSel))],
+    ["Observação",       obs || "—"],
+  ];
+  docPdf.setFontSize(10);
+  pagCampos.forEach(([label, valor]) => {
+    docPdf.setFont("helvetica","bold");   docPdf.text(`${label}:`, 14, y);
+    docPdf.setFont("helvetica","normal"); docPdf.text(String(valor), 60, y);
+    y += 8;
+  });
+
+  // Destaque do valor
+  y += 6;
+  docPdf.setFillColor(232,245,233);
+  docPdf.roundedRect(14, y, 182, 18, 3, 3, "F");
+  docPdf.setTextColor(46,125,50);
+  docPdf.setFont("helvetica","bold");
+  docPdf.setFontSize(13);
+  docPdf.text(`Pagamento confirmado: R$ ${taxa.toFixed(2).replace(".",",")}`, 20, y+12);
+
+  // Rodapé
+  y += 36;
+  docPdf.setTextColor(107,122,141);
+  docPdf.setFont("helvetica","normal");
+  docPdf.setFontSize(9);
+  docPdf.line(14, y, 196, y); y += 6;
+  docPdf.text(`Documento gerado automaticamente em ${new Date().toLocaleString("pt-BR")}`, 14, y); y += 5;
+  docPdf.text(`${nomeCondominio} — Sistema de Gestão Condominial`, 14, y);
+
+  docPdf.save(`recibo-${morador.unidade.replace(/\s/g,"-")}-${mesSel}.pdf`);
+};
+
 function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const [morador, setMorador]     = useState(null);
   const [docLegal, setDocLegal]   = useState(null);
@@ -1657,6 +1763,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const [condoConfig, setCondoConfig] = useState(null);
   const [extrasMor, setExtrasMor] = useState([]);
   const [pagExtrasMor, setPagExtrasMor] = useState([]);
+  const [documentosMor, setDocumentosMor] = useState([]);
   const [mesSel, setMesSel]       = useState(mesAtual());
   const [formReserva, setFormReserva] = useState({ area:"Churrasqueira", data:"", horario:"", observacao:"" });
   const [enviandoReserva, setEnviandoReserva] = useState(false);
@@ -1668,12 +1775,19 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const [enquetesMor, setEnquetesMor] = useState([]);
   const [votosMor, setVotosMor] = useState([]);
   const [secaoAberta, setSecaoAberta] = useState(null);
+  const [acessoNegado, setAcessoNegado] = useState(false);
   const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!moradorId) return;
     const u1 = onSnapshot(doc(db, "moradores", moradorId), d => {
-      if (d.exists()) setMorador({ id:d.id, ...d.data() });
+      if (!d.exists()) { setAcessoNegado(true); return; }
+      const dados = d.data();
+      // Se o morador tem token, o link precisa trazer o token certo.
+      // Moradores antigos (sem token) continuam funcionando — links já distribuídos não quebram.
+      if (dados.tokenPortal && dados.tokenPortal !== portalToken) { setAcessoNegado(true); return; }
+      setAcessoNegado(false);
+      setMorador({ id:d.id, ...dados });
     });
     const u2 = onSnapshot(
       query(collection(db, "cobrancas"), where("moradorId","==",moradorId)),
@@ -1685,6 +1799,16 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     );
     return () => { u1(); u2(); u3(); };
   }, [moradorId]);
+
+  // Documentos que o síndico liberou para os moradores (convenção, regimento, atas...)
+  useEffect(() => {
+    if (!morador?.condominioId) return;
+    const u = onSnapshot(
+      query(collection(db, "documentos"), where("condominioId","==",morador.condominioId)),
+      s => setDocumentosMor(s.docs.map(d => ({ id:d.id, ...d.data() })).filter(d => d.publico))
+    );
+    return u;
+  }, [morador?.condominioId]);
 
   // Comunicados do condomínio (carrega quando o morador é conhecido)
   useEffect(() => {
@@ -1780,6 +1904,18 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
       });
     } catch(e) {}
   };
+
+  if (acessoNegado) return (
+    <div style={{ minHeight:"100vh", background:D.sidebar, display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:D.fontBody }}>
+      <div style={{ background:"#fff", borderRadius:16, padding:"32px 28px", maxWidth:400, textAlign:"center", boxShadow:"0 12px 40px rgba(0,0,0,.25)" }}>
+        <div style={{ display:"flex", justifyContent:"center", marginBottom:14, color:D.textMut }}><NavIcon id="lock" size={38} /></div>
+        <div style={{ fontFamily:D.fontDisplay, fontSize:18, fontWeight:700, color:D.text, marginBottom:8, letterSpacing:"-0.02em" }}>Link inválido ou expirado</div>
+        <p style={{ fontFamily:D.fontBody, fontSize:13.5, color:D.textSec, lineHeight:1.6, margin:0 }}>
+          Este link de acesso não é mais válido. Peça ao síndico para enviar o link atualizado do seu portal.
+        </p>
+      </div>
+    </div>
+  );
 
   if (!morador) return (
     <div style={{ minHeight:"100vh", background:D.sidebar, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontFamily:D.fontBody }}>
@@ -1948,6 +2084,12 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
                         {c.status==="pago"?"Pago":c.status==="atrasado"?"Atrasado":"Pendente"}
                       </span>
                       <div style={{ fontSize:13, fontWeight:600, color:D.text, marginTop:2 }}>R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
+                      {c.status === "pago" && (
+                        <button onClick={() => gerarReciboPDF(morador, c.dataPagamento, c.obs, { mesSel: c.mes, taxa: condoConfig?.taxa || taxa, nomeCondominio: morador.condominioNome || "Condomínio" })}
+                          style={{ display:"inline-flex", alignItems:"center", gap:5, marginTop:6, padding:"4px 10px", background:D.muted, color:D.accent, border:`1px solid ${D.border}`, borderRadius:20, fontSize:11.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                          <NavIcon id="download" size={12} /> Recibo
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1968,6 +2110,26 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
                 </div>
                 <p style={{ fontSize:13, color:D.text, lineHeight:1.6, margin:"0 0 6px", whiteSpace:"pre-wrap" }}>{com.mensagem}</p>
                 <div style={{ fontSize:11.5, color:D.textMut }}>{com.data}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {documentosMor.length > 0 && secao("documentos", "Documentos do condomínio", "documentos",
+          documentosMor.length, D.accent,
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {documentosMor.map(d => (
+              <div key={d.id} style={{ display:"flex", alignItems:"center", gap:11, padding:"12px 14px", background:D.bgCard, border:`1px solid ${D.border}`, borderRadius:D.radiusSm }}>
+                <div style={{ width:32, height:32, borderRadius:8, background:D.muted, color:D.accent, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id={docIconId(d.categoria)} size={16} /></div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:D.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{d.nome}</div>
+                  <div style={{ fontSize:11.5, color:D.textSec }}>{d.categoria}</div>
+                </div>
+                {d.arquivo && (
+                  <a href={d.arquivo} download={d.arquivoNome || d.nome} style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"6px 12px", background:D.muted, color:D.accent, border:`1px solid ${D.border}`, borderRadius:20, fontSize:11.5, fontWeight:600, textDecoration:"none", flexShrink:0 }}>
+                    <NavIcon id="download" size={12} /> Baixar
+                  </a>
+                )}
               </div>
             ))}
           </div>
@@ -2089,7 +2251,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
           </>
         )}
 
-        {enquetesMor.length > 0 && secao("enquetes", "Enquetes e votações", "enquetes",
+        {enquetesMor.length > 0 && secao("enquetes", "Consultas aos moradores", "enquetes",
           enquetesAbertas || null, D.success,
           <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
             {enquetesMor.map(enq => {
@@ -2204,6 +2366,7 @@ const NAV_ICON_PATHS = {
   evSol:       '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
   fxCash:      '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
   fxMoeda:     '<circle cx="12" cy="12" r="9"/><path d="M14.8 9.4a3 3 0 0 0-2.8-1.4c-1.7 0-2.7.8-2.7 2 0 2.8 5.8 1.3 5.8 4 0 1.3-1.1 2.1-2.9 2.1a3.2 3.2 0 0 1-3-1.5"/><path d="M12 6.5v11"/>',
+  whats:       '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.4 8.4 0 0 1-4-1L3 21l2.2-4.9A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/><path d="M8.5 9.5c0 3 2.5 5.5 5.5 5.5l1-1.2-1.8-1-.9.8a4.3 4.3 0 0 1-2.4-2.4l.8-.9-1-1.8-1.2 1z"/>',
   sino:        '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   busca:       '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
   fechar:      '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -2296,6 +2459,149 @@ const casaBusca = (item, termo, campos) => {
   return campos.some(c => normalizarTexto(item?.[c]).includes(t));
 };
 
+
+/* ── Manutenção preventiva ──
+   Limpeza de caixa d'água, dedetização, recarga de extintor e inspeção de elevador são
+   obrigações com prazo. Antes o sistema só avisava depois que o documento vencia. */
+const PERIODICIDADES = [
+  { id:"mensal",     label:"Mensal",       meses:1  },
+  { id:"bimestral",  label:"A cada 2 meses", meses:2 },
+  { id:"trimestral", label:"Trimestral",   meses:3  },
+  { id:"semestral",  label:"Semestral",    meses:6  },
+  { id:"anual",      label:"Anual",        meses:12 },
+];
+const infoPeriodicidade = (id) => PERIODICIDADES.find(p => p.id === id) || PERIODICIDADES[3];
+
+// Soma meses a uma data no formato aaaa-mm-dd e devolve no mesmo formato
+const somarMeses = (dataISO, meses) => {
+  if (!dataISO) return "";
+  const [a, m, d] = dataISO.split("-").map(Number);
+  const base = new Date(a, m - 1, d);
+  const alvo = new Date(base.getFullYear(), base.getMonth() + meses, 1);
+  // Se o dia não existe no mês de destino (ex: 31 em fevereiro), usa o último dia
+  const ultimoDia = new Date(alvo.getFullYear(), alvo.getMonth() + 1, 0).getDate();
+  alvo.setDate(Math.min(d, ultimoDia));
+  return `${alvo.getFullYear()}-${String(alvo.getMonth()+1).padStart(2,"0")}-${String(alvo.getDate()).padStart(2,"0")}`;
+};
+
+// Dias até a próxima execução (negativo = atrasada)
+const diasAteData = (dataISO) => {
+  if (!dataISO) return null;
+  const [a, m, d] = dataISO.split("-").map(Number);
+  const alvo = new Date(a, m - 1, d).setHours(0,0,0,0);
+  const hoje = new Date().setHours(0,0,0,0);
+  return Math.round((alvo - hoje) / 86400000);
+};
+
+/* ── Token do portal do morador ──
+   Sem token, quem tivesse o link teria acesso permanente e não haveria como revogar
+   (ex: morador que vendeu o apartamento). Com token, trocar o valor invalida o link antigo. */
+const gerarTokenPortal = () => {
+  const c = "abcdefghijkmnopqrstuvwxyz23456789"; // sem l/1/0/o para não confundir na leitura
+  let t = "";
+  for (let i = 0; i < 12; i++) t += c[Math.floor(Math.random() * c.length)];
+  return t;
+};
+
+/* ── WhatsApp: canal real de cobrança no Brasil ──
+   Monta o link wa.me a partir do telefone cadastrado. Sem API e sem custo: é só uma URL. */
+const telefoneParaWhats = (tel) => {
+  const so = String(tel || "").replace(/\D/g, "");
+  if (so.length < 10) return null;                 // precisa de DDD + número
+  return so.startsWith("55") ? so : `55${so}`;     // completa o código do país
+};
+const linkWhatsApp = (tel, msg) => {
+  const num = telefoneParaWhats(tel);
+  if (!num) return null;
+  return `https://wa.me/${num}?text=${encodeURIComponent(msg)}`;
+};
+
+/* ── Papéis de usuário ──
+   O campo `papel` já era gravado no cadastro mas nunca era lido: todo mundo entrava como síndico.
+   Aqui ele passa a definir o que cada pessoa vê e pode fazer. */
+const PAPEIS = {
+  sindico: {
+    label: "Síndico",
+    descricao: "Acesso total ao sistema, incluindo configurações e remoção de moradores.",
+    abas: null,          // null = todas
+    podeEscrever: true,
+    podeConfigurar: true,
+    podeRemoverMorador: true,
+  },
+  subsindico: {
+    label: "Subsíndico",
+    descricao: "Opera o dia a dia. Não acessa Configurações nem remove moradores.",
+    abas: null,
+    podeEscrever: true,
+    podeConfigurar: false,
+    podeRemoverMorador: false,
+  },
+  conselho: {
+    label: "Conselho fiscal",
+    descricao: "Vê as contas e os relatórios para fiscalizar. Não altera nada.",
+    abas: ["dashboard","cobrancas","moradores","despesas","servicos","fundoReserva","fluxoCaixa","documentos","historico"],
+    podeEscrever: false,
+    podeConfigurar: false,
+    podeRemoverMorador: false,
+  },
+  portaria: {
+    label: "Portaria",
+    descricao: "Registra entrada de visitantes e recebimento de encomendas. Não vê o financeiro.",
+    abas: ["acessos","entregas","moradores","comunicados"],
+    podeEscrever: true,
+    podeConfigurar: false,
+    podeRemoverMorador: false,
+  },
+};
+// Papel desconhecido ou ausente cai em síndico, preservando as contas que já existem
+const infoPapel = (p) => PAPEIS[p] || PAPEIS.sindico;
+
+/* ── Importação de moradores por planilha ──
+   Aceita colar direto do Excel/Sheets (colunas separadas por TAB) ou CSV (; ou ,).
+   Detecta e ignora a linha de cabeçalho, para o síndico poder colar a seleção inteira. */
+const COLUNAS_IMPORT = ["unidade", "nome", "email", "telefone", "tipo", "proprietario"];
+
+const detectarSeparador = (linha) => {
+  if (linha.includes("\t")) return "\t";
+  if (linha.includes(";")) return ";";
+  if (linha.includes(",")) return ",";
+  return "\t";
+};
+
+const ehCabecalho = (celulas) => {
+  const t = celulas.map(c => normalizarTexto(c).trim());
+  return t.some(c => ["unidade","apto","apartamento"].includes(c))
+      && t.some(c => ["nome","morador"].includes(c));
+};
+
+const parsearPlanilha = (texto) => {
+  const linhas = String(texto || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!linhas.length) return [];
+  const sep = detectarSeparador(linhas[0]);
+  const corpo = linhas.map(l => l.split(sep).map(c => c.trim().replace(/^["']|["']$/g, "")));
+  const inicio = ehCabecalho(corpo[0]) ? 1 : 0;
+  return corpo.slice(inicio).map((cels, i) => {
+    const reg = { _linha: inicio + i + 1 };
+    COLUNAS_IMPORT.forEach((campo, idx) => { reg[campo] = cels[idx] || ""; });
+    return reg;
+  });
+};
+
+// Valida uma linha contra os moradores já cadastrados e contra as outras linhas do próprio lote
+const validarLinhaImport = (reg, moradoresExistentes, outrasLinhas) => {
+  const erros = [];
+  if (!reg.unidade) erros.push("unidade vazia");
+  if (!reg.nome) erros.push("nome vazio");
+  if (!reg.email) erros.push("e-mail vazio");
+  else if (!reg.email.includes("@") || !reg.email.includes(".")) erros.push("e-mail inválido");
+
+  const un = normalizarTexto(reg.unidade), em = normalizarTexto(reg.email);
+  if (un && moradoresExistentes.some(m => normalizarTexto(m.unidade) === un)) erros.push("unidade já cadastrada");
+  if (em && moradoresExistentes.some(m => normalizarTexto(m.email) === em)) erros.push("e-mail já cadastrado");
+  if (un && outrasLinhas.filter(o => normalizarTexto(o.unidade) === un).length > 1) erros.push("unidade repetida na planilha");
+  if (em && outrasLinhas.filter(o => normalizarTexto(o.email) === em).length > 1) erros.push("e-mail repetido na planilha");
+  return erros;
+};
 
 const BarraFiltros = ({
   periodo, setPeriodo, timestamps = [], total = 0, D, isMobile, rotuloItem = "registro",
@@ -2453,6 +2759,16 @@ const BarraFiltros = ({
   );
 };
 
+const CATS_DESPESA = {
+  agua:{icon:"💧",label:"Água"}, luz:{icon:"⚡",label:"Luz"}, limpeza:{icon:"🧹",label:"Limpeza"},
+  portaria:{icon:"🛡️",label:"Portaria / Segurança"}, elevador:{icon:"🛗",label:"Elevador"},
+  jardinagem:{icon:"🌳",label:"Jardinagem"}, salario:{icon:"👷",label:"Zelador / Salário"},
+  internet:{icon:"🌐",label:"Internet / Telefone"}, manutencao:{icon:"🔧",label:"Manutenção"},
+  material:{icon:"📦",label:"Material"}, impostos:{icon:"🧾",label:"Impostos / Taxas"},
+  outro:{icon:"📌",label:"Outra despesa"},
+};
+const despCat = (tipo) => CATS_DESPESA[tipo] || CATS_DESPESA.outro;
+
 // Mapa: categoria de despesa → id do ícone de traço
 const CAT_ICON_ID = {
   agua:"despesas", luz:"catLuz", limpeza:"catLimpeza", portaria:"catPortaria",
@@ -2579,6 +2895,16 @@ export default function App() {
   const [buscaDoc, setBuscaDoc]         = useState("");
   const [fichaSecao, setFichaSecao]     = useState("cobrancas");
   const [selCob, setSelCob]             = useState([]);
+  const [papelUsuario, setPapelUsuario] = useState("sindico");
+  const [equipe, setEquipe]             = useState([]);
+  const [novoConvite, setNovoConvite]   = useState({ email:"", papel:"portaria" });
+  const [manutencoes, setManutencoes]   = useState([]);
+  const [histCompleto, setHistCompleto] = useState(false);
+  const [acordos, setAcordos]           = useState([]);
+  const [formAcordo, setFormAcordo]     = useState({ moradorId:"", nParcelas:3, primeiraData:"", entrada:"" });
+  const [novaManutencao, setNovaManutencao] = useState({ titulo:"", periodicidade:"semestral", proximaData:"", responsavel:"", obs:"" });
+  const [importTexto, setImportTexto]   = useState("");
+  const [importando, setImportando]     = useState(false);
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -2586,7 +2912,7 @@ export default function App() {
   const [comunicados, setComunicados] = useState([]);
   const [novoComunicado, setNovoComunicado] = useState({ titulo:"", mensagem:"", fixado:false });
   const [documentos, setDocumentos] = useState([]);
-  const [novoDocumento, setNovoDocumento] = useState({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"" });
+  const [novoDocumento, setNovoDocumento] = useState({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"", publico:false });
   const [fundoMovs, setFundoMovs] = useState([]);
   const [novaMovFundo, setNovaMovFundo] = useState({ tipo:"aporte", valor:"", descricao:"", data:"" });
   const [cobrancasExtras, setCobrancasExtras] = useState([]);
@@ -2620,7 +2946,15 @@ export default function App() {
     return unsub;
   }, []);
 
-  const readOnly = user?.email === VISITANTE_EMAIL;
+  const ehVisitante = user?.email === VISITANTE_EMAIL;
+  const perm = ehVisitante ? { abas:null, podeEscrever:false, podeConfigurar:false, podeRemoverMorador:false } : infoPapel(papelUsuario);
+  // readOnly = "não pode escrever". Cobre visitante e conselho fiscal.
+  const readOnly = ehVisitante || !perm.podeEscrever;
+  // Aba visível para este papel?
+  const podeVerAba = (id) => {
+    if (id === "config" && !perm.podeConfigurar) return false;
+    return !perm.abas || perm.abas.includes(id);
+  };
 
   // ── Status da assinatura (Fase 4a) ──
   // Retorna { estado, diasRestantes } onde estado ∈ 'cortesia'|'ativo'|'trial'|'expirado'
@@ -2671,6 +3005,7 @@ export default function App() {
             const uSnap = await getDoc(doc(db, "usuarios", user.uid));
             if (uSnap.exists() && uSnap.data().condominioId) {
               const cId = uSnap.data().condominioId;
+              setPapelUsuario(uSnap.data().papel || "sindico");
               setCondominioId(cId);
               const cSnap = await getDoc(doc(db, "condominios", cId));
               if (cSnap.exists()) setCondominio({ id:cSnap.id, ...cSnap.data() });
@@ -2697,6 +3032,9 @@ export default function App() {
     const byCond = (col) => query(collection(db, col), where("condominioId", "==", condominioId));
 
     const u1 = onSnapshot(byCond("moradores"), s => setMoradores(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const uEq = onSnapshot(byCond("usuarios"), s => setEquipe(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const uAco = onSnapshot(byCond("acordos"), s => setAcordos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const uMan = onSnapshot(byCond("manutencoes"), s => setManutencoes(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (a.proximaData||"").localeCompare(b.proximaData||""))));
     const u2 = onSnapshot(byCond("cobrancas"), s => setCobrancas(s.docs.map(d => ({ id:d.id, ...d.data() }))));
     const u4 = onSnapshot(byCond("despesas"),  s => setDespesas(s.docs.map(d => ({ id:d.id, ...d.data() }))));
     const u5 = onSnapshot(byCond("servicos"),  s => setServicos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
@@ -2734,7 +3072,7 @@ export default function App() {
       setObsMes(texto); setObsSalva(texto);
     });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); u15(); u16(); u17(); u18(); u19(); u20(); };
+    return () => { u1(); uEq(); uMan(); uAco(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); u15(); u16(); u17(); u18(); u19(); u20(); };
   }, [user, condominioId, mesSel]);
 
   // (Removido o auto-popular com MOCK_MORADORES — no multi-tenant cada
@@ -2830,7 +3168,7 @@ export default function App() {
     if (entregasParadas.length) lista.push({ icon:"entregas", cor:D.warning, aba:"entregas", texto:`${entregasParadas.length} encomenda${entregasParadas.length>1?"s":""} parada${entregasParadas.length>1?"s":""} há mais de 7 dias` });
 
     // 5) Cobranças já em atraso no mês selecionado
-    const atrasadosMes = cobMes.filter(c => c.status === "atrasado");
+    const atrasadosMes = cobMes.filter(c => c.status === "atrasado" && !c.acordoId);
     if (atrasadosMes.length) lista.push({ icon:"multa", cor:D.danger, aba:"cobrancas", texto:`${atrasadosMes.length} cobrança${atrasadosMes.length>1?"s":""} em atraso em ${mesLabel(mesSel)}` });
 
     // 6) Cobranças pendentes vencendo nos próximos 3 dias (avisa ANTES de virar atraso)
@@ -2861,6 +3199,39 @@ export default function App() {
     const enquetesParadas = enquetes.filter(e => e.status === "aberta" && diasDesde(e.timestamp) >= 30);
     if (enquetesParadas.length) lista.push({ icon:"enquetes", cor:D.textSec, aba:"enquetes", texto:`${enquetesParadas.length} enquete${enquetesParadas.length>1?"s":""} aberta${enquetesParadas.length>1?"s":""} há mais de 30 dias` });
 
+    // 14) Parcela de acordo vencida — se o morador furar o acordo, o síndico precisa saber
+    const parcelasVencidas = acordos.filter(a => a.status === "ativo").reduce((soma, a) =>
+      soma + (a.parcelas || []).filter(pc => pc.status !== "pago" && diasAteData(pc.vencimento) < 0).length, 0);
+    if (parcelasVencidas) lista.push({ icon:"multa", cor:D.danger, aba:"cobrancas", texto:`${parcelasVencidas} parcela(s) de acordo vencida(s)` });
+
+    // 12) Manutenção preventiva atrasada ou vencendo — o sinal que evita multa e interdição
+    const manutAtrasadas = manutencoes.filter(m => { const d = diasAteData(m.proximaData); return d !== null && d < 0; });
+    const manutProximas  = manutencoes.filter(m => { const d = diasAteData(m.proximaData); return d !== null && d >= 0 && d <= 15; });
+    if (manutAtrasadas.length) lista.push({ icon:"servicos", cor:D.danger, aba:"servicos", texto:`${manutAtrasadas.length} manutenção(ões) preventiva(s) atrasada(s)` });
+    else if (manutProximas.length) lista.push({ icon:"servicos", cor:D.warning, aba:"servicos", texto:`${manutProximas.length} manutenção(ões) preventiva(s) nos próximos 15 dias` });
+
+    // 13) Despesa muito acima da média dos últimos meses (sinal clássico de vazamento)
+    (() => {
+      const porCategoria = {};
+      despesas.forEach(d => {
+        if (!d.tipo || !d.mes || !(d.valor > 0)) return;
+        (porCategoria[d.tipo] = porCategoria[d.tipo] || []).push(d);
+      });
+      Object.entries(porCategoria).forEach(([tipo, itens]) => {
+        const doMes = itens.filter(d => d.mes === hojeYMD);
+        if (!doMes.length) return;
+        // Média dos 6 meses anteriores (precisa de pelo menos 3 para a comparação significar algo)
+        const anteriores = itens.filter(d => d.mes < hojeYMD).sort((a,b) => b.mes.localeCompare(a.mes)).slice(0, 6);
+        if (anteriores.length < 3) return;
+        const media = anteriores.reduce((s,d) => s + d.valor, 0) / anteriores.length;
+        const atual = doMes.reduce((s,d) => s + d.valor, 0);
+        if (media > 0 && atual > media * 1.4) {
+          const pct = Math.round((atual / media - 1) * 100);
+          lista.push({ icon:catIconId(tipo), cor:D.warning, aba:"despesas", texto:`${despCat(tipo).label} está ${pct}% acima da média dos últimos meses` });
+        }
+      });
+    })();
+
     // 11) Assinatura perto de vencer ou expirada (não se aplica a cortesia)
     if (infoAssinatura.estado === "expirado") {
       lista.push({ icon:"assinatura", cor:D.danger, aba:"config", texto:"Sua assinatura expirou — algumas funções podem ficar limitadas" });
@@ -2888,6 +3259,11 @@ export default function App() {
   // Retorna { valorBase, multa, juros, diasAtraso, valorTotal }.
   // Só aplica encargos se: o plano permite, o síndico ativou, e a cobrança está atrasada.
   const encargosCobranca = (cob) => {
+    // Enquanto o acordo está ativo, multa e juros ficam parados: foram congelados na negociação
+    if (cob?.acordoId) {
+      const base = taxaDoMorador(cob.moradorId);
+      return { valorBase: base, multa: 0, juros: 0, diasAtraso: 0, valorTotal: base };
+    }
     const valorBase = taxaDoMorador(cob.moradorId);
     const semEncargos = { valorBase, multa:0, juros:0, diasAtraso:0, valorTotal: valorBase };
     if (!cob || cob.status !== "atrasado") return semEncargos;
@@ -2903,15 +3279,6 @@ export default function App() {
   };
 
   // Categorias de despesa (ícone + rótulo)
-  const CATS_DESPESA = {
-    agua:{icon:"💧",label:"Água"}, luz:{icon:"⚡",label:"Luz"}, limpeza:{icon:"🧹",label:"Limpeza"},
-    portaria:{icon:"🛡️",label:"Portaria / Segurança"}, elevador:{icon:"🛗",label:"Elevador"},
-    jardinagem:{icon:"🌳",label:"Jardinagem"}, salario:{icon:"👷",label:"Zelador / Salário"},
-    internet:{icon:"🌐",label:"Internet / Telefone"}, manutencao:{icon:"🔧",label:"Manutenção"},
-    material:{icon:"📦",label:"Material"}, impostos:{icon:"🧾",label:"Impostos / Taxas"},
-    outro:{icon:"📌",label:"Outra despesa"},
-  };
-  const despCat = (tipo) => CATS_DESPESA[tipo] || CATS_DESPESA.outro;
 
   // ── Exportação CSV (abre no Excel / Google Sheets) ──
   // Backup completo em JSON: tudo do condomínio num arquivo só, para guardar fora do sistema.
@@ -3128,89 +3495,12 @@ export default function App() {
 
   // ── Pagamentos ──
   // ── Gerar recibo de pagamento em PDF ──
-  const gerarReciboPDF = (morador, dataPagamento, obs) => {
-    const docPdf  = new jsPDF();
-    const AZUL    = [30, 58, 95];
-    const DOURADO = [201, 147, 58];
-    const numRecibo = `${mesSel.replace("-","")}-${morador.id?.slice(0,6).toUpperCase() || "000000"}`;
+  // Nome do condomínio para uso em PDFs. Antes estava fixo como "Vila Real 140" em 5 pontos,
+  // o que fazia qualquer outro cliente receber documentos com o nome do primeiro condomínio.
+  const nomeCond = () => condominio?.nome || "Condomínio";
+  // Versão do nome segura para nome de arquivo (sem acento, espaço ou barra)
+  const slugCond = () => normalizarTexto(nomeCond()).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "condominio";
 
-    // Cabeçalho
-    docPdf.setFillColor(...AZUL);
-    docPdf.rect(0, 0, 210, 38, "F");
-    docPdf.setTextColor(255,255,255);
-    docPdf.setFontSize(18);
-    docPdf.setFont("helvetica","bold");
-    docPdf.text("Condomínio Vila Real 140", 14, 16);
-    docPdf.setFontSize(10);
-    docPdf.setFont("helvetica","normal");
-    docPdf.text("Recibo de Pagamento de Taxa Condominial", 14, 26);
-    docPdf.setTextColor(...DOURADO);
-    docPdf.text(`Nº ${numRecibo}`, 14, 33);
-
-    // Corpo
-    docPdf.setTextColor(30,30,30);
-    let y = 52;
-    docPdf.setFontSize(11);
-    docPdf.setFont("helvetica","bold");
-    docPdf.text("DADOS DO MORADOR", 14, y); y += 7;
-    docPdf.setDrawColor(201,147,58);
-    docPdf.setLineWidth(0.5);
-    docPdf.line(14, y, 196, y); y += 8;
-
-    const campos = [
-      ["Nome",             morador.nome],
-      ["Unidade",          morador.unidade],
-      ["E-mail",           morador.email],
-      ["Telefone",         morador.telefone || "—"],
-    ];
-    docPdf.setFont("helvetica","normal");
-    docPdf.setFontSize(10);
-    campos.forEach(([label, valor]) => {
-      docPdf.setFont("helvetica","bold");   docPdf.text(`${label}:`, 14, y);
-      docPdf.setFont("helvetica","normal"); docPdf.text(valor, 60, y);
-      y += 8;
-    });
-
-    y += 6;
-    docPdf.setFont("helvetica","bold");
-    docPdf.setFontSize(11);
-    docPdf.text("DADOS DO PAGAMENTO", 14, y); y += 7;
-    docPdf.line(14, y, 196, y); y += 8;
-
-    const pagCampos = [
-      ["Referência",       mesLabelEmail(mesSel)],
-      ["Valor pago",       `R$ ${taxa.toFixed(2).replace(".",",")}`],
-      ["Data do pagamento",dataPagamento],
-      ["Vencimento",       formatarDataBR(dataVencimentoMes(mesSel))],
-      ["Observação",       obs || "—"],
-    ];
-    docPdf.setFontSize(10);
-    pagCampos.forEach(([label, valor]) => {
-      docPdf.setFont("helvetica","bold");   docPdf.text(`${label}:`, 14, y);
-      docPdf.setFont("helvetica","normal"); docPdf.text(String(valor), 60, y);
-      y += 8;
-    });
-
-    // Destaque do valor
-    y += 6;
-    docPdf.setFillColor(232,245,233);
-    docPdf.roundedRect(14, y, 182, 18, 3, 3, "F");
-    docPdf.setTextColor(46,125,50);
-    docPdf.setFont("helvetica","bold");
-    docPdf.setFontSize(13);
-    docPdf.text(`Pagamento confirmado: R$ ${taxa.toFixed(2).replace(".",",")}`, 20, y+12);
-
-    // Rodapé
-    y += 36;
-    docPdf.setTextColor(107,122,141);
-    docPdf.setFont("helvetica","normal");
-    docPdf.setFontSize(9);
-    docPdf.line(14, y, 196, y); y += 6;
-    docPdf.text(`Documento gerado automaticamente em ${new Date().toLocaleString("pt-BR")}`, 14, y); y += 5;
-    docPdf.text("Condomínio Vila Real 140 — Sistema de Gestão Condominial", 14, y);
-
-    docPdf.save(`recibo-${morador.unidade.replace(/\s/g,"-")}-${mesSel}.pdf`);
-  };
 
   const registrarPagamento = (moradorId) => {
     const morador = moradores.find(m => m.id === moradorId);
@@ -3220,7 +3510,7 @@ export default function App() {
       setModal(null); setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
       let emailOk = false;
       if (morador) {
-        gerarReciboPDF(morador, dataPgto, pagForm.obs);
+        gerarReciboPDF(morador, dataPgto, pagForm.obs, { mesSel, taxa, nomeCondominio: nomeCond() });
         registrarLog("✅", `Pagamento registrado: ${morador.nome} (${morador.unidade}) — ${mesLabel(mesSel)} — R$ ${taxa.toFixed(2).replace(".",",")}`);
         // Envia e-mail de confirmação
         try {
@@ -3301,14 +3591,317 @@ export default function App() {
     // taxaCustom: número se preenchido, null se vazio (usa a taxa padrão)
     const taxaCustom = novoMorador.taxaCustom !== "" && valorValido(novoMorador.taxaCustom)
       ? paraNumero(novoMorador.taxaCustom) : null;
-    const dados = { ...novoMorador, taxaCustom, condominioId };
+    const dados = {
+      ...novoMorador, taxaCustom, condominioId, tokenPortal: gerarTokenPortal(),
+      // LGPD: guarda quando e por quem o cadastro foi feito, para comprovar a base legal
+      cadastradoEm: new Date().toISOString(),
+      cadastradoPor: user?.email || "",
+      origemCadastro: "cadastro individual",
+    };
     const ref = await addDoc(collection(db, "moradores"), dados);
     await setDoc(doc(db, "cobrancas", `${condominioId}_${ref.id}_${mesSel}`), { condominioId, moradorId:ref.id, mes:mesSel, status:"pendente", comprovante:null, dataPagamento:null, obs:"" });
     registrarLog("👤", `Morador cadastrado: ${novoMorador.nome} (${novoMorador.unidade})`);
     setNovoMorador({ nome:"", unidade:"", proprietario:"", email:"", telefone:"", tipo:"Proprietário", veiculos:"", pets:"", taxaCustom:"" }); setModal(null); showToast("Morador cadastrado!");
   };
 
+  // Importa vários moradores de uma vez a partir de planilha colada ou CSV.
+  // Só grava as linhas válidas; as com erro são mostradas ao síndico para correção.
+  const importarMoradores = async (linhasValidas) => {
+    if (!linhasValidas.length || importando) return;
+    setImportando(true);
+    try {
+      const batch = writeBatch(db);
+      linhasValidas.forEach(l => {
+        const ref = doc(collection(db, "moradores"));
+        batch.set(ref, {
+          condominioId,
+          nome: l.nome,
+          unidade: l.unidade,
+          email: l.email,
+          telefone: l.telefone || "",
+          tipo: l.tipo || "Proprietário",
+          proprietario: l.proprietario || "",
+          veiculos: "", pets: "", taxaCustom: null,
+          tokenPortal: gerarTokenPortal(),
+          cadastradoEm: new Date().toISOString(),
+          cadastradoPor: user?.email || "",
+          origemCadastro: "importação de planilha",
+        });
+        // Já cria a cobrança do mês corrente, como no cadastro individual
+        batch.set(doc(db, "cobrancas", `${condominioId}_${ref.id}_${mesSel}`),
+          { condominioId, moradorId: ref.id, mes: mesSel, status: "pendente", comprovante: null, arquivoNome: null });
+      });
+      await batch.commit();
+      registrarLog("👥", `Importação: ${linhasValidas.length} morador(es) cadastrado(s) de uma vez`);
+      showToast(`${linhasValidas.length} morador(es) importado(s) com sucesso.`);
+      setImportTexto("");
+      setModal(null);
+    } catch (e) {
+      console.error("Erro na importação:", e);
+      showToast("Não foi possível importar. Verifique sua conexão e tente de novo.", "error");
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  // ── Acordo de dívida ──
+  // O acordo NÃO apaga nem altera as cobranças originais: elas ganham a marca `acordoId`
+  // e param de contar como atraso puro. Se o acordo for cancelado, tudo volta como estava.
+  const acordoDoMorador = (moradorId) => acordos.find(a => a.moradorId === moradorId && a.status === "ativo");
+
+  const criarAcordo = async () => {
+    const { moradorId, nParcelas, primeiraData, entrada } = formAcordo;
+    const m = moradores.find(x => x.id === moradorId);
+    if (!m) { showToast("Selecione o morador.", "error"); return; }
+    if (!primeiraData) { showToast("Informe o vencimento da primeira parcela.", "error"); return; }
+    const n = parseInt(nParcelas) || 0;
+    if (n < 1 || n > 36) { showToast("O número de parcelas deve ficar entre 1 e 36.", "error"); return; }
+    if (acordoDoMorador(moradorId)) { showToast("Este morador já tem um acordo ativo. Cancele o atual antes de criar outro.", "error"); return; }
+
+    // Dívida = cobranças em aberto do morador, com multa e juros congelados na data de hoje
+    const emAberto = cobrancas.filter(c => c.moradorId === moradorId && c.status !== "pago" && !c.acordoId);
+    if (!emAberto.length) { showToast("Este morador não tem cobranças em aberto.", "error"); return; }
+    const totalDivida = emAberto.reduce((soma, c) => soma + encargosCobranca(c).valorTotal, 0);
+    const valorEntrada = valorValido(entrada) ? paraNumero(entrada) : 0;
+    if (valorEntrada >= totalDivida) { showToast("A entrada não pode ser igual ou maior que a dívida.", "error"); return; }
+    const restante = totalDivida - valorEntrada;
+    const valorParcela = Math.round((restante / n) * 100) / 100;
+
+    const parcelas = Array.from({ length: n }, (_, i) => ({
+      numero: i + 1,
+      // A última parcela absorve a diferença de centavos do arredondamento
+      valor: i === n - 1 ? Math.round((restante - valorParcela * (n - 1)) * 100) / 100 : valorParcela,
+      vencimento: somarMeses(primeiraData, i),
+      status: "pendente",
+      pagoEm: null,
+    }));
+
+    if (!window.confirm(
+      `Criar acordo para ${m.nome} (${m.unidade})?\n\n` +
+      `Dívida atual: R$ ${totalDivida.toFixed(2).replace(".",",")} (${emAberto.length} cobrança(s))\n` +
+      (valorEntrada > 0 ? `Entrada: R$ ${valorEntrada.toFixed(2).replace(".",",")}\n` : "") +
+      `${n}x de aproximadamente R$ ${valorParcela.toFixed(2).replace(".",",")}\n\n` +
+      `As cobranças originais ficam marcadas como "em acordo" e param de acumular novos encargos.`
+    )) return;
+
+    try {
+      const ref = await addDoc(collection(db, "acordos"), {
+        condominioId, moradorId,
+        moradorNome: m.nome, unidade: m.unidade,
+        cobrancasIds: emAberto.map(c => c.id),
+        totalDivida, entrada: valorEntrada, parcelas,
+        status: "ativo",
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
+        criadoPor: user?.email || "",
+        timestamp: Date.now(),
+      });
+      // Marca as cobranças originais (sem apagar nem mudar o status)
+      const batch = writeBatch(db);
+      emAberto.forEach(c => batch.set(doc(db, "cobrancas", c.id), { acordoId: ref.id }, { merge:true }));
+      await batch.commit();
+      registrarLog("🤝", `Acordo criado: ${m.nome} (${m.unidade}) — R$ ${totalDivida.toFixed(2)} em ${n}x`);
+      showToast(`Acordo criado: ${n} parcela(s) para ${m.nome}.`);
+      setFormAcordo({ moradorId:"", nParcelas:3, primeiraData:"", entrada:"" });
+      setModal(null);
+    } catch (e) {
+      console.error("Erro ao criar acordo:", e);
+      showToast("Não foi possível criar o acordo. Verifique sua conexão e tente de novo.", "error");
+    }
+  };
+
+  const pagarParcela = async (acordo, numero) => {
+    const p = acordo.parcelas.find(x => x.numero === numero);
+    if (!p || p.status === "pago") return;
+    if (!window.confirm(`Registrar o pagamento da parcela ${numero} (R$ ${p.valor.toFixed(2).replace(".",",")})?`)) return;
+    const hoje = new Date().toLocaleDateString("pt-BR");
+    const novas = acordo.parcelas.map(x => x.numero === numero ? { ...x, status:"pago", pagoEm:hoje } : x);
+    const quitado = novas.every(x => x.status === "pago");
+    try {
+      await setDoc(doc(db, "acordos", acordo.id), { parcelas: novas, status: quitado ? "quitado" : "ativo" }, { merge:true });
+      // Ao quitar tudo, as cobranças originais finalmente viram pagas
+      if (quitado) {
+        const batch = writeBatch(db);
+        (acordo.cobrancasIds || []).forEach(cid => batch.set(doc(db, "cobrancas", cid), { status:"pago", dataPagamento:hoje, obs:"Quitado via acordo" }, { merge:true }));
+        await batch.commit();
+        registrarLog("✅", `Acordo quitado: ${acordo.moradorNome} (${acordo.unidade})`);
+        showToast(`Acordo quitado. As cobranças de ${acordo.moradorNome} foram baixadas.`);
+      } else {
+        registrarLog("💰", `Parcela ${numero} paga: ${acordo.moradorNome} (${acordo.unidade})`);
+        showToast(`Parcela ${numero} registrada.`);
+      }
+    } catch (e) {
+      console.error("Erro ao pagar parcela:", e);
+      showToast("Não foi possível registrar. Tente de novo.", "error");
+    }
+  };
+
+  const cancelarAcordo = async (acordo) => {
+    if (!window.confirm(`Cancelar o acordo de ${acordo.moradorNome}?\n\nAs cobranças originais voltam a ser tratadas como atraso normal, com multa e juros voltando a correr.`)) return;
+    try {
+      await setDoc(doc(db, "acordos", acordo.id), { status:"cancelado", canceladoEm: new Date().toLocaleDateString("pt-BR") }, { merge:true });
+      const batch = writeBatch(db);
+      (acordo.cobrancasIds || []).forEach(cid => batch.set(doc(db, "cobrancas", cid), { acordoId: null }, { merge:true }));
+      await batch.commit();
+      registrarLog("↩️", `Acordo cancelado: ${acordo.moradorNome} (${acordo.unidade})`);
+      showToast("Acordo cancelado. As cobranças voltaram ao estado anterior.");
+    } catch (e) {
+      console.error("Erro ao cancelar acordo:", e);
+      showToast("Não foi possível cancelar. Tente de novo.", "error");
+    }
+  };
+
+  // ── Manutenção preventiva ──
+  const salvarManutencao = async () => {
+    if (!novaManutencao.titulo.trim()) { showToast("Informe o que precisa ser feito.", "error"); return; }
+    if (!novaManutencao.proximaData) { showToast("Informe a data da próxima execução.", "error"); return; }
+    try {
+      await addDoc(collection(db, "manutencoes"), {
+        condominioId,
+        titulo: novaManutencao.titulo.trim(),
+        periodicidade: novaManutencao.periodicidade,
+        proximaData: novaManutencao.proximaData,
+        responsavel: novaManutencao.responsavel.trim(),
+        obs: novaManutencao.obs.trim(),
+        ultimaExecucao: null,
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
+        timestamp: Date.now(),
+      });
+      registrarLog("🔧", `Manutenção preventiva cadastrada: ${novaManutencao.titulo.trim()}`);
+      showToast("Manutenção preventiva cadastrada.");
+      setNovaManutencao({ titulo:"", periodicidade:"semestral", proximaData:"", responsavel:"", obs:"" });
+      setModal(null);
+    } catch (e) {
+      console.error("Erro ao salvar manutenção:", e);
+      showToast("Não foi possível salvar. Verifique sua conexão e tente de novo.", "error");
+    }
+  };
+
+  // Ao concluir, agenda a próxima automaticamente pela periodicidade
+  const concluirManutencao = async (m) => {
+    const hoje = new Date();
+    const hojeISO = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}-${String(hoje.getDate()).padStart(2,"0")}`;
+    const prox = somarMeses(hojeISO, infoPeriodicidade(m.periodicidade).meses);
+    if (!window.confirm(`Marcar "${m.titulo}" como feita hoje?\n\nA próxima fica agendada para ${formatarDataBR(prox)}.`)) return;
+    try {
+      await setDoc(doc(db, "manutencoes", m.id), { ultimaExecucao: hojeISO, proximaData: prox }, { merge:true });
+      registrarLog("✅", `Manutenção realizada: ${m.titulo} — próxima em ${formatarDataBR(prox)}`);
+      showToast(`Feito. Próxima manutenção agendada para ${formatarDataBR(prox)}.`);
+    } catch (e) {
+      console.error("Erro ao concluir manutenção:", e);
+      showToast("Não foi possível registrar. Tente de novo.", "error");
+    }
+  };
+
+  const removerManutencao = async (id) => await removerComDesfazer("manutencoes", id, "Manutenção");
+
+  // Liga/desliga a visibilidade de um documento no portal do morador
+  const alternarDocPublico = async (docItem) => {
+    try {
+      const novo = !docItem.publico;
+      await setDoc(doc(db, "documentos", docItem.id), { publico: novo }, { merge:true });
+      showToast(novo ? "Documento visível para os moradores." : "Documento oculto dos moradores.");
+    } catch (e) {
+      console.error("Erro ao alterar visibilidade:", e);
+      showToast("Não foi possível alterar. Tente de novo.", "error");
+    }
+  };
+
+  // Troca o token do morador: o link antigo para de funcionar na hora
+  const revogarLinkPortal = async (m) => {
+    const temToken = !!m.tokenPortal;
+    const msg = temToken
+      ? `Gerar um link novo para ${m.nome}?\n\nO link antigo para de funcionar imediatamente. Use isto se o morador saiu do apartamento ou se o link vazou.`
+      : `Proteger o portal de ${m.nome} com um link exclusivo?\n\nO link atual para de funcionar e você precisa enviar o novo ao morador.`;
+    if (!window.confirm(msg)) return;
+    try {
+      await setDoc(doc(db, "moradores", m.id), { tokenPortal: gerarTokenPortal() }, { merge:true });
+      registrarLog("🔑", `Link do portal renovado: ${m.nome} (${m.unidade})`);
+      showToast("Link renovado. Copie e envie o novo link ao morador.");
+    } catch (e) {
+      console.error("Erro ao renovar link:", e);
+      showToast("Não foi possível renovar o link. Tente de novo.", "error");
+    }
+  };
+
+  // Mensagem de cobrança pronta para o WhatsApp, com valor, encargos e link do portal
+  const whatsCobranca = (m, cob) => {
+    const enc = cob ? encargosCobranca(cob) : null;
+    const link = `${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}${m.tokenPortal ? `&t=${m.tokenPortal}` : ""}`;
+    const valor = enc ? enc.valorTotal.toFixed(2).replace(".", ",") : "";
+    const linhas = [
+      `Olá, ${(m.nome || "").split(" ")[0]}!`,
+      "",
+      `Passando para lembrar da taxa de condomínio de ${mesLabel(mesSel)} — ${m.unidade}.`,
+    ];
+    if (enc && (enc.multa > 0 || enc.juros > 0)) {
+      linhas.push(`Valor: R$ ${valor} (taxa R$ ${enc.valorBase.toFixed(2).replace(".",",")} + multa e juros por ${enc.diasAtraso} dia(s) de atraso).`);
+    } else if (enc) {
+      linhas.push(`Valor: R$ ${valor}.`);
+    }
+    linhas.push("", `Você pode consultar tudo pelo portal: ${link}`, "", `${nomeCond()}`);
+    return linhas.join("\n");
+  };
+
+  const abrirWhatsCobranca = (m, cob) => {
+    const url = linkWhatsApp(m.telefone, whatsCobranca(m, cob));
+    if (!url) { showToast(`${m.nome} não tem telefone válido cadastrado. Edite o morador para incluir.`, "error"); return; }
+    window.open(url, "_blank", "noopener,noreferrer");
+    registrarLog("📱", `Cobrança enviada por WhatsApp: ${m.nome} (${m.unidade}) — ${mesLabel(mesSel)}`);
+  };
+
+  // ── Equipe: convidar, alterar papel e revogar acesso ──
+  const convidarMembro = async (email, papel) => {
+    const e = String(email||"").trim().toLowerCase();
+    if (!e.includes("@") || !e.includes(".")) { showToast("Informe um e-mail válido.", "error"); return false; }
+    if (equipe.some(u => normalizarTexto(u.email) === normalizarTexto(e))) { showToast("Esta pessoa já faz parte da equipe.", "error"); return false; }
+    try {
+      await setDoc(doc(db, "convites", e), {
+        email: e, papel, condominioId,
+        condominioNome: condominio?.nome || "",
+        convidadoPor: user?.email || "",
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
+      });
+      registrarLog("👤", `Convite enviado: ${e} como ${infoPapel(papel).label}`);
+      showToast(`Convite criado. Peça para ${e} criar a conta com este e-mail.`);
+      return true;
+    } catch (err) {
+      console.error("Erro ao convidar:", err);
+      showToast("Não foi possível criar o convite. Tente de novo.", "error");
+      return false;
+    }
+  };
+
+  const alterarPapel = async (uid, novoPapel) => {
+    const u = equipe.find(x => x.id === uid);
+    if (!u) return;
+    if (u.id === user?.uid) { showToast("Você não pode alterar o seu próprio perfil.", "error"); return; }
+    try {
+      await setDoc(doc(db, "usuarios", uid), { papel: novoPapel }, { merge:true });
+      registrarLog("👤", `Perfil alterado: ${u.email} agora é ${infoPapel(novoPapel).label}`);
+      showToast(`${u.nome || u.email} agora é ${infoPapel(novoPapel).label}.`);
+    } catch (e) {
+      console.error("Erro ao alterar perfil:", e);
+      showToast("Não foi possível alterar o perfil. Tente de novo.", "error");
+    }
+  };
+
+  const revogarAcesso = async (uid) => {
+    const u = equipe.find(x => x.id === uid);
+    if (!u) return;
+    if (u.id === user?.uid) { showToast("Você não pode remover o seu próprio acesso.", "error"); return; }
+    if (!window.confirm(`Remover o acesso de ${u.nome || u.email}?\n\nA conta continua existindo, mas deixa de ver este condomínio.`)) return;
+    try {
+      await setDoc(doc(db, "usuarios", uid), { condominioId: null }, { merge:true });
+      registrarLog("🗑️", `Acesso revogado: ${u.email}`);
+      showToast("Acesso removido.");
+    } catch (e) {
+      console.error("Erro ao revogar:", e);
+      showToast("Não foi possível remover o acesso. Tente de novo.", "error");
+    }
+  };
+
   const removerMorador = async (id) => {
+    if (!perm.podeRemoverMorador) { showToast("Seu perfil não permite remover moradores.", "error"); return; }
     const m = moradores.find(x => x.id === id);
     if (!m) return;
     try {
@@ -3563,11 +4156,12 @@ export default function App() {
       obs: novoDocumento.obs || "",
       arquivo: base64,
       arquivoNome: novoDocumento.arquivoNome || "",
+      publico: !!novoDocumento.publico,
       criadoEm: new Date().toLocaleDateString("pt-BR"),
       timestamp: Date.now(),
     });
     registrarLog("📁", `Documento adicionado: ${novoDocumento.nome.trim()}`);
-    setNovoDocumento({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"" });
+    setNovoDocumento({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"", publico:false });
     setModal(null);
     showToast("Documento salvo!");
   };
@@ -3845,49 +4439,28 @@ export default function App() {
     return { label:`Válido · vence ${new Date(a,m-1,d).toLocaleDateString("pt-BR")}`, cor:D.success, bg:D.successBg, dias };
   };
 
-  const enviarLembretes = () => {
-    const dev = cobMes.filter(c=>c.status!=="pago").map(c=>moradores.find(m=>m.id===c.moradorId)).filter(Boolean);
-    if (!dev.length) { showToast("Todos já pagaram!"); return; }
-    showToast(`📧 Lembretes para ${dev.length} morador(es): ${dev.map(d=>`${d.nome}`).join(", ")}`);
-  };
 
-  const salvarTaxa = async (v) => { await setDoc(doc(db,"condominios",condominioId), { taxa:v }, { merge:true }); showToast("Taxa atualizada!"); };
 
-  const salvarObsMes = async () => {
-    await setDoc(doc(db, "observacoes", `${condominioId}_${mesSel}`), { condominioId, texto: obsMes, mes: mesSel, atualizadoEm: new Date().toLocaleString("pt-BR") }, { merge:true });
-    setObsSalva(obsMes);
-    showToast("Observação salva!");
-  };
 
-  const salvarDiaVencimento = async (v) => {
-    await setDoc(doc(db,"condominios",condominioId), { diaVencimento: parseInt(v) }, { merge:true });
-    showToast("Dia de vencimento salvo!");
-  };
 
-  const salvarConfigMultaJuros = async (ativo, multa, juros) => {
-    await setDoc(doc(db,"condominios",condominioId), {
-      cobrarMultaJuros: ativo,
-      multaPercent: parseFloat(multa) || 0,
-      jurosPercentMes: parseFloat(juros) || 0,
-    }, { merge:true });
-    showToast("Configuração de multa/juros salva!");
-  };
 
   // Salva todos os parâmetros da tela de config de uma vez
   const [salvandoConfig, setSalvandoConfig] = useState(false);
   const salvarConfigGeral = async () => {
     setSalvandoConfig(true);
     try {
-      const dados = { taxa: parseFloat(taxa) || 0, diaVencimento: parseInt(diaVencimento) || 10 };
+      // paraNumero (e não parseFloat): os campos aceitam vírgula, e parseFloat("180,50") daria 180
+      const dados = { taxa: paraNumero(taxa) || 0, diaVencimento: parseInt(diaVencimento) || 10 };
       if (podeUsar("multaJuros")) {
         dados.cobrarMultaJuros = cobrarMultaJuros;
-        dados.multaPercent = parseFloat(multaPercent) || 0;
-        dados.jurosPercentMes = parseFloat(jurosPercentMes) || 0;
+        dados.multaPercent = paraNumero(multaPercent) || 0;
+        dados.jurosPercentMes = paraNumero(jurosPercentMes) || 0;
       }
       await setDoc(doc(db,"condominios",condominioId), dados, { merge:true });
       showToast("Configurações salvas!");
     } catch (e) {
-      showToast("Erro ao salvar. Tente novamente.");
+      console.error("Erro ao salvar configurações:", e);
+      showToast("Não foi possível salvar. Verifique sua conexão e tente de novo.", "error");
     } finally { setSalvandoConfig(false); }
   };
 
@@ -4032,7 +4605,7 @@ export default function App() {
   const exportarPDF = () => {
     const docPdf = new jsPDF(); const X=14; const AZUL=[30,58,95]; let y=18;
     docPdf.setFontSize(17); docPdf.setTextColor(...AZUL);
-    docPdf.text("Vila Real 140 — Relatório do Condomínio", X, y); y+=7;
+    docPdf.text(`${nomeCond()} — Relatório do Condomínio`, X, y); y+=7;
     docPdf.setFontSize(10); docPdf.setTextColor(107,122,141);
     docPdf.text(`Período: ${mesLabel(mesSel)}  ·  Gerado em ${new Date().toLocaleDateString("pt-BR")}`, X, y); y+=10;
     if (obsSalva) {
@@ -4067,7 +4640,7 @@ export default function App() {
       head:[["Serviço","Início","Fim","Material","Mão de obra","Total"]],
       body: servicos.filter(s=>s.status==="concluido").map(s=>[s.titulo,s.dataInicio||"—",s.dataFim||"—",`R$ ${(s.valorMaterial||0).toFixed(2).replace(".",",")}`,`R$ ${(s.valorMaoDeObra||0).toFixed(2).replace(".",",")}`,`R$ ${((s.valorMaterial||0)+(s.valorMaoDeObra||0)).toFixed(2).replace(".",",")}`]),
     });
-    docPdf.save(`relatorio-vilareal-${mesSel}.pdf`); showToast("PDF gerado com sucesso!");
+    docPdf.save(`relatorio-${slugCond()}-${mesSel}.pdf`); showToast("PDF gerado com sucesso!");
   };
 
   const exportarPrestacaoContas = () => {
@@ -4087,7 +4660,7 @@ export default function App() {
     docPdf.setTextColor(255,255,255);
     docPdf.setFont("helvetica","bold");
     docPdf.setFontSize(22);
-    docPdf.text("Condominio Vila Real 140", W/2, 30, { align:"center" });
+    docPdf.text(nomeCond(), W/2, 30, { align:"center" });
     docPdf.setFontSize(14);
     docPdf.setFont("helvetica","normal");
     docPdf.text("Prestacao de Contas", W/2, 42, { align:"center" });
@@ -4227,11 +4800,11 @@ export default function App() {
       docPdf.setFillColor(...AZUL);
       docPdf.rect(0, 287, W, 10, "F");
       docPdf.setFontSize(8); docPdf.setFont("helvetica","normal"); docPdf.setTextColor(255,255,255);
-      docPdf.text(`Condominio Vila Real 140 - Prestacao de Contas - ${mesLabelEmail(mesSel)}`, X, 293);
+      docPdf.text(`${nomeCond()} - Prestação de Contas - ${mesLabelEmail(mesSel)}`, X, 293);
       docPdf.text(`Pagina ${i} de ${totalPags}`, W-14, 293, { align:"right" });
     }
 
-    docPdf.save(`prestacao-contas-vilareal-${mesSel}.pdf`);
+    docPdf.save(`prestacao-contas-${slugCond()}-${mesSel}.pdf`);
     showToast("Prestacao de contas gerada!");
   };
 
@@ -4243,21 +4816,21 @@ export default function App() {
     { id:"moradores", icon:"👥", label:"Moradores"  },
     { id:"despesas",  icon:"💧", label:"Água/Luz"   },
     { id:"servicos",  icon:"🔧", label:"Serviços"   },
-  ];
+  ].filter(i => podeVerAba(i.id));
   const navSecundario = [
     { id:"reservas",    icon:"📅", label:"Reservas"    },
     { id:"acessos",     icon:"🚪", label:"Acessos"     },
     { id:"entregas",    icon:"📦", label:"Entregas"    },
     { id:"comunicados", icon:"📢", label:"Comunicados" },
     { id:"ocorrencias", icon:"🛎️", label:"Ocorrências" },
-    { id:"enquetes",    icon:"🗳️", label:"Enquetes"    },
+    { id:"enquetes",    icon:"🗳️", label:"Consultas"    },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
     { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
     { id:"fluxoCaixa",  icon:"📈", label:"Fluxo de Caixa" },
     { id:"agenda",      icon:"🗓️", label:"Agenda"      },
     { id:"historico",   icon:"📋", label:"Histórico"   },
-    ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config."  }] : []),
-  ];
+    ...(perm.podeConfigurar ? [{ id:"config", icon:"⚙️", label:"Config."  }] : []),
+  ].filter(i => podeVerAba(i.id));
 
   const navItems = [
     { id:"dashboard",   icon:"📊", label:"Dashboard"   },
@@ -4270,14 +4843,21 @@ export default function App() {
     { id:"entregas",    icon:"📦", label:"Entregas"    },
     { id:"comunicados", icon:"📢", label:"Comunicados" },
     { id:"ocorrencias", icon:"🛎️", label:"Ocorrências" },
-    { id:"enquetes",    icon:"🗳️", label:"Enquetes"    },
+    { id:"enquetes",    icon:"🗳️", label:"Consultas"    },
     { id:"documentos",  icon:"📁", label:"Documentos"  },
     { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
     { id:"fluxoCaixa",  icon:"📈", label:"Fluxo de Caixa" },
     { id:"agenda",      icon:"🗓️", label:"Agenda"      },
     { id:"historico",   icon:"📋", label:"Histórico"   },
-    ...(!readOnly ? [{ id:"config", icon:"⚙️", label:"Config." }] : []),
-  ];
+    ...(perm.podeConfigurar ? [{ id:"config", icon:"⚙️", label:"Config." }] : []),
+  ].filter(i => podeVerAba(i.id));
+
+  // Se o papel não dá acesso à aba atual, leva para a primeira permitida.
+  // Fica aqui (e não junto dos outros efeitos) porque depende de navItems.
+  useEffect(() => {
+    if (!condominioId || !navItems.length) return;
+    if (!podeVerAba(aba) && navItems[0].id !== aba) setAba(navItems[0].id);
+  }, [papelUsuario, condominioId, aba]);
 
   // Agrupamento da sidebar desktop (seções com título)
   const gruposNav = [
@@ -4285,8 +4865,8 @@ export default function App() {
     { titulo:"Operação",    ids:["despesas","servicos","reservas","acessos","entregas"] },
     { titulo:"Comunicação", ids:["comunicados","ocorrencias","enquetes"] },
     { titulo:"Financeiro",  ids:["fundoReserva","fluxoCaixa"] },
-    { titulo:"Geral",       ids:["documentos","agenda","historico", ...(!readOnly ? ["config"] : [])] },
-  ];
+    { titulo:"Geral",       ids:["documentos","agenda","historico", ...(perm.podeConfigurar ? ["config"] : [])] },
+  ].map(g => ({ ...g, ids: g.ids.filter(podeVerAba) })).filter(g => g.ids.length > 0);
   const labelPorId = Object.fromEntries(navItems.map(n => [n.id, n.label]));
 
   if (!authChecked) return (
@@ -4295,7 +4875,7 @@ export default function App() {
 
   if (modoVisitante && !user) return (
     <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#1E3A5F", color:"#fff", fontFamily:D.fontBody, textAlign:"center", padding:24 }}>
-      <div><div style={{ fontSize:36, marginBottom:10 }}>🔒</div>Link de visualização indisponível.<br/>Contate o síndico.</div>
+      <div><div style={{ display:"flex", justifyContent:"center", marginBottom:10, color:D.textMut }}><NavIcon id="lock" size={34} /></div>Link de visualização indisponível.<br/>Contate o síndico.</div>
     </div>
   );
 
@@ -4409,7 +4989,7 @@ export default function App() {
               <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2, overflow:"hidden", textOverflow:"ellipsis" }}>{m.email}</div>
             </div>
           </div>
-          <Badge status={cob.status} />
+          {cob.acordoId ? <span style={{ display:"inline-flex", alignItems:"center", gap:6, background:D.secondary, color:D.accent, fontSize:11.5, fontWeight:600, padding:"4px 11px 4px 8px", borderRadius:20, fontFamily:D.fontBody, whiteSpace:"nowrap" }}><span style={{ width:6, height:6, borderRadius:"50%", background:D.accent }} />Em acordo</span> : <Badge status={cob.status} />}
         </div>
         {/* Valor da cobrança (com encargos se houver) */}
         <div style={{ marginBottom:8 }}>
@@ -4424,6 +5004,11 @@ export default function App() {
         </div>
         {cob.dataPagamento && <div style={{ fontSize:12, color:"#9aa6b5", marginBottom:8 }}>Pago em {cob.dataPagamento}</div>}
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+          {cob.status !== "pago" && !readOnly && m.telefone && (
+            <button onClick={() => abrirWhatsCobranca(m, cob)} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, flex:1, minWidth:130, padding:"10px 14px", background:D.successBg, color:D.success, border:`1px solid ${D.success}33`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+              <NavIcon id="whats" size={15} /> Cobrar no WhatsApp
+            </button>
+          )}
           {cob.status !== "pago" ? (
             !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Registrar Pgto</button>
           ) : (
@@ -4488,7 +5073,7 @@ export default function App() {
                     <button key={id} onClick={() => setAba(id)} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", padding:"8px 11px", background: ativo ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", color: ativo ? "#fff" : "rgba(226,232,245,0.82)", fontFamily:D.fontBody, fontSize:13, fontWeight: ativo ? 600 : 500, textAlign:"left", borderRadius:8, marginBottom:1, outline:"none", borderLeft: ativo ? `2px solid ${D.sidebarActBdr}` : "2px solid transparent" }}>
                       <span style={{ opacity: ativo?1:.75, display:"flex" }}><NavIcon id={id} /></span>
                       <span style={{ flex:1 }}>{labelPorId[id]}</span>
-                      {bloqueado && <span style={{ fontSize:11, opacity:.6 }}>🔒</span>}
+                      {bloqueado && <span style={{ display:"flex", opacity:.6 }}><NavIcon id="lock" size={12} /></span>}
                     </button>
                   );
                 })}
@@ -4524,7 +5109,7 @@ export default function App() {
                     <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", padding:"10px 4px", display:"flex", flexDirection:"column", alignItems:"center", gap:4, color: aba===n.id ? "#fff" : "rgba(226,232,245,0.75)", borderRadius:10, fontFamily:D.fontBody, position:"relative" }}>
                       <span style={{ display:"flex" }}><NavIcon id={n.id} size={20} /></span>
                       <span style={{ fontSize:10, fontWeight: aba===n.id?600:400 }}>{n.label}</span>
-                      {bloqueado && <span style={{ position:"absolute", top:4, right:8, fontSize:10 }}>🔒</span>}
+                      {bloqueado && <span style={{ position:"absolute", top:4, right:8, display:"flex", opacity:.7 }}><NavIcon id="lock" size={11} /></span>}
                     </button>
                     );
                   })}
@@ -4651,16 +5236,6 @@ export default function App() {
                   </div>
                 );
 
-                const saldoCard = (
-                  <div style={{ background:D.primary, borderRadius:D.radius, padding: isMobile?"18px 20px":"22px 24px", boxShadow:D.shadowMd, color:"#fff", position:"relative", overflow:"hidden", minWidth:0 }}>
-                    <div style={{ position:"absolute", top:-30, right:-30, width:120, height:120, borderRadius:"50%", background:"rgba(16,185,129,0.18)" }} />
-                    <div style={{ position:"relative" }}>
-                      <div style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:".8px", opacity:.85 }}>Saldo em caixa</div>
-                      <div style={{ fontFamily:D.fontDisplay, fontSize: isMobile?26:30, fontWeight:700, letterSpacing:"-0.03em", marginTop:8, color: saldoCaixaTotal<0?"#FCA5A5":"#fff" }}>{fmt(saldoCaixaTotal)}</div>
-                      <div style={{ fontFamily:D.fontBody, fontSize:12, opacity:.8, marginTop:4 }}>Acumulado de todos os meses</div>
-                    </div>
-                  </div>
-                );
 
                 const inadimplCard = (
                   <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?"18px 16px":"20px 22px", boxShadow:D.shadow, border:`1px solid ${D.border}`, minWidth:0 }}>
@@ -4725,7 +5300,7 @@ export default function App() {
                               </div>
                               <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:5, flexShrink:0 }}>
                                 <div style={{ fontFamily:D.fontBody, fontSize:14, fontWeight:700, color:D.text }}>R$ {taxaDoMorador(cob.moradorId).toFixed(2).replace(".",",")}</div>
-                                <Badge status={cob.status} />
+                                {cob.acordoId ? <span style={{ display:"inline-flex", alignItems:"center", gap:6, background:D.secondary, color:D.accent, fontSize:11.5, fontWeight:600, padding:"4px 11px 4px 8px", borderRadius:20, fontFamily:D.fontBody, whiteSpace:"nowrap" }}><span style={{ width:6, height:6, borderRadius:"50%", background:D.accent }} />Em acordo</span> : <Badge status={cob.status} />}
                               </div>
                             </div>
                           );
@@ -4750,7 +5325,7 @@ export default function App() {
                                 <td style={{ padding:"14px 24px", fontFamily:D.fontDisplay, fontSize:13, fontWeight:600, color:D.text }}>{m.unidade}</td>
                                 <td style={{ padding:"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{m.nome}</td>
                                 <td style={{ padding:"14px 24px", fontFamily:D.fontBody, fontSize:13, color:D.text }}>R$ {taxaDoMorador(cob.moradorId).toFixed(2).replace(".",",")}</td>
-                                <td style={{ padding:"14px 24px" }}><Badge status={cob.status} /></td>
+                                <td style={{ padding:"14px 24px" }}>{cob.acordoId ? <span style={{ display:"inline-flex", alignItems:"center", gap:6, background:D.secondary, color:D.accent, fontSize:11.5, fontWeight:600, padding:"4px 11px 4px 8px", borderRadius:20, fontFamily:D.fontBody, whiteSpace:"nowrap" }}><span style={{ width:6, height:6, borderRadius:"50%", background:D.accent }} />Em acordo</span> : <Badge status={cob.status} />}</td>
                               </tr>
                             );
                           })}
@@ -4918,6 +5493,12 @@ export default function App() {
                   {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
                 </select>
                 <button onClick={exportarCobrancasCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, flex: isMobile?1:"none", whiteSpace:"nowrap" }}>⬇ Exportar CSV</button>
+                <button onClick={exportarPDF} title="Resumo do mês em PDF" style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                  <NavIcon id="download" size={15} /> Relatório
+                </button>
+                <button onClick={exportarPrestacaoContas} title="Relatório completo do mês em PDF, pronto para apresentar aos moradores" style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                  <NavIcon id="histDoc" size={15} /> Prestação de contas
+                </button>
                 {!readOnly && !isMobile && <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"9px 16px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, fontFamily:D.fontBody }}>{enviandoEmails?"Enviando...":"Cobrar pendentes"}</button>}
               </div>
             </div>
@@ -4999,7 +5580,7 @@ export default function App() {
               </div>
             ) : (
               <div style={{ background:D.muted, borderRadius:D.radius, padding:"14px 16px", marginBottom:16, display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-                <span style={{ fontSize:20 }}>🔒</span>
+                <span style={{ display:"flex", color:D.textMut }}><NavIcon id="lock" size={19} /></span>
                 <div style={{ flex:1, minWidth:180 }}>
                   <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>Cobranças extras e rateios — plano Padrão</div>
                   <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Cobre taxas de obra, rateios de contas e fundos aprovados em assembleia.</div>
@@ -5044,6 +5625,94 @@ export default function App() {
                     })}
                   </div>
                 )}
+
+                {/* ── Acordos de dívida ativos ── */}
+                {(() => {
+                  const ativos = acordos.filter(a => a.status === "ativo");
+                  const inadimplentes = cobMes.filter(c => c.status !== "pago" && !c.acordoId);
+                  if (!ativos.length && (readOnly || !inadimplentes.length)) return null;
+                  return (
+                    <div style={{ marginBottom:20 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, marginBottom:12, flexWrap:"wrap" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                          <span style={{ width:8, height:8, borderRadius:"50%", background:D.accent }} />
+                          <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>
+                            Acordos de dívida{ativos.length ? ` (${ativos.length})` : ""}
+                          </span>
+                        </div>
+                        {!readOnly && inadimplentes.length > 0 && (
+                          <button onClick={() => { setFormAcordo({ moradorId:"", nParcelas:3, primeiraData:"", entrada:"" }); setModal({ type:"novoAcordo" }); }}
+                            style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"8px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width: isMobile?"100%":"auto" }}>
+                            + Novo acordo
+                          </button>
+                        )}
+                      </div>
+
+                      {ativos.length === 0 ? (
+                        <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.accent}` }}>
+                          <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.6 }}>
+                            Negocie a dívida em parcelas sem perder o controle: as cobranças originais ficam registradas e param de acumular novos encargos enquanto o acordo estiver em dia.
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"repeat(auto-fill,minmax(340px,1fr))", gap:12 }}>
+                          {ativos.map(ac => {
+                            const pagas = ac.parcelas.filter(p => p.status === "pago").length;
+                            const total = ac.parcelas.length;
+                            const proxima = ac.parcelas.find(p => p.status !== "pago");
+                            const atrasada = proxima && diasAteData(proxima.vencimento) < 0;
+                            return (
+                              <div key={ac.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${atrasada?D.danger:D.accent}` }}>
+                                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, marginBottom:10 }}>
+                                  <div style={{ minWidth:0 }}>
+                                    <div style={{ fontFamily:D.fontDisplay, fontSize:14.5, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{ac.unidade} — {ac.moradorNome}</div>
+                                    <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>
+                                      R$ {ac.totalDivida.toFixed(2).replace(".",",")} em {total}x · desde {ac.criadoEm}
+                                    </div>
+                                  </div>
+                                  {!readOnly && (
+                                    <button onClick={() => cancelarAcordo(ac)} title="Cancelar acordo" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer", flexShrink:0 }}><NavIcon id="logUndo" size={14} /></button>
+                                  )}
+                                </div>
+
+                                {/* Progresso */}
+                                <div style={{ display:"flex", alignItems:"center", gap:9, marginBottom:12 }}>
+                                  <div style={{ flex:1, height:6, background:D.muted, borderRadius:20, overflow:"hidden" }}>
+                                    <div style={{ width:`${(pagas/total)*100}%`, height:"100%", background:D.success, borderRadius:20 }} />
+                                  </div>
+                                  <span style={{ fontFamily:D.fontBody, fontSize:11.5, fontWeight:600, color:D.textSec, flexShrink:0 }}>{pagas}/{total} pagas</span>
+                                </div>
+
+                                {/* Parcelas */}
+                                <div style={{ display:"flex", flexDirection:"column", gap:6, maxHeight:180, overflowY:"auto" }}>
+                                  {ac.parcelas.map(pc => {
+                                    const dias = diasAteData(pc.vencimento);
+                                    const atr = pc.status !== "pago" && dias !== null && dias < 0;
+                                    const cor = pc.status === "pago" ? D.success : atr ? D.danger : D.textSec;
+                                    return (
+                                      <div key={pc.numero} style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 10px", background: pc.status==="pago"?D.successBg:atr?D.dangerBg:D.muted, borderRadius:D.radiusSm }}>
+                                        <span style={{ width:22, height:22, borderRadius:6, background:"#fff", color:cor, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontBody, fontSize:11, fontWeight:700, flexShrink:0 }}>{pc.numero}</span>
+                                        <div style={{ flex:1, minWidth:0 }}>
+                                          <div style={{ fontFamily:D.fontBody, fontSize:12.5, fontWeight:600, color:D.text }}>R$ {pc.valor.toFixed(2).replace(".",",")}</div>
+                                          <div style={{ fontFamily:D.fontBody, fontSize:11, color:cor }}>
+                                            {pc.status === "pago" ? `Pago em ${pc.pagoEm}` : `Vence ${formatarDataBR(pc.vencimento)}${atr?` · ${Math.abs(dias)}d atraso`:""}`}
+                                          </div>
+                                        </div>
+                                        {pc.status !== "pago" && !readOnly && (
+                                          <button onClick={() => pagarParcela(ac, pc.numero)} style={{ padding:"5px 11px", background:D.primary, color:"#fff", border:"none", borderRadius:20, fontSize:11.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, flexShrink:0 }}>Baixar</button>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {selCob.length > 0 && !readOnly && (
                   <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap", background:D.primary, color:"#fff", borderRadius:D.radius, padding:"12px 16px", marginBottom:14 }}>
@@ -5115,10 +5784,13 @@ export default function App() {
                                   <span>R$ {enc.valorBase.toFixed(2).replace(".",",")}</span>
                                 )}
                               </td>
-                              <td style={{ padding:"13px 16px" }}><Badge status={cob.status} /></td>
+                              <td style={{ padding:"13px 16px" }}>{cob.acordoId ? <span style={{ display:"inline-flex", alignItems:"center", gap:6, background:D.secondary, color:D.accent, fontSize:11.5, fontWeight:600, padding:"4px 11px 4px 8px", borderRadius:20, fontFamily:D.fontBody, whiteSpace:"nowrap" }}><span style={{ width:6, height:6, borderRadius:"50%", background:D.accent }} />Em acordo</span> : <Badge status={cob.status} />}</td>
                               <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec, fontFamily:D.fontBody }}>{cob.dataPagamento || "—"}</td>
                               <td style={{ padding:"13px 16px" }}>
                                 <div style={{ display:"flex", gap:6 }}>
+                                  {cob.status !== "pago" && !readOnly && m.telefone && (
+                                    <AcaoBtn icon="whats" cor={D.success} titulo={`Cobrar ${m.nome} por WhatsApp`} onClick={() => abrirWhatsCobranca(m, cob)} />
+                                  )}
                                   {cob.status !== "pago" ? (
                                     !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Registrar</button>
                                   ) : (
@@ -5161,6 +5833,11 @@ export default function App() {
                     ⬇ Exportar CSV
                   </button>
                   {!readOnly && (
+                    <button onClick={() => setModal({ type:"importarMoradores" })} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"10px 16px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width: isMobile?"100%":"auto" }}>
+                      <NavIcon id="entregas" size={15} /> Importar planilha
+                    </button>
+                  )}
+                  {!readOnly && (
                     <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)`, width: isMobile?"100%":"auto" }}>
                       + Adicionar morador
                     </button>
@@ -5187,7 +5864,7 @@ export default function App() {
                 const lista = ordenados.filter(m => filtroMorador==="todos" || statusDe(m)===filtroMorador);
 
                 const inicial = (m) => (m.nome || m.unidade || "?").trim().charAt(0).toUpperCase();
-                const linkMorador = (m) => `${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}`;
+                const linkMorador = (m) => `${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}${m.tokenPortal ? `&t=${m.tokenPortal}` : ""}`;
                 const abrirEditar = (m) => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,proprietario:m.proprietario||"",email:m.email,telefone:m.telefone||"",tipo:m.tipo||"Proprietário",veiculos:m.veiculos||"",pets:m.pets||"",taxaCustom:m.taxaCustom!=null?String(m.taxaCustom):""}); setModal({type:"editarMorador"}); };
 
                 // Botão de ação com ícone de traço (desktop)
@@ -5231,7 +5908,7 @@ export default function App() {
                                     <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.unidade}{m.proprietario?` · Prop: ${m.proprietario}`:""}</div>
                                   </div>
                                 </div>
-                                {cob && <Badge status={cob.status} />}
+                                {cob && (cob.acordoId ? <span style={{ display:"inline-flex", alignItems:"center", gap:6, background:D.secondary, color:D.accent, fontSize:11.5, fontWeight:600, padding:"4px 11px 4px 8px", borderRadius:20, fontFamily:D.fontBody, whiteSpace:"nowrap" }}><span style={{ width:6, height:6, borderRadius:"50%", background:D.accent }} />Em acordo</span> : <Badge status={cob.status} />)}
                               </div>
                               {m.email && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.email}</div>}
                               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginTop:12 }}>
@@ -5274,10 +5951,12 @@ export default function App() {
                                   <div style={{ fontFamily:D.fontBody, fontSize:12.5, color:D.textSec }}>{m.email||"—"}</div>
                                   {m.telefone && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:2 }}>{m.telefone}</div>}
                                 </td>
-                                <td style={{ padding:"12px 20px" }}>{cob ? <Badge status={cob.status} /> : <span style={{ color:D.textMut, fontSize:12 }}>—</span>}</td>
+                                <td style={{ padding:"12px 20px" }}>{cob ? (cob.acordoId ? <span style={{ display:"inline-flex", alignItems:"center", gap:6, background:D.secondary, color:D.accent, fontSize:11.5, fontWeight:600, padding:"4px 11px 4px 8px", borderRadius:20, fontFamily:D.fontBody, whiteSpace:"nowrap" }}><span style={{ width:6, height:6, borderRadius:"50%", background:D.accent }} />Em acordo</span> : <Badge status={cob.status} />) : <span style={{ color:D.textMut, fontSize:12 }}>—</span>}</td>
                                 <td style={{ padding:"12px 20px" }}>
                                   <div style={{ display:"flex", gap:6 }}>
                                     <AcaoBtn icon="histDoc" titulo="Ver histórico" onClick={() => { setFichaSecao("cobrancas"); setModal({ type:"historico", data:m }); }} />
+                                    {m.telefone && <AcaoBtn icon="whats" cor={D.success} titulo={`Falar com ${m.nome} no WhatsApp`} onClick={() => { const u = linkWhatsApp(m.telefone, `Olá, ${(m.nome||"").split(" ")[0]}! Aqui é do ${nomeCond()}.`); if (u) window.open(u, "_blank", "noopener,noreferrer"); }} />}
+                                    {!readOnly && <AcaoBtn icon="unlock" cor={D.warning} titulo="Gerar link novo (invalida o antigo)" onClick={() => revogarLinkPortal(m)} />}
                                     <AcaoBtn icon="link" titulo="Copiar link do portal" onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} />
                                     {!readOnly && <>
                                       <AcaoBtn icon="logPencil" titulo="Editar morador" onClick={() => abrirEditar(m)} />
@@ -5451,7 +6130,7 @@ export default function App() {
         {/* Trava de plano: abas bloqueadas para planos inferiores */}
         {["servicos","reservas","acessos","historico","comunicados","documentos","fundoReserva","entregas","agenda","fluxoCaixa","ocorrencias","enquetes"].includes(aba) && !podeUsar(aba) && (
           <div>
-            <TopBar title={{servicos:"Serviços e Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa",ocorrencias:"Ocorrências",enquetes:"Enquetes"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
+            <TopBar title={{servicos:"Serviços e Manutenção",reservas:"Reservas",acessos:"Controle de Acessos",historico:"Histórico",comunicados:"Comunicados",documentos:"Documentos",fundoReserva:"Fundo de Reserva",entregas:"Controle de Entregas",agenda:"Agenda",fluxoCaixa:"Fluxo de Caixa",ocorrencias:"Ocorrências",enquetes:"Consultas aos moradores"}[aba]} user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <UpgradeCard recurso={aba} planoNecessario={RECURSO_PLANO[aba]} isMobile={isMobile} />
           </div>
         )}
@@ -5467,6 +6146,90 @@ export default function App() {
               </div>
               {!readOnly && <button onClick={() => setModal({ type:"novoServico" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)` }}>+ Novo</button>}
             </div>
+
+            {/* ── Manutenção preventiva ── */}
+            {(() => {
+              const comPrazo = manutencoes.map(m => ({ ...m, dias: diasAteData(m.proximaData) }));
+              const atrasadas = comPrazo.filter(m => m.dias !== null && m.dias < 0);
+              const proximas  = comPrazo.filter(m => m.dias !== null && m.dias >= 0 && m.dias <= 30);
+              return (
+                <div style={{ marginBottom:28 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, marginBottom:12, flexWrap:"wrap" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <span style={{ width:8, height:8, borderRadius:"50%", background:D.accent }} />
+                      <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:".8px" }}>Manutenção preventiva</span>
+                    </div>
+                    {!readOnly && (
+                      <button onClick={() => { setNovaManutencao({ titulo:"", periodicidade:"semestral", proximaData:"", responsavel:"", obs:"" }); setModal({ type:"novaManutencao" }); }}
+                        style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"8px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width: isMobile?"100%":"auto" }}>
+                        + Nova rotina
+                      </button>
+                    )}
+                  </div>
+
+                  {manutencoes.length === 0 ? (
+                    <div style={{ background:D.bgCard, borderRadius:D.radius, padding:"20px 22px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.accent}` }}>
+                      <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.6 }}>
+                        Cadastre as rotinas obrigatórias — limpeza da caixa d'água, dedetização, recarga de extintor, inspeção do elevador — e o sistema avisa antes de cada prazo vencer.
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {(atrasadas.length > 0 || proximas.length > 0) && (
+                        <div style={{ display:"flex", alignItems:"center", gap:10, background: atrasadas.length?D.dangerBg:D.warningBg, border:`1px solid ${atrasadas.length?"#FECACA":"#FDE68A"}`, borderRadius:D.radius, padding:"10px 16px", marginBottom:12 }}>
+                          <span style={{ color: atrasadas.length?D.danger:D.warning, display:"flex", flexShrink:0 }}><NavIcon id="alerta" size={16} /></span>
+                          <span style={{ fontFamily:D.fontBody, fontSize:12.5, fontWeight:600, color: atrasadas.length?"#991B1B":"#92400E" }}>
+                            {atrasadas.length > 0 && `${atrasadas.length} manutenção(ões) atrasada(s)`}
+                            {atrasadas.length > 0 && proximas.length > 0 && " · "}
+                            {proximas.length > 0 && `${proximas.length} vencendo em até 30 dias`}
+                          </span>
+                        </div>
+                      )}
+                      <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"repeat(auto-fill,minmax(300px,1fr))", gap:12 }}>
+                        {comPrazo.map(m => {
+                          const atrasada = m.dias !== null && m.dias < 0;
+                          const proxima  = m.dias !== null && m.dias >= 0 && m.dias <= 30;
+                          const cor = atrasada ? D.danger : proxima ? D.warning : D.success;
+                          const rot = m.dias === null ? "Sem data"
+                            : atrasada ? `Atrasada há ${Math.abs(m.dias)} dia${Math.abs(m.dias)!==1?"s":""}`
+                            : m.dias === 0 ? "É hoje"
+                            : `Em ${m.dias} dia${m.dias!==1?"s":""}`;
+                          return (
+                            <div key={m.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:"16px 18px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${cor}` }}>
+                              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, marginBottom:10 }}>
+                                <div style={{ minWidth:0 }}>
+                                  <div style={{ fontFamily:D.fontDisplay, fontSize:14.5, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>{m.titulo}</div>
+                                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>
+                                    {infoPeriodicidade(m.periodicidade).label}{m.responsavel ? ` · ${m.responsavel}` : ""}
+                                  </div>
+                                </div>
+                                {!readOnly && (
+                                  <button onClick={() => removerManutencao(m.id)} title="Remover rotina" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer", flexShrink:0 }}><NavIcon id="logTrash" size={14} /></button>
+                                )}
+                              </div>
+                              <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom: readOnly?0:12 }}>
+                                <span style={{ display:"inline-flex", alignItems:"center", gap:6, background: atrasada?D.dangerBg:proxima?D.warningBg:D.successBg, color:cor, fontSize:11.5, fontWeight:600, padding:"4px 11px 4px 8px", borderRadius:20, fontFamily:D.fontBody }}>
+                                  <span style={{ width:6, height:6, borderRadius:"50%", background:cor }} />{rot}
+                                </span>
+                                <span style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textMut }}>{m.proximaData ? formatarDataBR(m.proximaData) : ""}</span>
+                              </div>
+                              {m.ultimaExecucao && (
+                                <div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textMut, marginBottom: readOnly?0:10 }}>Última: {formatarDataBR(m.ultimaExecucao)}</div>
+                              )}
+                              {!readOnly && (
+                                <button onClick={() => concluirManutencao(m)} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, width:"100%", padding:"9px 14px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                                  <NavIcon id="logCheck" size={14} /> Marcar como feita
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
 
             {(() => {
               const pend = servicos.filter(s=>s.status==="pendente");
@@ -5921,7 +6684,7 @@ export default function App() {
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
                 <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>Documentos importantes do condomínio, com alerta de vencimento</div>
                 {!readOnly && (
-                  <button onClick={() => { setNovoDocumento({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"" }); setModal({ type:"novoDocumento" }); }} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)`, width: isMobile?"100%":"auto" }}>
+                  <button onClick={() => { setNovoDocumento({ nome:"", categoria:"Alvará", vencimento:"", obs:"", arquivo:null, arquivoNome:"", publico:false }); setModal({ type:"novoDocumento" }); }} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)`, width: isMobile?"100%":"auto" }}>
                     + Novo documento
                   </button>
                 )}
@@ -5994,7 +6757,7 @@ export default function App() {
                             const s = docItem.sit;
                             return (
                               <div key={docItem.id} style={{ background:D.bgCard, borderRadius:D.radius, padding:"18px 20px", boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${s.cor}` }}>
-                                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, marginBottom:10 }}>
+                                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8, marginBottom:10 }}>
                                   <div style={{ display:"flex", alignItems:"center", gap:11, minWidth:0 }}>
                                     <div style={{ width:38, height:38, borderRadius:9, background:D.muted, display:"flex", alignItems:"center", justifyContent:"center", color:D.accent, flexShrink:0 }}><NavIcon id={docIconId(docItem.categoria)} size={18} /></div>
                                     <div style={{ minWidth:0 }}>
@@ -6002,6 +6765,12 @@ export default function App() {
                                       <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{docItem.categoria}</div>
                                     </div>
                                   </div>
+                                  {!readOnly && (
+                                    <button onClick={() => alternarDocPublico(docItem)} title={docItem.publico ? "Visível no portal do morador — clique para ocultar" : "Oculto dos moradores — clique para liberar no portal"}
+                                      style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background: docItem.publico?D.successBg:D.muted, color: docItem.publico?D.success:D.textMut, border:`1px solid ${docItem.publico?D.success+"33":D.border}`, borderRadius:8, cursor:"pointer", flexShrink:0 }}>
+                                      <NavIcon id={docItem.publico ? "unlock" : "lock"} size={15} />
+                                    </button>
+                                  )}
                                   {!readOnly && (
                                     <button onClick={() => { if(window.confirm("Remover este documento?")) removerDocumento(docItem.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer", flexShrink:0 }}><NavIcon id="logTrash" size={15} /></button>
                                   )}
@@ -6262,7 +7031,7 @@ export default function App() {
           const votosDaEnquete = (enqId) => votos.filter(v => v.enqueteId === enqId);
           return (
           <div>
-            <TopBar title="Enquetes" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
+            <TopBar title="Consultas aos moradores" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
@@ -6719,7 +7488,13 @@ export default function App() {
               </div>
             ) : (() => {
               // Filtro por período (data) e depois por tipo
-              const noPer = logs.filter(l => noPeriodo(l.timestamp, perLog) && casaBusca(l, buscaLog, ["descricao","usuario","dataHora"]));
+              // Por padrão mostra os últimos 12 meses: o histórico cresce para sempre e
+              // carregar tudo deixa a tela lenta com o tempo. O botão abaixo libera o resto.
+              const LIMITE_MESES = 12;
+              const corteHistorico = Date.now() - LIMITE_MESES * 30 * MS_DIA;
+              const logsAntigos = logs.filter(l => (l.timestamp || 0) < corteHistorico).length;
+              const baseLogs = histCompleto ? logs : logs.filter(l => (l.timestamp || 0) >= corteHistorico);
+              const noPer = baseLogs.filter(l => noPeriodo(l.timestamp, perLog) && casaBusca(l, buscaLog, ["descricao","usuario","dataHora"]));
               const filtrados = noPer.filter(l => filtroLog === "tudo" || tipoLog(l) === filtroLog);
               // Agrupamento por data (logs já vêm ordenados por timestamp desc)
               const grupos = [];
@@ -6766,6 +7541,19 @@ export default function App() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Registros mais antigos ficam fora por padrão, para a tela abrir rápido */}
+                  {!histCompleto && logsAntigos > 0 && (
+                    <div style={{ textAlign:"center", marginTop:18 }}>
+                      <button onClick={() => setHistCompleto(true)}
+                        style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"10px 20px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                        <NavIcon id="setaBaixo" size={14} /> Carregar registros anteriores ({logsAntigos})
+                      </button>
+                      <div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textMut, marginTop:8 }}>
+                        Mostrando os últimos 12 meses
+                      </div>
                     </div>
                   )}
                 </>
@@ -6883,7 +7671,7 @@ export default function App() {
                   </>
                 ) : (
                   <div style={{ background:D.muted, borderRadius:D.radiusSm, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-                    <span style={{ fontSize:20 }}>🔒</span>
+                    <span style={{ display:"flex", color:D.textMut }}><NavIcon id="lock" size={19} /></span>
                     <div style={{ flex:1, minWidth:180 }}>
                       <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>Multa e juros — plano Padrão</div>
                       <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Cobre automaticamente multa e juros sobre atrasos.</div>
@@ -6968,7 +7756,7 @@ export default function App() {
                 </>
               ) : (
                 <div style={{ background:D.muted, borderRadius:D.radiusSm, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-                  <span style={{ fontSize:20 }}>🔒</span>
+                  <span style={{ display:"flex", color:D.textMut }}><NavIcon id="lock" size={19} /></span>
                   <div style={{ flex:1, minWidth:180 }}>
                     <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>E-mails automáticos — plano Padrão</div>
                     <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Envie lembretes e cobranças automáticas por e-mail.</div>
@@ -6976,6 +7764,78 @@ export default function App() {
                   <a href="mailto:comercial.mysindi@gmail.com?subject=Upgrade de plano — MySindi" style={{ padding:"8px 16px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>Fazer upgrade</a>
                 </div>
               )}
+            </div>
+
+            {/* Card de EQUIPE */}
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.success}`, marginBottom:20 }}>
+              <div style={{ fontFamily:D.fontBody, fontSize:10.5, fontWeight:700, color:D.success, textTransform:"uppercase", letterSpacing:"1px", marginBottom:8 }}>Equipe</div>
+              <h3 style={{ color:D.text, margin:"0 0 4px", fontSize:15, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Quem tem acesso</h3>
+              <p style={{ color:D.textSec, fontSize:12.5, margin:"0 0 18px", lineHeight:1.6 }}>
+                Dê acesso ao subsíndico, ao conselho fiscal e à portaria sem compartilhar a sua senha. Cada perfil vê apenas o que precisa.
+              </p>
+
+              {/* Lista da equipe */}
+              <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:20 }}>
+                {equipe.length === 0 ? (
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textMut, padding:"12px 0" }}>Carregando...</div>
+                ) : equipe.map(u => {
+                  const eu = u.id === user?.uid;
+                  const info = infoPapel(u.papel);
+                  return (
+                    <div key={u.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:D.bgCard, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, flexWrap: isMobile?"wrap":"nowrap" }}>
+                      <div style={{ width:34, height:34, borderRadius:"50%", background:D.primary, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, flexShrink:0 }}>
+                        {(u.nome || u.email || "?").charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {u.nome || u.email}{eu && <span style={{ color:D.textMut, fontWeight:400 }}> · você</span>}
+                        </div>
+                        <div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{u.email}</div>
+                      </div>
+                      {eu ? (
+                        <span style={{ fontFamily:D.fontBody, fontSize:12, fontWeight:600, color:D.textSec, background:D.muted, padding:"6px 12px", borderRadius:20, flexShrink:0 }}>{info.label}</span>
+                      ) : (
+                        <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+                          <select value={u.papel || "sindico"} onChange={e => alterarPapel(u.id, e.target.value)}
+                            style={{ padding:"7px 10px", border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:12.5, background:"#fff", fontFamily:D.fontBody, color:D.text, cursor:"pointer" }}>
+                            {Object.entries(PAPEIS).map(([id,p]) => <option key={id} value={id}>{p.label}</option>)}
+                          </select>
+                          <button onClick={() => revogarAcesso(u.id)} title="Remover acesso"
+                            style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid ${D.border}`, borderRadius:8, cursor:"pointer" }}>
+                            <NavIcon id="logTrash" size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Convidar */}
+              <div style={{ background:D.muted, borderRadius:D.radius, padding:"16px 18px" }}>
+                <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, marginBottom:12 }}>Convidar alguém</div>
+                <div style={{ display:"flex", gap:10, flexDirection: isMobile?"column":"row", alignItems: isMobile?"stretch":"flex-end" }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <label style={{ fontSize:10.5, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>E-mail</label>
+                    <input value={novoConvite.email} onChange={e => setNovoConvite(p => ({...p, email:e.target.value}))} placeholder="pessoa@email.com"
+                      style={{ display:"block", width:"100%", padding:"10px 12px", border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13.5, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+                  </div>
+                  <div style={{ minWidth: isMobile?"auto":170 }}>
+                    <label style={{ fontSize:10.5, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:5 }}>Perfil</label>
+                    <select value={novoConvite.papel} onChange={e => setNovoConvite(p => ({...p, papel:e.target.value}))}
+                      style={{ display:"block", width:"100%", padding:"10px 12px", border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13.5, boxSizing:"border-box", background:"#fff", fontFamily:D.fontBody, color:D.text, cursor:"pointer" }}>
+                      {Object.entries(PAPEIS).filter(([id]) => id !== "sindico").map(([id,p]) => <option key={id} value={id}>{p.label}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={async () => { const ok = await convidarMembro(novoConvite.email, novoConvite.papel); if (ok) setNovoConvite({ email:"", papel:"portaria" }); }}
+                    style={{ padding:"10px 20px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, whiteSpace:"nowrap" }}>
+                    Convidar
+                  </button>
+                </div>
+                <div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:10, lineHeight:1.5 }}>
+                  {infoPapel(novoConvite.papel).descricao} A pessoa recebe acesso ao criar a conta com este e-mail.
+                </div>
+              </div>
             </div>
 
             {/* Card de INFO — CONTA */}
@@ -7004,7 +7864,7 @@ export default function App() {
           <input value={pagForm.obs} onChange={e=>setPagForm(p=>({...p,obs:e.target.value}))} placeholder="Ex: Pago via Pix" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:6, marginBottom:14, boxSizing:"border-box" }} />
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Comprovante</label>
           <div onClick={() => fileRef.current.click()} style={{ marginTop:6, border:"2px dashed #D0DAE6", borderRadius:8, padding:"18px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:"#6B7A8D", fontSize:13 }}>
-            {pagForm.arquivoNome ? <span style={{color:"#2E6DA4",fontWeight:600}}>📎 {pagForm.arquivoNome}</span> : <><div style={{fontSize:22,marginBottom:4}}>📁</div>Toque para selecionar</>}
+            {pagForm.arquivoNome ? <span style={{color:D.accent,fontWeight:600,display:"inline-flex",alignItems:"center",gap:6}}><NavIcon id="histDoc" size={14} /> {pagForm.arquivoNome}</span> : <><div style={{display:"flex",justifyContent:"center",marginBottom:6,color:D.textMut}}><NavIcon id="download" size={20} /></div>Toque para selecionar</>}
           </div>
           <input ref={fileRef} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f=e.target.files[0]; if(f) setPagForm(p=>({...p,arquivo:f,arquivoNome:f.name})); }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
@@ -7020,7 +7880,7 @@ export default function App() {
             <img src={modal.data.comprovante} alt="comprovante" style={{ width:"100%", borderRadius:8, border:"1px solid #E8EDF3" }} />
           ) : modal.data.comprovante?.startsWith("data:application/pdf") ? (
             <div style={{ textAlign:"center", padding:20 }}>
-              <div style={{ fontSize:48, marginBottom:10 }}>📄</div>
+              <div style={{ display:"flex", justifyContent:"center", marginBottom:10, color:D.textMut }}><NavIcon id="histDoc" size={44} /></div>
               <p style={{ color:"#1E3A5F", fontWeight:600, marginBottom:14 }}>{modal.data.arquivoNome||"comprovante.pdf"}</p>
               <a href={modal.data.comprovante} download={modal.data.arquivoNome||"comprovante.pdf"} style={{ padding:"10px 24px", background:"#2E6DA4", color:"#fff", borderRadius:8, textDecoration:"none", fontSize:13, fontWeight:600 }}>⬇ Baixar PDF</a>
             </div>
@@ -7037,6 +7897,200 @@ export default function App() {
           </div>
         </Modal>
       )}
+
+      {modal?.type === "novoAcordo" && (() => {
+        const devedores = moradores.filter(m => cobrancas.some(c => c.moradorId === m.id && c.status !== "pago" && !c.acordoId));
+        const sel = formAcordo.moradorId ? moradores.find(m => m.id === formAcordo.moradorId) : null;
+        const emAberto = sel ? cobrancas.filter(c => c.moradorId === sel.id && c.status !== "pago" && !c.acordoId) : [];
+        const totalDivida = emAberto.reduce((soma, c) => soma + encargosCobranca(c).valorTotal, 0);
+        const entradaNum = valorValido(formAcordo.entrada) ? paraNumero(formAcordo.entrada) : 0;
+        const n = parseInt(formAcordo.nParcelas) || 1;
+        const valorParcela = totalDivida > entradaNum ? (totalDivida - entradaNum) / n : 0;
+        return (
+          <Modal title="Novo acordo de dívida" onClose={() => setModal(null)} isMobile={isMobile}>
+            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Morador *</label>
+                <select value={formAcordo.moradorId} onChange={e=>setFormAcordo(p=>({...p,moradorId:e.target.value}))}
+                  style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", background:"#fff", fontFamily:D.fontBody, color:D.text, cursor:"pointer" }}>
+                  <option value="">Selecione quem vai negociar</option>
+                  {devedores.map(m => <option key={m.id} value={m.id}>{m.unidade} — {m.nome}</option>)}
+                </select>
+                {devedores.length === 0 && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginTop:6 }}>Nenhum morador com cobrança em aberto.</div>}
+              </div>
+
+              {sel && (
+                <div style={{ background:D.muted, borderRadius:D.radius, padding:"14px 16px" }}>
+                  <div style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, marginBottom:8 }}>Dívida atual</div>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color:D.danger, letterSpacing:"-0.02em" }}>R$ {totalDivida.toFixed(2).replace(".",",")}</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:4 }}>
+                    {emAberto.length} cobrança(s): {emAberto.map(c => mesLabel(c.mes)).join(", ")}
+                  </div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textMut, marginTop:8, lineHeight:1.5 }}>
+                    Multa e juros ficam congelados na data de hoje enquanto o acordo estiver em dia.
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display:"flex", gap:12, flexDirection: isMobile?"column":"row" }}>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Entrada (opcional)</label>
+                  <input type="text" inputMode="decimal" value={formAcordo.entrada} onChange={e=>setFormAcordo(p=>({...p,entrada:e.target.value}))} placeholder="0,00"
+                    style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Parcelas *</label>
+                  <input type="number" min="1" max="36" value={formAcordo.nParcelas} onChange={e=>setFormAcordo(p=>({...p,nParcelas:e.target.value}))}
+                    style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Vencimento da 1ª parcela *</label>
+                <input type="date" value={formAcordo.primeiraData} onChange={e=>setFormAcordo(p=>({...p,primeiraData:e.target.value}))}
+                  style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+                <div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textMut, marginTop:6 }}>As demais vencem no mesmo dia dos meses seguintes.</div>
+              </div>
+
+              {sel && valorParcela > 0 && (
+                <div style={{ background:D.successBg, border:`1px solid ${D.success}33`, borderRadius:D.radius, padding:"14px 16px" }}>
+                  <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.text, lineHeight:1.6 }}>
+                    {entradaNum > 0 && <>Entrada de <b>R$ {entradaNum.toFixed(2).replace(".",",")}</b> mais<br/></>}
+                    <b>{n}x de aproximadamente R$ {valorParcela.toFixed(2).replace(".",",")}</b>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display:"flex", gap:10, justifyContent:"flex-end", flexDirection: isMobile?"column-reverse":"row" }}>
+                <button onClick={() => setModal(null)} style={{ padding:"11px 20px", background:D.bgCard, color:D.textSec, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+                <button onClick={criarAcordo} disabled={!sel} style={{ padding:"11px 22px", background: sel?D.primary:D.muted, color: sel?"#fff":D.textMut, border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor: sel?"pointer":"default", fontFamily:D.fontBody }}>Criar acordo</button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {modal?.type === "novaManutencao" && (
+        <Modal title="Nova rotina de manutenção" onClose={() => setModal(null)} isMobile={isMobile}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>O que precisa ser feito *</label>
+              <input value={novaManutencao.titulo} onChange={e=>setNovaManutencao(p=>({...p,titulo:e.target.value}))} placeholder="Ex: Limpeza da caixa d'água"
+                style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:8 }}>
+                {[
+                  { t:"Limpeza da caixa d'água", p:"semestral" },
+                  { t:"Dedetização", p:"semestral" },
+                  { t:"Recarga de extintores", p:"anual" },
+                  { t:"Inspeção do elevador", p:"mensal" },
+                  { t:"Limpeza de calhas", p:"semestral" },
+                ].map((sug,i) => (
+                  <button key={i} onClick={() => setNovaManutencao(p => ({...p, titulo:sug.t, periodicidade:sug.p }))}
+                    style={{ padding:"4px 11px", background:D.muted, color:D.textSec, border:`1px solid ${D.border}`, borderRadius:20, fontSize:11.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                    {sug.t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display:"flex", gap:12, flexDirection: isMobile?"column":"row" }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>A cada quanto tempo *</label>
+                <select value={novaManutencao.periodicidade} onChange={e=>setNovaManutencao(p=>({...p,periodicidade:e.target.value}))}
+                  style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", background:"#fff", fontFamily:D.fontBody, color:D.text, cursor:"pointer" }}>
+                  {PERIODICIDADES.map(pp => <option key={pp.id} value={pp.id}>{pp.label}</option>)}
+                </select>
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Próxima execução *</label>
+                <input type="date" value={novaManutencao.proximaData} onChange={e=>setNovaManutencao(p=>({...p,proximaData:e.target.value}))}
+                  style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>Responsável</label>
+              <input value={novaManutencao.responsavel} onChange={e=>setNovaManutencao(p=>({...p,responsavel:e.target.value}))} placeholder="Empresa ou pessoa"
+                style={{ display:"block", width:"100%", padding:"11px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, boxSizing:"border-box", fontFamily:D.fontBody, color:D.text }} />
+            </div>
+
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end", flexDirection: isMobile?"column-reverse":"row" }}>
+              <button onClick={() => setModal(null)} style={{ padding:"11px 20px", background:D.bgCard, color:D.textSec, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+              <button onClick={salvarManutencao} style={{ padding:"11px 22px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cadastrar rotina</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "importarMoradores" && (() => {
+        const linhas = parsearPlanilha(importTexto);
+        const comErros = linhas.map(l => ({ ...l, erros: validarLinhaImport(l, moradores, linhas) }));
+        const validas = comErros.filter(l => l.erros.length === 0);
+        const invalidas = comErros.filter(l => l.erros.length > 0);
+        return (
+          <Modal title="Importar moradores" onClose={() => { setImportTexto(""); setModal(null); }} isMobile={isMobile}>
+            <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.6, margin:"0 0 14px" }}>
+              Cole as linhas direto do Excel ou Google Sheets (ou um CSV). A ordem das colunas deve ser:
+            </p>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:14 }}>
+              {["Unidade *","Nome *","E-mail *","Telefone","Tipo","Proprietário"].map((c,i) => (
+                <span key={i} style={{ fontFamily:D.fontBody, fontSize:11.5, fontWeight:600, background: i<3?D.secondary:D.muted, color: i<3?D.text:D.textSec, padding:"4px 10px", borderRadius:20 }}>{c}</span>
+              ))}
+            </div>
+            <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginBottom:10 }}>
+              Se a primeira linha for o cabeçalho da planilha, ela é ignorada automaticamente.
+            </div>
+
+            <textarea value={importTexto} onChange={e => setImportTexto(e.target.value)} rows={7}
+              placeholder={"Apto 101\tMayara Silva\tmayara@email.com\t(85) 99999-8888\nApto 102\tJoão Souza\tjoao@email.com"}
+              style={{ display:"block", width:"100%", padding:"12px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, boxSizing:"border-box", fontFamily:"monospace", color:D.text, resize:"vertical", lineHeight:1.6, marginBottom:14 }} />
+
+            {linhas.length > 0 && (
+              <>
+                <div style={{ display:"flex", gap:10, marginBottom:12, flexWrap:"wrap" }}>
+                  <span style={{ display:"inline-flex", alignItems:"center", gap:6, fontFamily:D.fontBody, fontSize:12.5, fontWeight:600, color:D.success, background:D.successBg, padding:"5px 12px", borderRadius:20 }}>
+                    <NavIcon id="logCheck" size={13} /> {validas.length} pronta{validas.length!==1?"s":""} para importar
+                  </span>
+                  {invalidas.length > 0 && (
+                    <span style={{ display:"inline-flex", alignItems:"center", gap:6, fontFamily:D.fontBody, fontSize:12.5, fontWeight:600, color:D.danger, background:D.dangerBg, padding:"5px 12px", borderRadius:20 }}>
+                      <NavIcon id="alerta" size={13} /> {invalidas.length} com problema
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ maxHeight:220, overflowY:"auto", border:`1px solid ${D.border}`, borderRadius:D.radiusSm, marginBottom:16 }}>
+                  {comErros.map((l,i) => {
+                    const ok = l.erros.length === 0;
+                    return (
+                      <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 12px", borderBottom: i<comErros.length-1?`1px solid ${D.border}`:"none", background: ok?"transparent":D.dangerBg }}>
+                        <span style={{ color: ok?D.success:D.danger, display:"flex", flexShrink:0 }}><NavIcon id={ok?"logCheck":"alerta"} size={14} /></span>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontFamily:D.fontBody, fontSize:12.5, fontWeight:600, color:D.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                            {l.unidade || "(sem unidade)"} — {l.nome || "(sem nome)"}
+                          </div>
+                          <div style={{ fontFamily:D.fontBody, fontSize:11.5, color: ok?D.textSec:D.danger }}>
+                            {ok ? l.email : l.erros.join(" · ")}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            <div style={{ display:"flex", gap:10, flexDirection: isMobile?"column-reverse":"row", justifyContent:"flex-end" }}>
+              <button onClick={() => { setImportTexto(""); setModal(null); }} style={{ padding:"11px 20px", background:D.bgCard, color:D.textSec, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                Cancelar
+              </button>
+              <button onClick={() => importarMoradores(validas)} disabled={validas.length === 0 || importando}
+                style={{ padding:"11px 22px", background: validas.length?D.primary:D.muted, color: validas.length?"#fff":D.textMut, border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor: validas.length&&!importando?"pointer":"default", fontFamily:D.fontBody }}>
+                {importando ? "Importando..." : validas.length ? `Importar ${validas.length} morador${validas.length!==1?"es":""}` : "Nada para importar"}
+              </button>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {modal?.type === "novoMorador" && (
         <Modal title="Novo Morador" onClose={() => setModal(null)} isMobile={isMobile}>
@@ -7135,7 +8189,7 @@ export default function App() {
                 {m.taxaCustom != null && <span style={{ background:D.warningBg, color:"#92400E", fontSize:11, fontWeight:600, padding:"2px 10px", borderRadius:12, fontFamily:D.fontBody }}>Taxa: R$ {Number(m.taxaCustom).toFixed(2).replace(".",",")}</span>}
               </div>
               <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:6, lineHeight:1.8 }}>
-                📧 {m.email}{m.telefone ? ` · 📱 ${m.telefone}` : ""}
+                {m.email}{m.telefone ? ` · ${m.telefone}` : ""}
                 {m.veiculos ? <><br/>🚗 {m.veiculos}</> : ""}
                 {m.pets ? <><br/>🐾 {m.pets}</> : ""}
               </div>
@@ -7198,7 +8252,7 @@ export default function App() {
                       <span style={{ fontSize:11, fontWeight:600, color:corBorda, textTransform:"capitalize" }}>{c.status}</span>
                       <span style={{ fontSize:12, color:"#1E3A5F", fontWeight:600 }}>R$ {taxa.toFixed(2).replace(".",",")}</span>
                       {c.status === "pago" && (
-                        <button onClick={() => gerarReciboPDF(m, c.dataPagamento, c.obs)} style={{ fontSize:11, padding:"3px 8px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, cursor:"pointer", fontWeight:600, marginTop:2 }}>
+                        <button onClick={() => gerarReciboPDF(m, c.dataPagamento, c.obs, { mesSel: c.mes, taxa, nomeCondominio: nomeCond() })} style={{ fontSize:11, padding:"3px 8px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, cursor:"pointer", fontWeight:600, marginTop:2 }}>
                           📄 Recibo
                         </button>
                       )}
@@ -7333,7 +8387,7 @@ export default function App() {
             </div>
             {podeUsar("emailAuto") && (
               <div style={{ background:D.secondary, borderRadius:D.radiusSm, padding:"10px 14px", fontFamily:D.fontBody, fontSize:12, color:D.textSec, display:"flex", alignItems:"center", gap:8 }}>
-                <span>📧</span> O morador será notificado por e-mail automaticamente (se tiver e-mail cadastrado).
+                <span style={{display:"flex",color:D.accent}}><NavIcon id="emails" size={14} /></span> O morador será notificado por e-mail automaticamente (se tiver e-mail cadastrado).
               </div>
             )}
           </div>
@@ -7630,6 +8684,13 @@ export default function App() {
           </div>
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:D.muted, color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
+            <label style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", background:D.muted, borderRadius:D.radiusSm, cursor:"pointer", marginBottom:16 }}>
+              <input type="checkbox" checked={!!novoDocumento.publico} onChange={e=>setNovoDocumento(p=>({...p,publico:e.target.checked}))} style={{ width:17, height:17, cursor:"pointer", accentColor:D.primary, flexShrink:0 }} />
+              <span style={{ minWidth:0 }}>
+                <span style={{ display:"block", fontFamily:D.fontBody, fontSize:13.5, fontWeight:600, color:D.text }}>Visível para os moradores</span>
+                <span style={{ display:"block", fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:2 }}>Aparece no portal para consulta e download. Use para convenção, regimento e atas.</span>
+              </span>
+            </label>
             <button onClick={salvarDocumento} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:D.fontBody }}>📁 Salvar</button>
           </div>
         </Modal>
@@ -7797,7 +8858,7 @@ export default function App() {
           </label>
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginTop:14 }}>Comprovante</label>
           <div onClick={() => fileRefDespesa.current.click()} style={{ marginTop:6, border:"2px dashed #D0DAE6", borderRadius:8, padding:"16px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:"#6B7A8D", fontSize:13 }}>
-            {novaDespesa.arquivoNome ? <span style={{color:"#2E6DA4",fontWeight:600}}>📎 {novaDespesa.arquivoNome}</span> : <>📁 Toque para selecionar</>}
+            {novaDespesa.arquivoNome ? <span style={{color:D.accent,fontWeight:600,display:"inline-flex",alignItems:"center",gap:6}}><NavIcon id="histDoc" size={14} /> {novaDespesa.arquivoNome}</span> : <>📁 Toque para selecionar</>}
           </div>
           <input ref={fileRefDespesa} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f=e.target.files[0]; if(f) setNovaDespesa(p=>({...p,arquivo:f,arquivoNome:f.name})); }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>

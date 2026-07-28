@@ -3490,7 +3490,14 @@ export default function App() {
       showToast(`${orfas.length} cobrança(s) órfã(s) removida(s).`);
     } catch (e) {
       console.error("Erro ao limpar cobranças órfãs:", e);
-      showToast("Não foi possível concluir a limpeza. Verifique sua conexão e tente de novo.", "error");
+      // Erro de permissão tem causa e solução específicas — vale dizer qual é
+      const semPermissao = String(e?.code || e?.message || "").includes("permission");
+      showToast(
+        semPermissao
+          ? "O Firebase bloqueou a remoção. Republique as regras do Firestore (versão mais recente) e tente de novo."
+          : "Não foi possível concluir a limpeza. Verifique sua conexão e tente de novo.",
+        "error"
+      );
     } finally {
       setLimpandoOrfas(false);
     }

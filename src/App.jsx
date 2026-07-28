@@ -2766,47 +2766,123 @@ const infoPapel = (p) => PAPEIS[p] || PAPEIS.sindico;
 /* ── Importação de moradores por planilha ──
    Aceita colar direto do Excel/Sheets (colunas separadas por TAB) ou CSV (; ou ,).
    Detecta e ignora a linha de cabeçalho, para o síndico poder colar a seleção inteira. */
-const COLUNAS_IMPORT = ["unidade", "nome", "email", "telefone", "tipo", "proprietario"];
+/* ── Importação de moradores ──
+   Lê a lista do jeito que o cliente tiver: planilha, bloco de notas, texto colado
+   ou foto. Em vez de exigir uma ordem fixa de colunas, identifica cada campo pelo
+   conteúdo — assim funciona com qualquer arrumação. */
 
-const detectarSeparador = (linha) => {
-  if (linha.includes("\t")) return "\t";
-  if (linha.includes(";")) return ";";
-  if (linha.includes(",")) return ",";
-  return "\t";
+const ehEmailImport = (t) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(t).trim());
+const ehTelefoneImport = (t) => {
+  const d = String(t).replace(/\D/g, "");
+  return d.length >= 10 && d.length <= 13 && !/^\d{4}$/.test(String(t).trim());
+};
+const ehUnidadeImport = (t) => {
+  const s = normalizarTexto(t).trim();
+  if (!s) return false;
+  if (/^(apto|ap|apart|apartamento|casa|unid|unidade|bloco|bl|lote|sala|torre)\b/.test(s)) return true;
+  if (/^\d{1,4}[a-z]?$/.test(s)) return true;                // 101, 42B
+  if (/^\d{1,3}\s*[-/]\s*\d{1,4}$/.test(s)) return true;     // 2-101, 2/101
+  return false;
+};
+const ehTipoImport = (t) => ["proprietario","proprietaria","inquilino","inquilina","locatario","morador","dono"]
+  .includes(normalizarTexto(t).trim());
+const ehNomeImport = (t) => {
+  const s = String(t).trim();
+  if (!s || s.length < 2) return false;
+  if (ehEmailImport(s) || ehTelefoneImport(s) || ehUnidadeImport(s) || ehTipoImport(s)) return false;
+  return /[a-zA-ZÀ-ú]{2,}/.test(s);
 };
 
-const ehCabecalho = (celulas) => {
-  const t = celulas.map(c => normalizarTexto(c).trim());
-  return t.some(c => ["unidade","apto","apartamento"].includes(c))
-      && t.some(c => ["nome","morador"].includes(c));
+// Quebra a linha aceitando tabulação, ponto e vírgula, barra, hífen, vírgula ou espaços alinhados
+const fatiarLinha = (linha) => {
+  const l = String(linha).trim();
+  if (l.includes("\t")) return l.split("\t");
+  if (l.includes(";"))  return l.split(";");
+  if (l.includes("|"))  return l.split("|");
+  if (/\s[-–—]\s/.test(l)) return l.split(/\s[-–—]\s/);   // hífen com espaço não quebra "Maria-Clara"
+  if (l.includes(",")) {
+    const p = l.split(",");
+    // Vírgula em "Silva, João" pertence ao nome; só separa se houver mais campos
+    if (p.length > 2 || p.some(x => ehEmailImport(x.trim()) || ehTelefoneImport(x.trim()))) return p;
+  }
+  if (/\s{2,}/.test(l)) return l.split(/\s{2,}/);
+  return [l];
+};
+
+// Descobre o papel de cada pedaço da linha
+const interpretarLinhaImport = (linha, numero) => {
+  const pedacos = fatiarLinha(linha).map(p => p.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+  if (!pedacos.length) return null;
+  const reg = { _linha: numero, unidade:"", nome:"", email:"", telefone:"", tipo:"", proprietario:"" };
+  const sobra = [];
+
+  pedacos.forEach(p => {
+    if (!reg.email && ehEmailImport(p))       { reg.email = p; return; }
+    if (!reg.telefone && ehTelefoneImport(p)) { reg.telefone = p; return; }
+    if (!reg.unidade && ehUnidadeImport(p))   { reg.unidade = p; return; }
+    // "Bloco B" seguido de "201" é uma unidade só, partida em dois pedaços
+    if (reg.unidade && /^\d{1,4}[a-zA-Z]?$/.test(p.trim()) && !/\d/.test(reg.unidade)) {
+      reg.unidade = `${reg.unidade} ${p.trim()}`; return;
+    }
+    if (!reg.tipo && ehTipoImport(p))         { reg.tipo = p; return; }
+    sobra.push(p);
+  });
+
+  const nomes = sobra.filter(ehNomeImport);
+  if (nomes.length) reg.nome = nomes[0];
+  if (nomes.length > 1) reg.proprietario = nomes[1];
+
+  // Formato "101 João Silva", sem separador nenhum
+  if (!reg.unidade && reg.nome) {
+    const m = reg.nome.match(/^(\d{1,4}[a-zA-Z]?)\s+(.+)$/);
+    if (m) { reg.unidade = m[1]; reg.nome = m[2]; }
+  }
+  if (reg.tipo) {
+    const t = normalizarTexto(reg.tipo);
+    reg.tipo = (t.startsWith("inquil") || t.startsWith("locat")) ? "Inquilino" : "Proprietário";
+  }
+  return reg;
+};
+
+const pareceCabecalhoImport = (linha) => {
+  const t = normalizarTexto(linha);
+  const rotulos = ["unidade","apto","apartamento","nome","morador","email","e-mail","telefone","celular","tipo","proprietario"];
+  return rotulos.filter(r => t.includes(r)).length >= 2 && !/@/.test(linha);
 };
 
 const parsearPlanilha = (texto) => {
   const linhas = String(texto || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  if (!linhas.length) return [];
-  const sep = detectarSeparador(linhas[0]);
-  const corpo = linhas.map(l => l.split(sep).map(c => c.trim().replace(/^["']|["']$/g, "")));
-  const inicio = ehCabecalho(corpo[0]) ? 1 : 0;
-  return corpo.slice(inicio).map((cels, i) => {
-    const reg = { _linha: inicio + i + 1 };
-    COLUNAS_IMPORT.forEach((campo, idx) => { reg[campo] = cels[idx] || ""; });
-    return reg;
-  });
+  return linhas
+    .filter(l => !pareceCabecalhoImport(l))
+    .map((l, i) => interpretarLinhaImport(l, i + 1))
+    .filter(r => r && (r.nome || r.unidade || r.email));
 };
+
+// Carrega uma biblioteca externa sob demanda, só quando o síndico usa o recurso.
+// Evita pesar o sistema inteiro por causa de uma tela usada uma vez.
+const carregarScript = (url) => new Promise((ok, erro) => {
+  if (document.querySelector(`script[src="${url}"]`)) return ok();
+  const el = document.createElement("script");
+  el.src = url; el.async = true;
+  el.onload = () => ok();
+  el.onerror = () => erro(new Error(`Falha ao carregar ${url}`));
+  document.head.appendChild(el);
+});
 
 // Valida uma linha contra os moradores já cadastrados e contra as outras linhas do próprio lote
 const validarLinhaImport = (reg, moradoresExistentes, outrasLinhas) => {
   const erros = [];
-  if (!reg.unidade) erros.push("unidade vazia");
-  if (!reg.nome) erros.push("nome vazio");
-  if (!reg.email) erros.push("e-mail vazio");
-  else if (!reg.email.includes("@") || !reg.email.includes(".")) erros.push("e-mail inválido");
+  // Unidade e nome são o mínimo. E-mail fica opcional: listas em papel e fotos
+  // quase nunca trazem e-mail, e exigir isso impediria a importação inteira.
+  if (!reg.unidade) erros.push("informe a unidade");
+  if (!reg.nome) erros.push("informe o nome");
+  if (reg.email && (!reg.email.includes("@") || !reg.email.includes("."))) erros.push("e-mail inválido");
 
   const un = normalizarTexto(reg.unidade), em = normalizarTexto(reg.email);
   if (un && moradoresExistentes.some(m => normalizarTexto(m.unidade) === un)) erros.push("unidade já cadastrada");
   if (em && moradoresExistentes.some(m => normalizarTexto(m.email) === em)) erros.push("e-mail já cadastrado");
-  if (un && outrasLinhas.filter(o => normalizarTexto(o.unidade) === un).length > 1) erros.push("unidade repetida na planilha");
-  if (em && outrasLinhas.filter(o => normalizarTexto(o.email) === em).length > 1) erros.push("e-mail repetido na planilha");
+  if (un && outrasLinhas.filter(o => normalizarTexto(o.unidade) === un).length > 1) erros.push("unidade repetida na lista");
+  if (em && outrasLinhas.filter(o => normalizarTexto(o.email) === em).length > 1) erros.push("e-mail repetido na lista");
   return erros;
 };
 
@@ -3133,6 +3209,9 @@ export default function App() {
   const [novaManutencao, setNovaManutencao] = useState({ titulo:"", periodicidade:"semestral", proximaData:"", responsavel:"", obs:"" });
   const [importTexto, setImportTexto]   = useState("");
   const [importando, setImportando]     = useState(false);
+  const [lendoArquivo, setLendoArquivo] = useState(false);
+  const [progressoLeitura, setProgressoLeitura] = useState("");
+  const [linhasEditadas, setLinhasEditadas] = useState({});
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -4012,6 +4091,60 @@ export default function App() {
     setNovoMorador({ nome:"", unidade:"", proprietario:"", email:"", telefone:"", tipo:"Proprietário", veiculos:"", pets:"", taxaCustom:"" }); setModal(null); showToast("Morador cadastrado!");
   };
 
+  // ── Leitura de arquivo: planilha, texto ou foto ──
+  // Cada formato vira texto puro e segue pelo mesmo parser, então o resultado
+  // é sempre revisado na mesma tela antes de gravar.
+  const lerArquivoImport = async (arquivo) => {
+    if (!arquivo) return;
+    setLendoArquivo(true);
+    setProgressoLeitura("");
+    try {
+      const nome = arquivo.name.toLowerCase();
+
+      // Planilha do Excel / LibreOffice
+      if (/\.(xlsx|xls)$/.test(nome)) {
+        setProgressoLeitura("Abrindo a planilha...");
+        await carregarScript("https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js");
+        const buffer = await arquivo.arrayBuffer();
+        const wb = window.XLSX.read(buffer, { type: "array" });
+        const aba = wb.Sheets[wb.SheetNames[0]];
+        const linhas = window.XLSX.utils.sheet_to_json(aba, { header: 1, blankrows: false, defval: "" });
+        const texto = linhas.map(l => l.map(c => String(c ?? "").trim()).filter(Boolean).join("\t")).filter(Boolean).join("\n");
+        setImportTexto(texto);
+        showToast(`Planilha lida: ${linhas.length} linha(s).`);
+        return;
+      }
+
+      // Foto ou imagem de lista
+      if (/^image\//.test(arquivo.type)) {
+        setProgressoLeitura("Preparando a leitura da imagem...");
+        await carregarScript("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js");
+        setProgressoLeitura("Lendo o texto da imagem... (pode levar até 1 minuto na primeira vez)");
+        const { data } = await window.Tesseract.recognize(arquivo, "por", {
+          logger: (m) => {
+            if (m.status === "recognizing text") setProgressoLeitura(`Lendo a imagem... ${Math.round(m.progress * 100)}%`);
+          },
+        });
+        const texto = String(data?.text || "").trim();
+        if (!texto) { showToast("Não consegui ler texto nessa imagem. Tente uma foto mais nítida ou digite a lista.", "error"); return; }
+        setImportTexto(texto);
+        showToast("Imagem lida. Confira os dados abaixo — leitura de foto costuma precisar de ajustes.");
+        return;
+      }
+
+      // Texto, CSV, bloco de notas
+      const texto = await arquivo.text();
+      setImportTexto(texto);
+      showToast("Arquivo lido.");
+    } catch (e) {
+      console.error("Erro ao ler o arquivo:", e);
+      showToast("Não foi possível ler este arquivo. Tente colar a lista direto no campo abaixo.", "error");
+    } finally {
+      setLendoArquivo(false);
+      setProgressoLeitura("");
+    }
+  };
+
   // Importa vários moradores de uma vez a partir de planilha colada ou CSV.
   // Só grava as linhas válidas; as com erro são mostradas ao síndico para correção.
   const importarMoradores = async (linhasValidas) => {
@@ -4025,7 +4158,7 @@ export default function App() {
           condominioId,
           nome: l.nome,
           unidade: l.unidade,
-          email: l.email,
+          email: l.email || "",
           telefone: l.telefone || "",
           tipo: l.tipo || "Proprietário",
           proprietario: l.proprietario || "",
@@ -4042,8 +4175,12 @@ export default function App() {
       });
       await batch.commit();
       registrarLog("👥", `Importação: ${linhasValidas.length} morador(es) cadastrado(s) de uma vez`);
-      showToast(`${linhasValidas.length} morador(es) importado(s) com sucesso.`);
+      const semEmail = linhasValidas.filter(l => !l.email).length;
+      showToast(semEmail
+        ? `${linhasValidas.length} morador(es) importado(s). ${semEmail} sem e-mail — cadastre depois para enviar cobrança por e-mail.`
+        : `${linhasValidas.length} morador(es) importado(s) com sucesso.`);
       setImportTexto("");
+      setLinhasEditadas({});
       setModal(null);
     } catch (e) {
       console.error("Erro na importação:", e);
@@ -8593,55 +8730,86 @@ export default function App() {
       )}
 
       {modal?.type === "importarMoradores" && (() => {
-        const linhas = parsearPlanilha(importTexto);
+        // O que o parser entendeu, já com as correções feitas na tela
+        const brutas = parsearPlanilha(importTexto);
+        const linhas = brutas.map((l, i) => ({ ...l, ...(linhasEditadas[i] || {}) }));
         const comErros = linhas.map(l => ({ ...l, erros: validarLinhaImport(l, moradores, linhas) }));
         const validas = comErros.filter(l => l.erros.length === 0);
         const invalidas = comErros.filter(l => l.erros.length > 0);
+        const editar = (i, campo, valor) => setLinhasEditadas(p => ({ ...p, [i]: { ...(p[i] || {}), [campo]: valor } }));
+        const limpar = () => { setImportTexto(""); setLinhasEditadas({}); };
+
         return (
-          <Modal title="Importar moradores" onClose={() => { setImportTexto(""); setModal(null); }} isMobile={isMobile}>
-            <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.6, margin:"0 0 14px" }}>
-              Cole as linhas direto do Excel ou Google Sheets (ou um CSV). A ordem das colunas deve ser:
-            </p>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:14 }}>
-              {["Unidade *","Nome *","E-mail *","Telefone","Tipo","Proprietário"].map((c,i) => (
-                <span key={i} style={{ fontFamily:D.fontBody, fontSize:11.5, fontWeight:600, background: i<3?D.secondary:D.muted, color: i<3?D.text:D.textSec, padding:"4px 10px", borderRadius:20 }}>{c}</span>
-              ))}
-            </div>
-            <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginBottom:10 }}>
-              Se a primeira linha for o cabeçalho da planilha, ela é ignorada automaticamente.
+          <Modal title="Importar moradores" onClose={() => { limpar(); setModal(null); }} isMobile={isMobile}>
+
+            {/* Origem da lista */}
+            <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"1fr 1fr", gap:10, marginBottom:16 }}>
+              <label style={{ display:"flex", alignItems:"center", gap:11, padding:"14px 16px", background:D.bgCard, border:`1.5px solid ${D.border}`, borderRadius:D.radius, cursor: lendoArquivo?"default":"pointer", opacity: lendoArquivo?.6:1 }}>
+                <span style={{ width:36, height:36, borderRadius:9, background:D.muted, color:D.accent, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id="histDoc" size={18} /></span>
+                <span style={{ minWidth:0 }}>
+                  <span style={{ display:"block", fontFamily:D.fontBody, fontSize:13.5, fontWeight:600, color:D.text }}>Planilha ou texto</span>
+                  <span style={{ display:"block", fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:1 }}>Excel, CSV ou bloco de notas</span>
+                </span>
+                <input type="file" accept=".xlsx,.xls,.csv,.txt,text/plain" disabled={lendoArquivo}
+                  onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; lerArquivoImport(f); }} style={{ display:"none" }} />
+              </label>
+
+              <label style={{ display:"flex", alignItems:"center", gap:11, padding:"14px 16px", background:D.bgCard, border:`1.5px solid ${D.border}`, borderRadius:D.radius, cursor: lendoArquivo?"default":"pointer", opacity: lendoArquivo?.6:1 }}>
+                <span style={{ width:36, height:36, borderRadius:9, background:D.muted, color:D.accent, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id="acPorta" size={18} /></span>
+                <span style={{ minWidth:0 }}>
+                  <span style={{ display:"block", fontFamily:D.fontBody, fontSize:13.5, fontWeight:600, color:D.text }}>Foto da lista</span>
+                  <span style={{ display:"block", fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:1 }}>Papel impresso, quadro, print</span>
+                </span>
+                <input type="file" accept="image/*" disabled={lendoArquivo}
+                  onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; lerArquivoImport(f); }} style={{ display:"none" }} />
+              </label>
             </div>
 
-            <textarea value={importTexto} onChange={e => setImportTexto(e.target.value)} rows={7}
-              placeholder={"Apto 101\tMayara Silva\tmayara@email.com\t(85) 99999-8888\nApto 102\tJoão Souza\tjoao@email.com"}
-              style={{ display:"block", width:"100%", padding:"12px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, boxSizing:"border-box", fontFamily:"monospace", color:D.text, resize:"vertical", lineHeight:1.6, marginBottom:14 }} />
+            {lendoArquivo && (
+              <div style={{ display:"flex", alignItems:"center", gap:10, background:D.secondary, border:`1px solid ${D.border}`, borderRadius:D.radius, padding:"12px 16px", marginBottom:14 }}>
+                <span style={{ color:D.accent, display:"flex", flexShrink:0 }}><NavIcon id="clock" size={16} /></span>
+                <span style={{ fontFamily:D.fontBody, fontSize:13, color:D.text }}>{progressoLeitura || "Lendo..."}</span>
+              </div>
+            )}
+
+            <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut, marginBottom:8 }}>
+              Ou cole a lista aqui. O sistema reconhece unidade, nome, e-mail e telefone em qualquer ordem.
+            </div>
+            <textarea value={importTexto} onChange={e => { setImportTexto(e.target.value); setLinhasEditadas({}); }} rows={5}
+              placeholder={"Apto 101 - Mayara Silva - mayara@email.com - (85) 99999-8888\n102, João Souza, joao@email.com"}
+              style={{ display:"block", width:"100%", padding:"12px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, boxSizing:"border-box", fontFamily:"monospace", color:D.text, resize:"vertical", lineHeight:1.6, marginBottom:16 }} />
 
             {linhas.length > 0 && (
               <>
-                <div style={{ display:"flex", gap:10, marginBottom:12, flexWrap:"wrap" }}>
+                <div style={{ display:"flex", gap:10, marginBottom:12, flexWrap:"wrap", alignItems:"center" }}>
                   <span style={{ display:"inline-flex", alignItems:"center", gap:6, fontFamily:D.fontBody, fontSize:12.5, fontWeight:600, color:D.success, background:D.successBg, padding:"5px 12px", borderRadius:20 }}>
-                    <NavIcon id="logCheck" size={13} /> {validas.length} pronta{validas.length!==1?"s":""} para importar
+                    <NavIcon id="logCheck" size={13} /> {validas.length} pronta{validas.length!==1?"s":""}
                   </span>
                   {invalidas.length > 0 && (
                     <span style={{ display:"inline-flex", alignItems:"center", gap:6, fontFamily:D.fontBody, fontSize:12.5, fontWeight:600, color:D.danger, background:D.dangerBg, padding:"5px 12px", borderRadius:20 }}>
-                      <NavIcon id="alerta" size={13} /> {invalidas.length} com problema
+                      <NavIcon id="alerta" size={13} /> {invalidas.length} para corrigir
                     </span>
                   )}
+                  <span style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textMut }}>Clique em qualquer campo para ajustar</span>
                 </div>
 
-                <div style={{ maxHeight:220, overflowY:"auto", border:`1px solid ${D.border}`, borderRadius:D.radiusSm, marginBottom:16 }}>
-                  {comErros.map((l,i) => {
+                <div style={{ maxHeight:260, overflowY:"auto", border:`1px solid ${D.border}`, borderRadius:D.radiusSm, marginBottom:16 }}>
+                  {comErros.map((l, i) => {
                     const ok = l.erros.length === 0;
+                    const campo = (nome, valor, placeholder, largura) => (
+                      <input value={valor || ""} onChange={e => editar(i, nome, e.target.value)} placeholder={placeholder}
+                        style={{ width:largura, padding:"5px 8px", border:`1px solid ${D.border}`, borderRadius:6, fontSize:12, fontFamily:D.fontBody, color:D.text, background:"#fff", minWidth:0 }} />
+                    );
                     return (
-                      <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 12px", borderBottom: i<comErros.length-1?`1px solid ${D.border}`:"none", background: ok?"transparent":D.dangerBg }}>
+                      <div key={i} style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", borderBottom: i<comErros.length-1?`1px solid ${D.border}`:"none", background: ok?"transparent":D.dangerBg, flexWrap:"wrap" }}>
                         <span style={{ color: ok?D.success:D.danger, display:"flex", flexShrink:0 }}><NavIcon id={ok?"logCheck":"alerta"} size={14} /></span>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontFamily:D.fontBody, fontSize:12.5, fontWeight:600, color:D.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                            {l.unidade || "(sem unidade)"} — {l.nome || "(sem nome)"}
-                          </div>
-                          <div style={{ fontFamily:D.fontBody, fontSize:11.5, color: ok?D.textSec:D.danger }}>
-                            {ok ? l.email : l.erros.join(" · ")}
-                          </div>
-                        </div>
+                        {campo("unidade", l.unidade, "Unidade", isMobile?"72px":"92px")}
+                        {campo("nome", l.nome, "Nome", isMobile?"110px":"170px")}
+                        {campo("email", l.email, "E-mail", isMobile?"130px":"190px")}
+                        {campo("telefone", l.telefone, "Telefone", isMobile?"104px":"130px")}
+                        {!ok && (
+                          <span style={{ fontFamily:D.fontBody, fontSize:11, color:D.danger, width:"100%", paddingLeft:22 }}>{l.erros.join(" · ")}</span>
+                        )}
                       </div>
                     );
                   })}
@@ -8650,7 +8818,7 @@ export default function App() {
             )}
 
             <div style={{ display:"flex", gap:10, flexDirection: isMobile?"column-reverse":"row", justifyContent:"flex-end" }}>
-              <button onClick={() => { setImportTexto(""); setModal(null); }} style={{ padding:"11px 20px", background:D.bgCard, color:D.textSec, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+              <button onClick={() => { limpar(); setModal(null); }} style={{ padding:"11px 20px", background:D.bgCard, color:D.textSec, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
                 Cancelar
               </button>
               <button onClick={() => importarMoradores(validas)} disabled={validas.length === 0 || importando}

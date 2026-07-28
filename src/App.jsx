@@ -3286,6 +3286,13 @@ export default function App() {
     const servicosParados = servicos.filter(s => s.status === "pendente" && (() => { const t = parseDataBR(s.dataAbertura); return t ? Math.floor((agora-t)/DIAS) >= 14 : false; })());
     if (servicosParados.length) lista.push({ icon:"servicos", cor:D.warning, aba:"servicos", texto:`${servicosParados.length} serviço${servicosParados.length>1?"s":""} pendente${servicosParados.length>1?"s":""} há mais de 14 dias` });
 
+    // 15) Moradores sem telefone válido — sem ele o botão de WhatsApp não aparece
+    const semWhats = moradores.filter(m => !linkWhatsApp(m.telefone, ""));
+    if (semWhats.length) lista.push({
+      icon:"whats", cor:D.textSec, aba:"moradores",
+      texto: `${semWhats.length} morador${semWhats.length>1?"es":""} sem telefone válido — cobrança por WhatsApp indisponível`,
+    });
+
     // 9) Visitante/prestador sem saída registrada há mais de 24h (provável esquecimento)
     const acessosEsquecidos = acessos.filter(a => !a.horaSaida && diasDesde(a.timestamp) >= 1);
     if (acessosEsquecidos.length) lista.push({ icon:"acPorta", cor:D.danger, aba:"acessos", texto:`${acessosEsquecidos.length} acesso${acessosEsquecidos.length>1?"s":""} sem saída registrada há mais de 24h` });
@@ -4104,10 +4111,9 @@ export default function App() {
     return linhas.join("\n");
   };
 
-  const abrirWhatsCobranca = (m, cob) => {
-    const url = linkWhatsApp(m.telefone, whatsCobranca(m, cob));
-    if (!url) { showToast(`${m.nome} não tem telefone válido cadastrado. Edite o morador para incluir.`, "error"); return; }
-    window.open(url, "_blank", "noopener,noreferrer");
+  // Registra no histórico que a cobrança foi enviada. A abertura do WhatsApp fica por conta
+  // do próprio link: window.open com parâmetros extras era tratado como popup e bloqueado.
+  const registrarEnvioWhats = (m) => {
     registrarLog("📱", `Cobrança enviada por WhatsApp: ${m.nome} (${m.unidade}) — ${mesLabel(mesSel)}`);
   };
 
@@ -5277,10 +5283,11 @@ export default function App() {
         </div>
         {cob.dataPagamento && <div style={{ fontSize:12, color:"#9aa6b5", marginBottom:8 }}>Pago em {cob.dataPagamento}</div>}
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-          {cob.status !== "pago" && !readOnly && m.telefone && (
-            <button onClick={() => abrirWhatsCobranca(m, cob)} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, flex:1, minWidth:130, padding:"10px 14px", background:D.successBg, color:D.success, border:`1px solid ${D.success}33`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+          {cob.status !== "pago" && !readOnly && linkWhatsApp(m.telefone, "") && (
+            <a href={linkWhatsApp(m.telefone, whatsCobranca(m, cob))} target="_blank" rel="noopener noreferrer" onClick={() => registrarEnvioWhats(m)}
+              style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, flex:1, minWidth:130, padding:"10px 14px", background:D.successBg, color:D.success, border:`1px solid ${D.success}33`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>
               <NavIcon id="whats" size={15} /> Cobrar no WhatsApp
-            </button>
+            </a>
           )}
           {cob.status !== "pago" ? (
             !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Registrar Pgto</button>
@@ -5882,7 +5889,11 @@ export default function App() {
               ];
               const lista = cobMes.filter(c => filtroCobranca==="todos" || c.status===filtroCobranca);
 
-              const AcaoBtn = ({ icon, cor, titulo, onClick }) => (
+              const AcaoBtn = ({ icon, cor, titulo, onClick, href }) => href ? (
+                <a href={href} target="_blank" rel="noopener noreferrer" title={titulo} onClick={onClick} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color: cor || D.textSec, border:`1px solid ${D.border}`, borderRadius:8, textDecoration:"none", flexShrink:0 }}>
+                  <NavIcon id={icon} size={15} />
+                </a>
+              ) : (
                 <button onClick={onClick} title={titulo} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color: cor||D.textSec, border:`1px solid ${D.border}`, borderRadius:8, cursor:"pointer" }}>
                   <NavIcon id={icon} size={15} />
                 </button>
@@ -6114,8 +6125,9 @@ export default function App() {
                               <td style={{ padding:"13px 16px", fontSize:12, color:D.textSec, fontFamily:D.fontBody }}>{cob.dataPagamento || "—"}</td>
                               <td style={{ padding:"13px 16px" }}>
                                 <div style={{ display:"flex", gap:6 }}>
-                                  {cob.status !== "pago" && !readOnly && m.telefone && (
-                                    <AcaoBtn icon="whats" cor={D.success} titulo={`Cobrar ${m.nome} por WhatsApp`} onClick={() => abrirWhatsCobranca(m, cob)} />
+                                  {cob.status !== "pago" && !readOnly && linkWhatsApp(m.telefone, "") && (
+                                    <AcaoBtn icon="whats" cor={D.success} titulo={`Cobrar ${m.nome} por WhatsApp`}
+                                      href={linkWhatsApp(m.telefone, whatsCobranca(m, cob))} onClick={() => registrarEnvioWhats(m)} />
                                   )}
                                   {cob.status !== "pago" ? (
                                     !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Registrar</button>
@@ -6281,7 +6293,10 @@ export default function App() {
                                 <td style={{ padding:"12px 20px" }}>
                                   <div style={{ display:"flex", gap:6 }}>
                                     <AcaoBtn icon="histDoc" titulo="Ver histórico" onClick={() => { setFichaSecao("cobrancas"); setModal({ type:"historico", data:m }); }} />
-                                    {m.telefone && <AcaoBtn icon="whats" cor={D.success} titulo={`Falar com ${m.nome} no WhatsApp`} onClick={() => { const u = linkWhatsApp(m.telefone, `Olá, ${(m.nome||"").split(" ")[0]}! Aqui é do ${nomeCond()}.`); if (u) window.open(u, "_blank", "noopener,noreferrer"); }} />}
+                                    {linkWhatsApp(m.telefone, "") && (
+                                      <AcaoBtn icon="whats" cor={D.success} titulo={`Falar com ${m.nome} no WhatsApp`}
+                                        href={linkWhatsApp(m.telefone, `Olá, ${(m.nome||"").split(" ")[0]}! Aqui é do ${nomeCond()}.`)} />
+                                    )}
                                     {!readOnly && <AcaoBtn icon="unlock" cor={D.warning} titulo="Gerar link novo (invalida o antigo)" onClick={() => revogarLinkPortal(m)} />}
                                     <AcaoBtn icon="link" titulo="Copiar link do portal" onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} />
                                     {!readOnly && <>

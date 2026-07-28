@@ -4859,8 +4859,17 @@ export default function App() {
   }, [user, moradores.length, diaVencimento, planoAtual]);
 
   const mesesDisponiveis = () => {
-    const s = new Set(cobrancas.map(c=>c.mes)); s.add(mesAtual());
+    const s = new Set(cobrancas.map(c=>c.mes));
+    s.add(mesAtual());
+    // Inclui o mês em que a cobrança começa, mesmo que ainda não tenha nada lançado:
+    // sem isso o síndico não conseguia navegar até ele pelo seletor.
+    if (marcoZero) s.add(marcoZero.slice(0,7));
     return Array.from(s).sort().reverse();
+  };
+  // Rótulo do seletor: avisa quando o mês não tem cobrança lançada
+  const rotuloMesSeletor = (m) => {
+    const n = cobrancas.filter(c => c.mes === m).length;
+    return n === 0 ? `${mesLabel(m)} (sem cobrança)` : mesLabel(m);
   };
 
   // ── PDF ──
@@ -5754,7 +5763,7 @@ export default function App() {
               </div>
               <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", width: isMobile?"100%":"auto" }}>
                 <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, flex: isMobile?1:"none" }}>
-                  {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
+                  {mesesDisponiveis().map(m => <option key={m} value={m}>{rotuloMesSeletor(m)}</option>)}
                 </select>
                 <button onClick={exportarCobrancasCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, flex: isMobile?1:"none", whiteSpace:"nowrap" }}>⬇ Exportar CSV</button>
                 <button onClick={exportarPDF} title="Resumo do mês em PDF" style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
@@ -5998,11 +6007,59 @@ export default function App() {
                 )}
 
                 {isMobile ? (
-                  <div>{lista.map((cob,i) => <CobCard key={i} cob={cob} />)}</div>
+                  cobMes.length === 0 ? (
+                    <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, padding:"28px 20px", textAlign:"center", fontFamily:D.fontBody }}>
+                      <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="cobrancas" size={32} /></div>
+                      <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>
+                        Nenhuma cobrança em {mesLabel(mesSel)}
+                      </div>
+                      {marcoZero && mesSel < marcoZero.slice(0,7) ? (
+                        <>
+                          <div style={{ fontSize:13, color:D.textSec, lineHeight:1.6, marginBottom:14 }}>
+                            A cobrança deste condomínio começa em <b>{mesLabel(marcoZero.slice(0,7))}</b>.
+                          </div>
+                          <button onClick={() => mudarMes(marcoZero.slice(0,7))} style={{ width:"100%", padding:"11px 18px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                            Ir para {mesLabel(marcoZero.slice(0,7))}
+                          </button>
+                        </>
+                      ) : (
+                        <div style={{ fontSize:13, color:D.textSec, lineHeight:1.6 }}>
+                          {moradores.length === 0
+                            ? "Cadastre os moradores para o sistema gerar as cobranças."
+                            : "As cobranças deste mês ainda não foram geradas."}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>{lista.map((cob,i) => <CobCard key={i} cob={cob} />)}</div>
+                  )
                 ) : (
                   <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
                     {cobMes.length === 0 ? (
-                      <div style={{ padding:32, textAlign:"center", color:D.textMut, fontSize:13, fontFamily:D.fontBody }}>Nenhuma cobrança neste mês.</div>
+                      <div style={{ padding:"32px 24px", textAlign:"center", fontFamily:D.fontBody }}>
+                        <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.textMut }}><NavIcon id="cobrancas" size={34} /></div>
+                        <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text, marginBottom:6, letterSpacing:"-0.02em" }}>
+                          Nenhuma cobrança em {mesLabel(mesSel)}
+                        </div>
+                        {marcoZero && mesSel < marcoZero.slice(0,7) ? (
+                          <>
+                            <div style={{ fontSize:13, color:D.textSec, lineHeight:1.6, maxWidth:420, margin:"0 auto 14px" }}>
+                              Você definiu que a cobrança deste condomínio começa em <b>{mesLabel(marcoZero.slice(0,7))}</b>. Meses anteriores não são cobrados.
+                            </div>
+                            <button onClick={() => mudarMes(marcoZero.slice(0,7))} style={{ display:"inline-flex", alignItems:"center", gap:7, padding:"10px 18px", background:D.primary, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                              Ir para {mesLabel(marcoZero.slice(0,7))}
+                            </button>
+                          </>
+                        ) : moradores.length === 0 ? (
+                          <div style={{ fontSize:13, color:D.textSec, lineHeight:1.6, maxWidth:420, margin:"0 auto" }}>
+                            Cadastre os moradores para o sistema gerar as cobranças deste mês.
+                          </div>
+                        ) : (
+                          <div style={{ fontSize:13, color:D.textSec, lineHeight:1.6, maxWidth:420, margin:"0 auto" }}>
+                            As cobranças deste mês ainda não foram geradas. Elas aparecem automaticamente ao abrir o mês corrente.
+                          </div>
+                        )}
+                      </div>
                     ) : lista.length === 0 ? (
                       <div style={{ padding:32, textAlign:"center", color:D.textMut, fontSize:13, fontFamily:D.fontBody }}>Nenhuma cobrança nesta categoria.</div>
                     ) : (
@@ -6096,7 +6153,7 @@ export default function App() {
                 <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{moradores.length} unidade{moradores.length!==1?"s":""} cadastrada{moradores.length!==1?"s":""}</div>
                 <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", width: isMobile?"100%":"auto" }}>
                   <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, fontFamily:D.fontBody, flex: isMobile?1:"none" }}>
-                    {mesesDisponiveis().map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
+                    {mesesDisponiveis().map(m => <option key={m} value={m}>{rotuloMesSeletor(m)}</option>)}
                   </select>
                   <button onClick={exportarMoradoresCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, flex: isMobile?1:"none", whiteSpace:"nowrap" }}>
                     ⬇ Exportar CSV

@@ -1780,6 +1780,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const [extrasMor, setExtrasMor] = useState([]);
   const [pagExtrasMor, setPagExtrasMor] = useState([]);
   const [documentosMor, setDocumentosMor] = useState([]);
+  const [prestacoesMor, setPrestacoesMor] = useState([]);
   const [mesSel, setMesSel]       = useState(mesAtual());
   const [formReserva, setFormReserva] = useState({ area:"Churrasqueira", data:"", horario:"", observacao:"" });
   const [enviandoReserva, setEnviandoReserva] = useState(false);
@@ -1826,13 +1827,18 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   }, [moradorId, morador?.condominioId]);
 
   // Documentos que o síndico liberou para os moradores (convenção, regimento, atas...)
+  // e as prestações de contas publicadas, que ficam em lugar próprio.
   useEffect(() => {
     if (!morador?.condominioId) return;
-    const u = onSnapshot(
+    const uDoc = onSnapshot(
       query(collection(db, "documentos"), where("condominioId","==",morador.condominioId)),
       s => setDocumentosMor(s.docs.map(d => ({ id:d.id, ...d.data() })).filter(d => d.publico))
     );
-    return u;
+    const uPre = onSnapshot(
+      query(collection(db, "prestacoes"), where("condominioId","==",morador.condominioId)),
+      s => setPrestacoesMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.mes.localeCompare(a.mes)))
+    );
+    return () => { uDoc(); uPre(); };
   }, [morador?.condominioId]);
 
   // Comunicados do condomínio (carrega quando o morador é conhecido)
@@ -2053,6 +2059,58 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
             )}
           </div>
         </div>
+
+        {/* ── Prestação de contas: sempre visível, para o morador saber que existe ── */}
+        {(() => {
+          const temPrestacao = prestacoesMor.length > 0;
+          const aberta = secaoAberta === "prestacao";
+          const cor = temPrestacao ? D.success : D.textMut;
+          return (
+            <div style={{ background:D.bgCard, borderRadius:D.radius, border:`1px solid ${temPrestacao ? (aberta ? D.success : D.border) : D.border}`, boxShadow:D.shadow, marginBottom:10, overflow:"hidden", opacity: temPrestacao ? 1 : .75 }}>
+              <button
+                onClick={() => temPrestacao && setSecaoAberta(a => a === "prestacao" ? null : "prestacao")}
+                disabled={!temPrestacao}
+                style={{ display:"flex", alignItems:"center", gap:12, width:"100%", padding:"15px 16px", background:"none", border:"none", cursor: temPrestacao ? "pointer" : "default", textAlign:"left", fontFamily:D.fontBody }}>
+                <span style={{ width:34, height:34, borderRadius:9, background: temPrestacao ? D.successBg : D.muted, color:cor, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <NavIcon id="histDoc" size={17} />
+                </span>
+                <span style={{ flex:1, minWidth:0 }}>
+                  <span style={{ display:"block", fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color: temPrestacao ? D.text : D.textSec, letterSpacing:"-0.02em" }}>
+                    Prestação de contas
+                  </span>
+                  <span style={{ display:"block", fontFamily:D.fontBody, fontSize:11.5, color: temPrestacao ? D.success : D.textMut, marginTop:2 }}>
+                    {temPrestacao
+                      ? `${prestacoesMor.length} ${prestacoesMor.length === 1 ? "mês disponível" : "meses disponíveis"}`
+                      : "Nenhuma publicada ainda"}
+                  </span>
+                </span>
+                {temPrestacao && (
+                  <span style={{ color:D.textMut, display:"flex", flexShrink:0, transform: aberta ? "rotate(180deg)" : "none", transition:"transform .18s" }}>
+                    <NavIcon id="setaBaixo" size={16} />
+                  </span>
+                )}
+              </button>
+
+              {aberta && temPrestacao && (
+                <div style={{ padding:"0 16px 18px", borderTop:`1px solid ${D.border}` }}>
+                  <div style={{ paddingTop:16, display:"flex", flexDirection:"column", gap:8 }}>
+                    {prestacoesMor.map(pr => (
+                      <div key={pr.id} style={{ display:"flex", alignItems:"center", gap:11, padding:"12px 14px", background:D.bgCard, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.success}`, borderRadius:D.radiusSm }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:600, color:D.text, textTransform:"capitalize" }}>{mesLabel(pr.mes)}</div>
+                          <div style={{ fontSize:11.5, color:D.textSec }}>Publicada em {pr.publicadoEm}</div>
+                        </div>
+                        <a href={pr.arquivo} download={pr.arquivoNome} style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"6px 12px", background:D.successBg, color:D.success, border:`1px solid ${D.success}33`, borderRadius:20, fontSize:11.5, fontWeight:600, textDecoration:"none", flexShrink:0 }}>
+                          <NavIcon id="download" size={12} /> Baixar
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── Seções ── */}
         {extrasMor.length > 0 && secao("extras", "Cobranças extras", "cobrancas",
@@ -2884,6 +2942,7 @@ export default function App() {
   const [logoCond, setLogoCond]                 = useState(null);
   const [salvandoLogo, setSalvandoLogo]         = useState(false);
   const [publicandoPrestacao, setPublicandoPrestacao] = useState(false);
+  const [prestacoes, setPrestacoes]             = useState([]);
   const [enviandoEmails, setEnviandoEmails] = useState(false);
   const [mesSel, setMesSel]         = useState(mesAtual);
   const [toast, setToast]           = useState(null);
@@ -3064,6 +3123,7 @@ export default function App() {
 
     const u1 = onSnapshot(byCond("moradores"), s => setMoradores(s.docs.map(d => ({ id:d.id, ...d.data() }))));
     const uEq = onSnapshot(byCond("usuarios"), s => setEquipe(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const uPre = onSnapshot(byCond("prestacoes"), s => setPrestacoes(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.mes.localeCompare(a.mes))));
     const uAco = onSnapshot(byCond("acordos"), s => setAcordos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
     const uMan = onSnapshot(byCond("manutencoes"), s => setManutencoes(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (a.proximaData||"").localeCompare(b.proximaData||""))));
     const u2 = onSnapshot(byCond("cobrancas"), s => setCobrancas(s.docs.map(d => ({ id:d.id, ...d.data() }))));
@@ -3107,7 +3167,7 @@ export default function App() {
       setObsMes(texto); setObsSalva(texto);
     });
 
-    return () => { u1(); uEq(); uMan(); uAco(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); u15(); u16(); u17(); u18(); u19(); u20(); };
+    return () => { u1(); uEq(); uMan(); uAco(); uPre(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); u15(); u16(); u17(); u18(); u19(); u20(); };
   }, [user, condominioId, mesSel]);
 
   // (Removido o auto-popular com MOCK_MORADORES — no multi-tenant cada
@@ -3325,7 +3385,9 @@ export default function App() {
     try {
       const colecoes = ["moradores","cobrancas","cobrancas_extras","pag_extras","despesas","servicos",
         "receitas","acessos","reservas","entregas","comunicados","ocorrencias","enquetes",
-        "documentos","fundo_movs","eventos","observacoes","logs"];
+        "documentos","fundo_movs","eventos","observacoes","logs",
+        // coleções criadas depois: sem elas o backup sairia incompleto
+        "manutencoes","acordos","prestacoes","usuarios"];
       const dados = {};
       let totalDocs = 0;
       for (const col of colecoes) {
@@ -3589,27 +3651,22 @@ export default function App() {
   // tudo à conta compartilhada), gera o PDF aqui e o disponibiliza como documento.
   const publicarPrestacaoContas = async () => {
     if (publicandoPrestacao) return;
-    const rotulo = `Prestação de contas — ${mesLabel(mesSel)}`;
-    const jaExiste = documentos.find(d => d.nome === rotulo);
-    if (jaExiste && !window.confirm(`Já existe uma "${rotulo}" publicada.\n\nSubstituir pela versão atual?`)) return;
+    const jaExiste = prestacoes.find(pr => pr.mes === mesSel);
+    if (jaExiste && !window.confirm(`A prestação de ${mesLabel(mesSel)} já está publicada.\n\nSubstituir pela versão atual?`)) return;
     setPublicandoPrestacao(true);
     try {
       const pdf = exportarPrestacaoContas(true);
       if (!pdf) { showToast("Não foi possível gerar o PDF.", "error"); return; }
-      const dados = {
+      // Coleção própria: a prestação não se mistura com convenção, regimento e atas
+      await setDoc(doc(db, "prestacoes", `${condominioId}_${mesSel}`), {
         condominioId,
-        nome: rotulo,
-        categoria: "Outro",
-        vencimento: "",
-        obs: `Publicada em ${new Date().toLocaleDateString("pt-BR")}`,
+        mes: mesSel,
         arquivo: pdf,
         arquivoNome: `prestacao-contas-${slugCond()}-${mesSel}.pdf`,
-        publico: true,
-        criadoEm: new Date().toLocaleDateString("pt-BR"),
+        publicadoEm: new Date().toLocaleDateString("pt-BR"),
+        publicadoPor: user?.email || "",
         timestamp: Date.now(),
-      };
-      if (jaExiste) await setDoc(doc(db, "documentos", jaExiste.id), dados, { merge:true });
-      else await addDoc(collection(db, "documentos"), dados);
+      });
       registrarLog("📄", `Prestação de contas de ${mesLabel(mesSel)} publicada no portal`);
       showToast(`Publicada. Os moradores já veem a prestação de ${mesLabel(mesSel)} no portal.`);
     } catch (e) {
@@ -6936,6 +6993,21 @@ export default function App() {
                       ))}
                     </div>
                   )}
+
+                  {/* Quantos estão liberados no portal — a funcionalidade passava despercebida */}
+                  {documentos.length > 0 && (() => {
+                    const publicos = documentos.filter(d => d.publico).length;
+                    return (
+                      <div style={{ display:"flex", alignItems:"center", gap:10, background: publicos ? D.successBg : D.muted, border:`1px solid ${publicos ? D.success+"33" : D.border}`, borderRadius:D.radius, padding:"10px 16px", marginBottom:16 }}>
+                        <span style={{ color: publicos ? D.success : D.textMut, display:"flex", flexShrink:0 }}><NavIcon id={publicos ? "unlock" : "lock"} size={16} /></span>
+                        <span style={{ fontFamily:D.fontBody, fontSize:12.5, color: publicos ? D.text : D.textSec }}>
+                          {publicos > 0
+                            ? <><b>{publicos}</b> {publicos === 1 ? "documento visível" : "documentos visíveis"} no portal do morador</>
+                            : <>Nenhum documento liberado para os moradores. Use o cadeado no card para liberar convenção, regimento e atas.</>}
+                        </span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Faixa de alerta */}
                   {atencao > 0 && (

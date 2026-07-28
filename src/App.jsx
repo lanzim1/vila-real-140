@@ -2886,6 +2886,55 @@ const validarLinhaImport = (reg, moradoresExistentes, outrasLinhas) => {
   return erros;
 };
 
+// Confirmação com o visual do sistema. As caixas do navegador destoam do produto,
+// não permitem destacar o que é irreversível e não têm o mesmo tom de voz.
+const DialogoConfirmacao = ({ dados, onResponder, D, isMobile }) => {
+  if (!dados) return null;
+  const { titulo, mensagem, detalhes, textoConfirmar, perigo } = dados;
+  const cor = perigo ? D.danger : D.primary;
+  return (
+    <div onClick={() => onResponder(false)}
+      style={{ position:"fixed", inset:0, background:"rgba(15,23,42,.55)", display:"flex", alignItems:"center", justifyContent:"center", padding:20, zIndex:200 }}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ background:D.bgCard, borderRadius:D.radiusXl || 16, padding: isMobile?"24px 20px 20px":"28px 28px 22px", maxWidth:440, width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,.3)" }}>
+
+        <div style={{ display:"flex", alignItems:"center", gap:13, marginBottom:14 }}>
+          <span style={{ width:42, height:42, borderRadius:11, background: perigo?D.dangerBg:D.secondary, color:cor, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+            <NavIcon id={perigo ? "alerta" : "logCheck"} size={20} />
+          </span>
+          <h3 style={{ fontFamily:D.fontDisplay, fontSize:17, fontWeight:700, color:D.text, margin:0, letterSpacing:"-0.02em", lineHeight:1.3 }}>{titulo}</h3>
+        </div>
+
+        {mensagem && (
+          <p style={{ fontFamily:D.fontBody, fontSize:13.5, color:D.textSec, lineHeight:1.6, margin:"0 0 14px" }}>{mensagem}</p>
+        )}
+
+        {detalhes?.length > 0 && (
+          <div style={{ background: perigo?D.dangerBg:D.muted, borderRadius:D.radiusSm, padding:"12px 14px", marginBottom:16 }}>
+            {detalhes.map((d, i) => (
+              <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:8, fontFamily:D.fontBody, fontSize:12.5, color: perigo?"#991B1B":D.textSec, lineHeight:1.5, marginTop: i?6:0 }}>
+                <span style={{ width:4, height:4, borderRadius:"50%", background: perigo?D.danger:D.textMut, flexShrink:0, marginTop:6 }} />
+                <span>{d}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", flexDirection: isMobile?"column-reverse":"row" }}>
+          <button onClick={() => onResponder(false)}
+            style={{ padding:"11px 20px", background:D.bgCard, color:D.textSec, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+            Cancelar
+          </button>
+          <button onClick={() => onResponder(true)} autoFocus
+            style={{ padding:"11px 22px", background:cor, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+            {textoConfirmar || "Confirmar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Menu de ações secundárias. Guarda o que é ocasional (copiar link, editar, remover)
 // para que a linha mostre só o que se usa todo dia — e mantenha as posições fixas.
 const MenuAcoes = ({ itens, D, aberto, onToggle }) => {
@@ -3252,6 +3301,8 @@ export default function App() {
   const [progressoLeitura, setProgressoLeitura] = useState("");
   const [linhasEditadas, setLinhasEditadas] = useState({});
   const [menuAcao, setMenuAcao]         = useState(null);
+  const [confirmacao, setConfirmacao]   = useState(null);
+  const respostaConfirmacao             = useRef(null);
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -3432,6 +3483,18 @@ export default function App() {
 
 
   const showToast = (msg, type="success") => setToast({ msg, type });
+
+  // Substitui window.confirm. Devolve uma promessa para poder usar com await,
+  // preservando a mesma estrutura "if (!confirmou) return;" que já existia.
+  const confirmar = (opcoes) => new Promise((resolve) => {
+    respostaConfirmacao.current = resolve;
+    setConfirmacao(typeof opcoes === "string" ? { titulo: opcoes } : opcoes);
+  });
+  const responderConfirmacao = (resposta) => {
+    setConfirmacao(null);
+    respostaConfirmacao.current?.(resposta);
+    respostaConfirmacao.current = null;
+  };
 
   // Fecha o menu de ações ao clicar em qualquer outro lugar da tela
   useEffect(() => {
@@ -3832,11 +3895,14 @@ export default function App() {
         return;
       }
       const resumo = orfas.slice(0, 8).map(o => `${o.unidade} — ${o.mes} (condomínio: ${o.cond})`).join("\n");
-      if (!window.confirm(
-        `Encontradas ${orfas.length} cobrança(s) que não pertencem a este condomínio:\n\n${resumo}` +
-        (orfas.length > 8 ? `\n...e mais ${orfas.length - 8}` : "") +
-        `\n\nEssas cobranças aparecem no portal do morador mas não no seu painel. Remover?`
-      )) return;
+      if (!await confirmar({
+        titulo: `Remover ${orfas.length} cobrança(s) inconsistente(s)?`,
+        mensagem: "Estas cobranças aparecem no portal do morador, mas não no seu painel — normalmente são sobras de testes ou de versões antigas.",
+        detalhes: [...orfas.slice(0, 6).map(o => `${o.unidade} — ${o.mes} (condomínio: ${o.cond})`),
+                   ...(orfas.length > 6 ? [`e mais ${orfas.length - 6}`] : [])],
+        textoConfirmar: "Remover",
+        perigo: true,
+      })) return;
 
       // Uma exclusão por vez, e não em lote: a regra que autoriza remover órfãs precisa
       // consultar o morador de cada cobrança, e um writeBatch tem limite de 20 consultas
@@ -3908,7 +3974,7 @@ export default function App() {
   };
 
   const removerLogo = async () => {
-    if (!window.confirm("Remover o logo? Os documentos voltam a sair só com o nome do condomínio.")) return;
+    if (!await confirmar({ titulo:"Remover o logo?", mensagem:"Os recibos e relatórios voltam a sair apenas com o nome do condomínio.", textoConfirmar:"Remover logo", perigo:true })) return;
     try {
       await setDoc(doc(db, "condominios", condominioId), { logo: null }, { merge:true });
       registrarLog("🖼️", "Logo do condomínio removido");
@@ -3925,7 +3991,7 @@ export default function App() {
   const publicarPrestacaoContas = async () => {
     if (publicandoPrestacao) return;
     const jaExiste = prestacoes.find(pr => pr.mes === mesSel);
-    if (jaExiste && !window.confirm(`A prestação de ${mesLabel(mesSel)} já está publicada.\n\nSubstituir pela versão atual?`)) return;
+    if (jaExiste && !await confirmar({ titulo:`Substituir a prestação de ${mesLabel(mesSel)}?`, mensagem:"Já existe uma versão publicada no portal. Ela será trocada pela versão atual.", textoConfirmar:"Substituir" })) return;
     setPublicandoPrestacao(true);
     try {
       const pdf = exportarPrestacaoContas(true);
@@ -4086,7 +4152,12 @@ export default function App() {
     if (selCob.length === 0) return;
     const dataPgto = new Date().toLocaleDateString("pt-BR");
     const nomes = selCob.map(id => moradores.find(m => m.id === id)?.unidade || "?").join(", ");
-    if (!window.confirm(`Marcar ${selCob.length} cobrança(s) como paga(s) em ${mesLabel(mesSel)}?\n\nUnidades: ${nomes}\n\nOs moradores NÃO receberão e-mail automático por esta ação.`)) return;
+    if (!await confirmar({
+      titulo: `Marcar ${selCob.length} cobrança(s) como paga(s)?`,
+      mensagem: `Referente a ${mesLabel(mesSel)}.`,
+      detalhes: [`Unidades: ${nomes}`, "Os moradores NÃO receberão e-mail automático por esta ação."],
+      textoConfirmar: "Registrar pagamentos",
+    })) return;
     try {
       const batch = writeBatch(db);
       selCob.forEach(moradorId => {
@@ -4120,7 +4191,11 @@ export default function App() {
     if (!novoMorador.email.includes("@") || !novoMorador.email.includes(".")) { showToast("E-mail parece inválido. Confira antes de salvar.", "error"); return; }
     // Duplicidade: mesma unidade ou mesmo e-mail já cadastrado
     const jaUnidade = moradores.find(m => normalizarTexto(m.unidade) === normalizarTexto(novoMorador.unidade));
-    if (jaUnidade && !window.confirm(`A unidade ${novoMorador.unidade} já está cadastrada para ${jaUnidade.nome}.\n\nCadastrar assim mesmo? (útil só se houver dois responsáveis pelo mesmo apartamento)`)) return;
+    if (jaUnidade && !await confirmar({
+      titulo: `A unidade ${novoMorador.unidade} já existe`,
+      mensagem: `Ela está cadastrada para ${jaUnidade.nome}. Cadastrar assim mesmo faz sentido quando há dois responsáveis pelo mesmo apartamento.`,
+      textoConfirmar: "Cadastrar mesmo assim",
+    })) return;
     const jaEmail = moradores.find(m => normalizarTexto(m.email) === normalizarTexto(novoMorador.email));
     if (jaEmail) { showToast(`Este e-mail já é do morador ${jaEmail.nome} (${jaEmail.unidade}). Use outro.`, "error"); return; }
     // taxaCustom: número se preenchido, null se vazio (usa a taxa padrão)
@@ -4271,13 +4346,16 @@ export default function App() {
       pagoEm: null,
     }));
 
-    if (!window.confirm(
-      `Criar acordo para ${m.nome} (${m.unidade})?\n\n` +
-      `Dívida atual: R$ ${totalDivida.toFixed(2).replace(".",",")} (${emAberto.length} cobrança(s))\n` +
-      (valorEntrada > 0 ? `Entrada: R$ ${valorEntrada.toFixed(2).replace(".",",")}\n` : "") +
-      `${n}x de aproximadamente R$ ${valorParcela.toFixed(2).replace(".",",")}\n\n` +
-      `As cobranças originais ficam marcadas como "em acordo" e param de acumular novos encargos.`
-    )) return;
+    if (!await confirmar({
+      titulo: `Criar acordo para ${m.nome}?`,
+      mensagem: `Unidade ${m.unidade}. As cobranças originais ficam marcadas como "em acordo" e param de acumular novos encargos.`,
+      detalhes: [
+        `Dívida atual: R$ ${totalDivida.toFixed(2).replace(".",",")} em ${emAberto.length} cobrança(s)`,
+        ...(valorEntrada > 0 ? [`Entrada: R$ ${valorEntrada.toFixed(2).replace(".",",")}`] : []),
+        `${n}x de aproximadamente R$ ${valorParcela.toFixed(2).replace(".",",")}`,
+      ],
+      textoConfirmar: "Criar acordo",
+    })) return;
 
     try {
       const ref = await addDoc(collection(db, "acordos"), {
@@ -4307,7 +4385,7 @@ export default function App() {
   const pagarParcela = async (acordo, numero) => {
     const p = acordo.parcelas.find(x => x.numero === numero);
     if (!p || p.status === "pago") return;
-    if (!window.confirm(`Registrar o pagamento da parcela ${numero} (R$ ${p.valor.toFixed(2).replace(".",",")})?`)) return;
+    if (!await confirmar({ titulo:`Registrar a parcela ${numero}?`, mensagem:`Valor de R$ ${p.valor.toFixed(2).replace(".",",")} será marcado como pago.`, textoConfirmar:"Registrar pagamento" })) return;
     const hoje = new Date().toLocaleDateString("pt-BR");
     const novas = acordo.parcelas.map(x => x.numero === numero ? { ...x, status:"pago", pagoEm:hoje } : x);
     const quitado = novas.every(x => x.status === "pago");
@@ -4331,7 +4409,13 @@ export default function App() {
   };
 
   const cancelarAcordo = async (acordo) => {
-    if (!window.confirm(`Cancelar o acordo de ${acordo.moradorNome}?\n\nAs cobranças originais voltam a ser tratadas como atraso normal, com multa e juros voltando a correr.`)) return;
+    if (!await confirmar({
+      titulo: `Cancelar o acordo de ${acordo.moradorNome}?`,
+      mensagem: "As cobranças originais voltam a ser tratadas como atraso normal.",
+      detalhes: ["Multa e juros voltam a correr a partir de hoje"],
+      textoConfirmar: "Cancelar acordo",
+      perigo: true,
+    })) return;
     try {
       await setDoc(doc(db, "acordos", acordo.id), { status:"cancelado", canceladoEm: new Date().toLocaleDateString("pt-BR") }, { merge:true });
       const batch = writeBatch(db);
@@ -4376,7 +4460,7 @@ export default function App() {
     const hoje = new Date();
     const hojeISO = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}-${String(hoje.getDate()).padStart(2,"0")}`;
     const prox = somarMeses(hojeISO, infoPeriodicidade(m.periodicidade).meses);
-    if (!window.confirm(`Marcar "${m.titulo}" como feita hoje?\n\nA próxima fica agendada para ${formatarDataBR(prox)}.`)) return;
+    if (!await confirmar({ titulo:`Marcar "${m.titulo}" como feita?`, mensagem:`A próxima execução fica agendada automaticamente para ${formatarDataBR(prox)}.`, textoConfirmar:"Marcar como feita" })) return;
     try {
       await setDoc(doc(db, "manutencoes", m.id), { ultimaExecucao: hojeISO, proximaData: prox }, { merge:true });
       registrarLog("✅", `Manutenção realizada: ${m.titulo} — próxima em ${formatarDataBR(prox)}`);
@@ -4404,10 +4488,18 @@ export default function App() {
   // Troca o token do morador: o link antigo para de funcionar na hora
   const revogarLinkPortal = async (m) => {
     const temToken = !!m.tokenPortal;
-    const msg = temToken
-      ? `Gerar um link novo para ${m.nome}?\n\nO link antigo para de funcionar imediatamente. Use isto se o morador saiu do apartamento ou se o link vazou.`
-      : `Proteger o portal de ${m.nome} com um link exclusivo?\n\nO link atual para de funcionar e você precisa enviar o novo ao morador.`;
-    if (!window.confirm(msg)) return;
+    if (!await confirmar(temToken ? {
+      titulo: `Gerar um link novo para ${m.nome}?`,
+      mensagem: "O link antigo para de funcionar imediatamente.",
+      detalhes: ["Use quando o morador sair do apartamento ou o link vazar", "Você precisa enviar o novo link ao morador"],
+      textoConfirmar: "Gerar link novo",
+      perigo: true,
+    } : {
+      titulo: `Proteger o portal de ${m.nome}?`,
+      mensagem: "O acesso passa a exigir um link exclusivo, que pode ser revogado depois.",
+      detalhes: ["O link atual para de funcionar", "Você precisa enviar o novo link ao morador"],
+      textoConfirmar: "Proteger portal",
+    })) return;
     try {
       await setDoc(doc(db, "moradores", m.id), { tokenPortal: gerarTokenPortal() }, { merge:true });
       registrarLog("🔑", `Link do portal renovado: ${m.nome} (${m.unidade})`);
@@ -4487,7 +4579,7 @@ export default function App() {
     const u = equipe.find(x => x.id === uid);
     if (!u) return;
     if (u.id === user?.uid) { showToast("Você não pode remover o seu próprio acesso.", "error"); return; }
-    if (!window.confirm(`Remover o acesso de ${u.nome || u.email}?\n\nA conta continua existindo, mas deixa de ver este condomínio.`)) return;
+    if (!await confirmar({ titulo:`Remover o acesso de ${u.nome || u.email}?`, mensagem:"A conta continua existindo, mas deixa de enxergar este condomínio.", textoConfirmar:"Remover acesso", perigo:true })) return;
     try {
       await setDoc(doc(db, "usuarios", uid), { condominioId: null }, { merge:true });
       registrarLog("🗑️", `Acesso revogado: ${u.email}`);
@@ -4510,11 +4602,17 @@ export default function App() {
       const backupCob = snap.docs.map(d => ({ id:d.id, dados:d.data() }));
 
       const nPagos = backupCob.filter(c => c.dados?.status === "pago").length;
-      const aviso = `Remover ${m.nome} (${m.unidade})?\n\n`
-        + `Isto também apaga ${backupCob.length} registro(s) de cobrança`
-        + (nPagos ? `, incluindo ${nPagos} pagamento(s) já quitado(s)` : "")
-        + `.\n\nVocê terá alguns segundos para desfazer.`;
-      if (!window.confirm(aviso)) return;
+      if (!await confirmar({
+        titulo: `Remover ${m.nome}?`,
+        mensagem: `Unidade ${m.unidade}.`,
+        detalhes: [
+          `${backupCob.length} registro(s) de cobrança serão apagados junto`,
+          ...(nPagos ? [`Inclui ${nPagos} pagamento(s) já quitado(s)`] : []),
+          "Você terá alguns segundos para desfazer",
+        ],
+        textoConfirmar: "Remover morador",
+        perigo: true,
+      })) return;
 
       await deleteDoc(doc(db, "moradores", id));
       const batch = writeBatch(db); snap.forEach(d => batch.delete(d.ref));
@@ -5654,7 +5752,7 @@ export default function App() {
       <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
         {d.status !== "pago" && !readOnly && <button onClick={() => marcarDespesaPaga(d.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Marcar Paga</button>}
         {d.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="histDoc" size={14} /> Comprovante</button>}
-        {!readOnly && <button onClick={() => { if(window.confirm("Remover esta despesa?")) removerDespesa(d.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>}
+        {!readOnly && <button onClick={async () => { if (await confirmar({ titulo:"Remover esta despesa?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerDespesa(d.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>}
       </div>
     </div>
   );
@@ -6189,7 +6287,7 @@ export default function App() {
                         </div>
                         <div style={{ display:"flex", gap:8 }}>
                           {!readOnly && <button onClick={() => setModal({ type:"gerenciarExtra", data:{ extraId: extra.id } })} style={{ padding:"7px 14px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Gerenciar</button>}
-                          {!readOnly && <button onClick={() => { if(window.confirm(`Remover a cobrança extra "${extra.descricao}"? Isso apaga os registros de pagamento dela.`)) removerCobrancaExtra(extra); }} title="Remover" style={{ width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>}
+                          {!readOnly && <button onClick={async () => { if (await confirmar({ titulo:`Remover "${extra.descricao}"?`, mensagem:"Os registros de pagamento desta cobrança também serão apagados.", textoConfirmar:"Remover", perigo:true })) removerCobrancaExtra(extra); }} title="Remover" style={{ width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:D.radiusSm, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>}
                         </div>
                       </div>
                     );
@@ -6774,7 +6872,7 @@ export default function App() {
                               <div style={{ display:"flex", gap:6 }}>
                                 {d.status!=="pago" && !readOnly && <button onClick={() => marcarDespesaPaga(d.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Marcar paga</button>}
                                 {d.comprovante && <AcaoBtn D={D} icon="histDoc" titulo="Ver comprovante" onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} />}
-                                {!readOnly && <AcaoBtn D={D} icon="logTrash" cor={D.danger} titulo="Remover despesa" onClick={() => { if(window.confirm("Remover esta despesa?")) removerDespesa(d.id); }} />}
+                                {!readOnly && <AcaoBtn D={D} icon="logTrash" cor={D.danger} titulo="Remover despesa" onClick={async () => { if (await confirmar({ titulo:"Remover esta despesa?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerDespesa(d.id); }} />}
                               </div>
                             </td>
                           </tr>
@@ -6912,7 +7010,7 @@ export default function App() {
                   {!readOnly && (
                     <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
                       <button onClick={() => { setConcluirForm({ dataInicio:"", dataFim:"", valorMaterial:"", valorMaoDeObra:"", obs:"" }); setModal({ type:"concluirServico", data:s }); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Concluir</button>
-                      <button onClick={() => { if(window.confirm(`Remover "${s.titulo}"?`)) removerServico(s.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
+                      <button onClick={async () => { if (await confirmar({ titulo:`Remover "${s.titulo}"?`, mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerServico(s.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                     </div>
                   )}
                 </div>
@@ -6932,7 +7030,7 @@ export default function App() {
                   {!readOnly && (
                     <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
                       <button onClick={() => reabrirServico(s.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", background:D.warningBg, color:"#92400E", border:`1px solid #FDE68A`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logUndo" size={14} /> Reabrir</button>
-                      <button onClick={() => { if(window.confirm(`Remover "${s.titulo}"?`)) removerServico(s.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
+                      <button onClick={async () => { if (await confirmar({ titulo:`Remover "${s.titulo}"?`, mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerServico(s.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                     </div>
                   )}
                 </div>
@@ -7121,7 +7219,7 @@ export default function App() {
                               <div style={{ fontFamily:D.fontBody, fontSize:12.5, color:D.textSec, marginTop:8 }}>{r.data}{r.horario?` · ${r.horario}`:""}</div>
                               {!readOnly && (
                                 <div style={{ marginTop:10 }}>
-                                  <button onClick={() => { if(window.confirm("Remover esta reserva?")) removerReserva(r.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>
+                                  <button onClick={async () => { if (await confirmar({ titulo:"Remover esta reserva?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerReserva(r.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>
                                 </div>
                               )}
                             </div>
@@ -7160,7 +7258,7 @@ export default function App() {
                                 </td>
                                 {!readOnly && (
                                   <td style={{ padding:"13px 18px" }}>
-                                    <button onClick={() => { if(window.confirm("Remover esta reserva?")) removerReserva(r.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
+                                    <button onClick={async () => { if (await confirmar({ titulo:"Remover esta reserva?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerReserva(r.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                                   </td>
                                 )}
                               </tr>
@@ -7268,7 +7366,7 @@ export default function App() {
                                 {dentroAgora && (
                                   <button onClick={() => registrarSaida(a.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={15} /> Registrar saída</button>
                                 )}
-                                <button onClick={() => { if(window.confirm("Remover este registro?")) removerAcesso(a.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>
+                                <button onClick={async () => { if (await confirmar({ titulo:"Remover este registro?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerAcesso(a.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logTrash" size={14} /> Remover</button>
                               </div>
                             )}
                           </div>
@@ -7334,7 +7432,7 @@ export default function App() {
                         {!readOnly && (
                           <div style={{ display:"flex", gap:6, flexShrink:0 }}>
                             <button onClick={() => alternarFixado(com)} title={com.fixado?"Desafixar":"Fixar no topo"} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background: com.fixado?D.secondary:D.muted, color: com.fixado?D.accent:D.textSec, border:`1px solid ${D.border}`, borderRadius:8, cursor:"pointer" }}><NavIcon id="pin" size={15} /></button>
-                            <button onClick={() => { if(window.confirm("Remover este comunicado?")) removerComunicado(com.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
+                            <button onClick={async () => { if (await confirmar({ titulo:"Remover este comunicado?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerComunicado(com.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                           </div>
                         )}
                       </div>
@@ -7464,7 +7562,7 @@ export default function App() {
                                     </button>
                                   )}
                                   {!readOnly && (
-                                    <button onClick={() => { if(window.confirm("Remover este documento?")) removerDocumento(docItem.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer", flexShrink:0 }}><NavIcon id="logTrash" size={15} /></button>
+                                    <button onClick={async () => { if (await confirmar({ titulo:"Remover este documento?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerDocumento(docItem.id); }} title="Remover" style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer", flexShrink:0 }}><NavIcon id="logTrash" size={15} /></button>
                                   )}
                                 </div>
                                 <span style={{ display:"inline-flex", alignItems:"center", gap:6, background:s.bg, color:s.cor, fontSize:12, fontWeight:600, padding:"4px 12px 4px 9px", borderRadius:20, fontFamily:D.fontBody, marginBottom:10 }}>
@@ -7585,7 +7683,7 @@ export default function App() {
                           {aporte?"+":"−"} R$ {m.valor.toFixed(2).replace(".",",")}
                         </span>
                         {!readOnly && (
-                          <button onClick={()=>{ if(window.confirm("Remover esta movimentação?")) removerMovFundo(m.id); }} title="Remover" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
+                          <button onClick={async ()=>{ if (await confirmar({ titulo:"Remover esta movimentação?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerMovFundo(m.id); }} title="Remover" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                         )}
                       </div>
                     </div>
@@ -7676,7 +7774,7 @@ export default function App() {
                                 ) : null;
                               })()}
                               <button onClick={() => marcarRetirada(e)} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={15} /> Retirada</button>
-                              <button onClick={() => { if(window.confirm("Remover este registro?")) removerEntrega(e.id); }} title="Remover" style={{ width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={16} /></button>
+                              <button onClick={async () => { if (await confirmar({ titulo:"Remover este registro?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerEntrega(e.id); }} title="Remover" style={{ width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={16} /></button>
                             </div>
                           )}
                         </div>
@@ -7718,7 +7816,7 @@ export default function App() {
                         <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:3 }}>{e.dataRetirada}{e.horaRetirada?` às ${e.horaRetirada}`:""}</div>
                       </div>
                       {!readOnly && (
-                        <button onClick={() => { if(window.confirm("Remover este registro?")) removerEntrega(e.id); }} title="Remover" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer", flexShrink:0 }}><NavIcon id="logTrash" size={15} /></button>
+                        <button onClick={async () => { if (await confirmar({ titulo:"Remover este registro?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerEntrega(e.id); }} title="Remover" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer", flexShrink:0 }}><NavIcon id="logTrash" size={15} /></button>
                       )}
                     </div>
                   ))}
@@ -7804,7 +7902,7 @@ export default function App() {
                         {!readOnly && (
                           <div style={{ display:"flex", gap:8, marginTop:14, flexWrap:"wrap" }}>
                             <button onClick={() => encerrarEnquete(enq.id, aberta)} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", background: aberta?D.warningBg:D.successBg, color: aberta?"#92400E":D.success, border:`1px solid ${aberta?"#FDE68A":"#86EFAC"}`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id={aberta?"lock":"unlock"} size={14} /> {aberta?"Encerrar":"Reabrir"}</button>
-                            <button onClick={() => { if(window.confirm(`Remover a enquete "${enq.titulo}"? Os votos serão apagados.`)) removerEnquete(enq); }} title="Remover" style={{ width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
+                            <button onClick={async () => { if (await confirmar({ titulo:`Remover "${enq.titulo}"?`, mensagem:"Todos os votos registrados nesta consulta serão apagados.", textoConfirmar:"Remover", perigo:true })) removerEnquete(enq); }} title="Remover" style={{ width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                           </div>
                         )}
                       </div>
@@ -7883,7 +7981,7 @@ export default function App() {
                             <button onClick={() => { setRespostaOcorr(o.respostaSindico || ""); setModal({ type:"responderOcorrencia", data:{ id:o.id, titulo:o.titulo } }); }} style={{ padding:"8px 14px", background:D.primary, color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Responder</button>
                             {o.status !== "em_andamento" && <button onClick={() => responderOcorrencia(o.id, o.respostaSindico || "", "em_andamento")} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="servicos" size={14} /> Em andamento</button>}
                             {o.status !== "resolvida" && <button onClick={() => responderOcorrencia(o.id, o.respostaSindico || "", "resolvida")} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Resolver</button>}
-                            <button onClick={() => { if(window.confirm("Remover esta ocorrência?")) removerOcorrencia(o.id); }} title="Remover" style={{ width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
+                            <button onClick={async () => { if (await confirmar({ titulo:"Remover esta ocorrência?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerOcorrencia(o.id); }} title="Remover" style={{ width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                           </div>
                         )}
                       </div>
@@ -7988,7 +8086,7 @@ export default function App() {
                       </div>
                       <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
                         <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:700, color:D.success }}>+ {fmt(r.valor)}</div>
-                        {!readOnly && <button onClick={() => { if(window.confirm("Remover esta receita?")) removerReceita(r.id); }} title="Remover" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>}
+                        {!readOnly && <button onClick={async () => { if (await confirmar({ titulo:"Remover esta receita?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerReceita(r.id); }} title="Remover" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>}
                       </div>
                     </div>
                   ))}
@@ -8056,7 +8154,7 @@ export default function App() {
                       : <span style={{ fontFamily:D.fontBody, fontSize:11.5, fontWeight:600, color:D.textMut, whiteSpace:"nowrap" }}>{prazo}</span>
                   )}
                   {!readOnly && (
-                    <button onClick={() => { if(window.confirm("Remover este evento?")) removerEvento(e.id); }} title="Remover" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
+                    <button onClick={async () => { if (await confirmar({ titulo:"Remover este evento?", mensagem:"Você poderá desfazer logo depois de remover.", textoConfirmar:"Remover", perigo:true })) removerEvento(e.id); }} title="Remover" style={{ width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer" }}><NavIcon id="logTrash" size={15} /></button>
                   )}
                 </div>
               </div>
@@ -8178,7 +8276,7 @@ export default function App() {
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>{logs.length} registro{logs.length!==1?"s":""} no sistema</p>
               </div>
               {!readOnly && logs.length > 0 && (
-                <button onClick={async () => { if(window.confirm("Limpar todo o histórico?")) { const batch = writeBatch(db); logs.forEach(l => batch.delete(doc(db,"logs",l.id))); await batch.commit(); showToast("Histórico limpo."); }}} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:D.dangerBg, color:"#991B1B", border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                <button onClick={async () => { if (await confirmar({ titulo:"Limpar todo o histórico?", mensagem:"Os registros de atividade serão apagados permanentemente. Esta ação não pode ser desfeita.", textoConfirmar:"Limpar histórico", perigo:true })) { const batch = writeBatch(db); logs.forEach(l => batch.delete(doc(db,"logs",l.id))); await batch.commit(); showToast("Histórico limpo."); }}} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:D.dangerBg, color:"#991B1B", border:`1px solid #FECACA`, borderRadius:D.radiusSm, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
                   <NavIcon id="logTrash" size={14} /> Limpar histórico
                 </button>
               )}
@@ -8467,7 +8565,16 @@ export default function App() {
                   );
                 })()}
                 {!readOnly && (
-                  <button onClick={() => { if(window.confirm("Iniciar a cobrança só a partir do mês que vem?\n\n• As cobranças pendentes deste mês e anteriores serão REMOVIDAS\n• O sistema passa a cobrar a partir do próximo mês\n• Pagamentos já registrados e o dia de vencimento NÃO são afetados")) zerarAtrasados(); }} style={{ padding:"11px 20px", background:D.danger, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                  <button onClick={async () => { if (await confirmar({
+                    titulo: "Iniciar a cobrança no próximo mês?",
+                    mensagem: "O sistema passa a cobrar somente a partir do mês que vem.",
+                    detalhes: [
+                      "As cobranças pendentes deste mês e anteriores serão REMOVIDAS",
+                      "Pagamentos já registrados e o dia de vencimento NÃO são afetados",
+                    ],
+                    textoConfirmar: "Iniciar no próximo mês",
+                    perigo: true,
+                  })) zerarAtrasados(); }} style={{ padding:"11px 20px", background:D.danger, color:"#fff", border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
                     Iniciar cobrança no próximo mês
                   </button>
                 )}
@@ -9709,6 +9816,7 @@ export default function App() {
         </Modal>
       )}
 
+      <DialogoConfirmacao dados={confirmacao} onResponder={responderConfirmacao} D={D} isMobile={isMobile} />
       {toast && <Toast msg={toast.msg} type={toast.type} acao={toast.acao} rotuloAcao={toast.rotuloAcao} onClose={() => setToast(null)} />}
     </div>
   );

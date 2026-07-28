@@ -2886,6 +2886,37 @@ const validarLinhaImport = (reg, moradoresExistentes, outrasLinhas) => {
   return erros;
 };
 
+// Menu de ações secundárias. Guarda o que é ocasional (copiar link, editar, remover)
+// para que a linha mostre só o que se usa todo dia — e mantenha as posições fixas.
+const MenuAcoes = ({ itens, D, aberto, onToggle }) => {
+  const estiloBotao = {
+    width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+    background: aberto ? D.secondary : D.muted, color: D.textSec,
+    border: `1px solid ${aberto ? D.accent : D.border}`, borderRadius: 8, cursor: "pointer", flexShrink: 0, padding: 0,
+  };
+  return (
+    <div style={{ position: "relative", flexShrink: 0 }}>
+      <button onClick={(e) => { e.stopPropagation(); onToggle(); }} title="Mais ações" style={estiloBotao}>
+        <NavIcon id="mais" size={15} />
+      </button>
+      {aberto && (
+        <div onClick={(e) => e.stopPropagation()} style={{ position:"absolute", top:"calc(100% + 6px)", right:0, minWidth:196, background:D.bgCard, border:`1px solid ${D.border}`, borderRadius:D.radius, boxShadow:D.shadowMd || D.shadow, padding:5, zIndex:80 }}>
+          {itens.filter(Boolean).map((it, i) => (
+            <div key={i}>
+              {it.separar && <div style={{ height:1, background:D.border, margin:"5px 0" }} />}
+              <button onClick={() => { it.onClick(); onToggle(); }}
+                style={{ display:"flex", alignItems:"center", gap:10, width:"100%", padding:"9px 11px", background:"none", border:"none", borderRadius:D.radiusSm, cursor:"pointer", fontFamily:D.fontBody, fontSize:13, color: it.cor || D.text, textAlign:"left" }}>
+                <span style={{ color: it.cor || D.textSec, display:"flex", flexShrink:0 }}><NavIcon id={it.icon} size={15} /></span>
+                {it.label}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Botão de ação em lista (ícone pequeno). Vira link de verdade quando recebe href —
 // window.open com parâmetros extras é tratado como popup e bloqueado pelo navegador.
 // Estava duplicado em três abas, e uma alteração feita em uma não valia para as outras.
@@ -2899,6 +2930,14 @@ const AcaoBtn = ({ icon, cor, titulo, onClick, href, D }) => {
     ? <a href={href} target="_blank" rel="noopener noreferrer" title={titulo} onClick={onClick} style={estilo}><NavIcon id={icon} size={15} /></a>
     : <button onClick={onClick} title={titulo} style={estilo}><NavIcon id={icon} size={15} /></button>;
 };
+
+// Ocupa o lugar de um botão indisponível, para os ícones não mudarem de posição
+// entre as linhas da tabela — o que faz clicar no botão errado.
+const AcaoVazia = ({ icon, titulo, D }) => (
+  <span title={titulo} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:"transparent", color:D.border, border:`1px dashed ${D.border}`, borderRadius:8, flexShrink:0 }}>
+    <NavIcon id={icon} size={15} />
+  </span>
+);
 
 const BarraFiltros = ({
   periodo, setPeriodo, timestamps = [], total = 0, D, isMobile, rotuloItem = "registro",
@@ -3212,6 +3251,7 @@ export default function App() {
   const [lendoArquivo, setLendoArquivo] = useState(false);
   const [progressoLeitura, setProgressoLeitura] = useState("");
   const [linhasEditadas, setLinhasEditadas] = useState({});
+  const [menuAcao, setMenuAcao]         = useState(null);
   const [acessos, setAcessos]   = useState([]);
   const [novoAcesso, setNovoAcesso] = useState({ nome:"", empresa:"", motivo:"", unidade:"", dataEntrada:"", horaEntrada:"", horaSaida:"" });
   const [reservas, setReservas] = useState([]);
@@ -3392,6 +3432,15 @@ export default function App() {
 
 
   const showToast = (msg, type="success") => setToast({ msg, type });
+
+  // Fecha o menu de ações ao clicar em qualquer outro lugar da tela
+  useEffect(() => {
+    if (!menuAcao) return;
+    const fechar = () => setMenuAcao(null);
+    // O timeout evita que o próprio clique que abriu o menu já o feche
+    const t = setTimeout(() => document.addEventListener("click", fechar), 0);
+    return () => { clearTimeout(t); document.removeEventListener("click", fechar); };
+  }, [menuAcao]);
 
   // Rede de segurança: qualquer escrita que falhe sem tratamento próprio avisa o síndico
   // em vez de falhar em silêncio (a ação simplesmente não acontecia e ninguém sabia).
@@ -6521,7 +6570,14 @@ export default function App() {
                                 {cob && (cob.acordoId ? <span style={{ display:"inline-flex", alignItems:"center", gap:6, background:D.secondary, color:D.accent, fontSize:11.5, fontWeight:600, padding:"4px 11px 4px 8px", borderRadius:20, fontFamily:D.fontBody, whiteSpace:"nowrap" }}><span style={{ width:6, height:6, borderRadius:"50%", background:D.accent }} />Em acordo</span> : <Badge status={cob.status} />)}
                               </div>
                               {m.email && <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.email}</div>}
-                              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginTop:12 }}>
+                              {linkWhatsApp(m.telefone, "") && (
+                                <a href={linkWhatsApp(m.telefone, MSG_WHATS.contatoGeral({ nome:m.nome, unidade:m.unidade, link:linkPortal(m), cond:nomeCond() }))}
+                                  target="_blank" rel="noopener noreferrer"
+                                  style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, marginTop:12, padding:"11px 14px", background:D.successBg, color:D.success, border:`1px solid ${D.success}33`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>
+                                  <NavIcon id="whats" size={15} /> Falar no WhatsApp
+                                </a>
+                              )}
+                              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginTop:8 }}>
                                 <button onClick={() => { setFichaSecao("cobrancas"); setModal({ type:"historico", data:m }); }} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="histDoc" size={14} /> Histórico</button>
                                 <button onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 10px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="link" size={14} /> Link</button>
                                 {!readOnly && <>
@@ -6563,18 +6619,21 @@ export default function App() {
                                 </td>
                                 <td style={{ padding:"12px 20px" }}>{cob ? (cob.acordoId ? <span style={{ display:"inline-flex", alignItems:"center", gap:6, background:D.secondary, color:D.accent, fontSize:11.5, fontWeight:600, padding:"4px 11px 4px 8px", borderRadius:20, fontFamily:D.fontBody, whiteSpace:"nowrap" }}><span style={{ width:6, height:6, borderRadius:"50%", background:D.accent }} />Em acordo</span> : <Badge status={cob.status} />) : <span style={{ color:D.textMut, fontSize:12 }}>—</span>}</td>
                                 <td style={{ padding:"12px 20px" }}>
-                                  <div style={{ display:"flex", gap:6 }}>
-                                    <AcaoBtn D={D} icon="histDoc" titulo="Ver histórico" onClick={() => { setFichaSecao("cobrancas"); setModal({ type:"historico", data:m }); }} />
-                                    {linkWhatsApp(m.telefone, "") && (
+                                  <div style={{ display:"flex", gap:6, justifyContent:"flex-end" }}>
+                                    <AcaoBtn D={D} icon="histDoc" titulo="Ver ficha do morador" onClick={() => { setFichaSecao("cobrancas"); setModal({ type:"historico", data:m }); }} />
+                                    {linkWhatsApp(m.telefone, "") ? (
                                       <AcaoBtn D={D} icon="whats" cor={D.success} titulo={`Falar com ${m.nome} no WhatsApp`}
                                         href={linkWhatsApp(m.telefone, MSG_WHATS.contatoGeral({ nome:m.nome, unidade:m.unidade, link:linkPortal(m), cond:nomeCond() }))} />
+                                    ) : (
+                                      <AcaoVazia D={D} icon="whats" titulo="Sem telefone cadastrado" />
                                     )}
-                                    {!readOnly && <AcaoBtn D={D} icon="unlock" cor={D.warning} titulo="Gerar link novo (invalida o antigo)" onClick={() => revogarLinkPortal(m)} />}
-                                    <AcaoBtn D={D} icon="link" titulo="Copiar link do portal" onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} />
-                                    {!readOnly && <>
-                                      <AcaoBtn D={D} icon="logPencil" titulo="Editar morador" onClick={() => abrirEditar(m)} />
-                                      <AcaoBtn D={D} icon="logTrash" cor={D.danger} titulo="Remover morador" onClick={() => { removerMorador(m.id); }} />
-                                    </>}
+                                    <MenuAcoes D={D} aberto={menuAcao === m.id} onToggle={() => setMenuAcao(a => a === m.id ? null : m.id)}
+                                      itens={[
+                                        { icon:"link", label:"Copiar link do portal", onClick: () => { navigator.clipboard.writeText(linkMorador(m)); showToast("Link copiado."); } },
+                                        !readOnly && { icon:"unlock", label:"Gerar link novo", cor:D.warning, onClick: () => revogarLinkPortal(m) },
+                                        !readOnly && { icon:"logPencil", label:"Editar morador", onClick: () => abrirEditar(m) },
+                                        !readOnly && { icon:"logTrash", label:"Remover morador", cor:D.danger, separar:true, onClick: () => removerMorador(m.id) },
+                                      ]} />
                                   </div>
                                 </td>
                               </tr>

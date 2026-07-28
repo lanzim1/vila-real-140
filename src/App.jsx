@@ -2599,6 +2599,81 @@ const linkWhatsApp = (tel, msg) => {
   return `https://wa.me/${num}?text=${encodeURIComponent(msg)}`;
 };
 
+/* ── Mensagens de WhatsApp ──
+   Ficam juntas para manter o mesmo tom em todo o sistema. Recebem o nome do condomínio,
+   então servem a qualquer cliente sem alteração no código. */
+const primeiroNome = (nome) => String(nome || "").trim().split(" ")[0] || "";
+const reais = (v) => `R$ ${Number(v || 0).toFixed(2).replace(".", ",")}`;
+
+const MSG_WHATS = {
+  // Ainda dentro do prazo: lembrete curto e cordial
+  cobrancaPendente: ({ nome, unidade, mes, valor, diaVenc, link, cond }) => [
+    `Olá, ${primeiroNome(nome)}! Tudo bem?`,
+    ``,
+    `Aqui é do ${cond}. Passando para lembrar da taxa condominial de ${mes} — ${unidade}.`,
+    ``,
+    `Valor: ${valor}`,
+    `Vencimento: dia ${diaVenc}`,
+    ``,
+    `Se já tiver pago, é só desconsiderar. Você pode conferir a situação e baixar os recibos aqui:`,
+    link,
+    ``,
+    `Qualquer dúvida, é só chamar.`,
+  ].join("\n"),
+
+  // Já venceu: direto, com a conta aberta, sem tom de cobrança agressiva
+  cobrancaAtrasada: ({ nome, unidade, mes, base, multa, juros, dias, total, link, cond }) => [
+    `Olá, ${primeiroNome(nome)}! Tudo bem?`,
+    ``,
+    `Aqui é do ${cond}. A taxa de ${mes} — ${unidade} consta em aberto há ${dias} ${dias === 1 ? "dia" : "dias"}.`,
+    ``,
+    `Taxa: ${base}`,
+    `Multa: ${multa}`,
+    `Juros: ${juros}`,
+    `Total hoje: ${total}`,
+    ``,
+    `Se já efetuou o pagamento, me avise para eu dar baixa. Se precisar combinar um prazo ou parcelar, me chame que a gente resolve.`,
+    ``,
+    `Detalhes e recibos: ${link}`,
+  ].join("\n"),
+
+  // Contato do dia a dia: abre a conversa e já deixa o portal à mão
+  contatoGeral: ({ nome, unidade, link, cond }) => [
+    `Olá, ${primeiroNome(nome)}! Tudo bem?`,
+    ``,
+    `Aqui é da administração do ${cond} — ${unidade}.`,
+    ``,
+    `Se precisar consultar cobranças, comunicados, reservas ou abrir uma ocorrência, o seu portal é este:`,
+    link,
+  ].join("\n"),
+
+  // Encomenda na portaria
+  entregaChegou: ({ nome, unidade, descricao, cond }) => [
+    `Olá, ${primeiroNome(nome)}!`,
+    ``,
+    `Chegou uma encomenda para você na portaria do ${cond} — ${unidade}.`,
+    descricao ? `` : null,
+    descricao ? `Descrição: ${descricao}` : null,
+    ``,
+    `Pode retirar quando for melhor para você.`,
+  ].filter(l => l !== null).join("\n"),
+
+  // Resposta a pedido de reserva
+  reservaAprovada: ({ nome, area, data, horario, cond }) => [
+    `Olá, ${primeiroNome(nome)}!`,
+    ``,
+    `Sua reserva foi aprovada:`,
+    ``,
+    `Área: ${area}`,
+    `Data: ${data}${horario ? ` · ${horario}` : ""}`,
+    ``,
+    `Boa festa! Qualquer coisa, é só chamar.`,
+    ``,
+    cond,
+  ].join("\n"),
+
+};
+
 /* ── Papéis de usuário ──
    O campo `papel` já era gravado no cadastro mas nunca era lido: todo mundo entrava como síndico.
    Aqui ele passa a definir o que cada pessoa vê e pode fazer. */
@@ -4107,22 +4182,26 @@ export default function App() {
   };
 
   // Mensagem de cobrança pronta para o WhatsApp, com valor, encargos e link do portal
+  // Link do portal do morador, usado nas mensagens
+  const linkPortal = (m) =>
+    `${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}${m.tokenPortal ? `&t=${m.tokenPortal}` : ""}`;
+
+  // Escolhe a mensagem conforme a situação: quem está no prazo recebe lembrete,
+  // quem está atrasado recebe a conta detalhada e a oferta de negociar.
   const whatsCobranca = (m, cob) => {
     const enc = cob ? encargosCobranca(cob) : null;
-    const link = `${window.location.origin}${window.location.pathname}?cond=${condominioId}&morador=${m.id}${m.tokenPortal ? `&t=${m.tokenPortal}` : ""}`;
-    const valor = enc ? enc.valorTotal.toFixed(2).replace(".", ",") : "";
-    const linhas = [
-      `Olá, ${(m.nome || "").split(" ")[0]}!`,
-      "",
-      `Passando para lembrar da taxa de condomínio de ${mesLabel(mesSel)} — ${m.unidade}.`,
-    ];
-    if (enc && (enc.multa > 0 || enc.juros > 0)) {
-      linhas.push(`Valor: R$ ${valor} (taxa R$ ${enc.valorBase.toFixed(2).replace(".",",")} + multa e juros por ${enc.diasAtraso} dia(s) de atraso).`);
-    } else if (enc) {
-      linhas.push(`Valor: R$ ${valor}.`);
-    }
-    linhas.push("", `Você pode consultar tudo pelo portal: ${link}`, "", `${nomeCond()}`);
-    return linhas.join("\n");
+    const base = { nome:m.nome, unidade:m.unidade, link:linkPortal(m), cond:nomeCond() };
+    if (!enc) return MSG_WHATS.contatoGeral(base);
+
+    const atrasada = cob.status === "atrasado" && (enc.multa > 0 || enc.juros > 0 || enc.diasAtraso > 0);
+    return atrasada
+      ? MSG_WHATS.cobrancaAtrasada({
+          ...base, mes: mesLabel(cob.mes), dias: enc.diasAtraso,
+          base: reais(enc.valorBase), multa: reais(enc.multa), juros: reais(enc.juros), total: reais(enc.valorTotal),
+        })
+      : MSG_WHATS.cobrancaPendente({
+          ...base, mes: mesLabel(cob.mes), valor: reais(enc.valorTotal), diaVenc: diaVencimento,
+        });
   };
 
   // Registra no histórico que a cobrança foi enviada. A abertura do WhatsApp fica por conta
@@ -6294,7 +6373,7 @@ export default function App() {
                                     <AcaoBtn D={D} icon="histDoc" titulo="Ver histórico" onClick={() => { setFichaSecao("cobrancas"); setModal({ type:"historico", data:m }); }} />
                                     {linkWhatsApp(m.telefone, "") && (
                                       <AcaoBtn D={D} icon="whats" cor={D.success} titulo={`Falar com ${m.nome} no WhatsApp`}
-                                        href={linkWhatsApp(m.telefone, `Olá, ${(m.nome||"").split(" ")[0]}! Aqui é do ${nomeCond()}.`)} />
+                                        href={linkWhatsApp(m.telefone, MSG_WHATS.contatoGeral({ nome:m.nome, unidade:m.unidade, link:linkPortal(m), cond:nomeCond() }))} />
                                     )}
                                     {!readOnly && <AcaoBtn D={D} icon="unlock" cor={D.warning} titulo="Gerar link novo (invalida o antigo)" onClick={() => revogarLinkPortal(m)} />}
                                     <AcaoBtn D={D} icon="link" titulo="Copiar link do portal" onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} />
@@ -6727,7 +6806,18 @@ export default function App() {
                             </div>
                             {!readOnly && (
                               <div style={{ display:"flex", gap:8, flexShrink:0 }}>
-                                <button onClick={() => aprovarReserva(r.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={15} /> Aprovar</button>
+                                {(() => {
+                                  const mor = moradores.find(x => x.id === r.moradorId) || moradores.find(x => normalizarTexto(x.unidade) === normalizarTexto(r.unidade || ""));
+                                  const url = mor && linkWhatsApp(mor.telefone, MSG_WHATS.reservaAprovada({ nome:mor.nome, area:r.area, data:r.data, horario:r.horario, cond:nomeCond() }));
+                                  return url ? (
+                                    <a href={url} target="_blank" rel="noopener noreferrer" title={`Avisar ${mor.nome} da aprovação pelo WhatsApp`}
+                                      onClick={() => registrarLog("📱", `Aviso de reserva enviado: ${mor.nome} (${mor.unidade}) — ${r.area}`)}
+                                      style={{ display:"flex", alignItems:"center", justifyContent:"center", width:38, height:38, background:D.successBg, color:D.success, border:`1px solid ${D.success}33`, borderRadius:D.radiusSm, textDecoration:"none", flexShrink:0 }}>
+                                      <NavIcon id="whats" size={16} />
+                                    </a>
+                                  ) : null;
+                                })()}
+                                                                <button onClick={() => aprovarReserva(r.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={15} /> Aprovar</button>
                                 <button onClick={() => rejeitarReserva(r.id)} title="Rejeitar" style={{ width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={16} /></button>
                               </div>
                             )}
@@ -7321,6 +7411,17 @@ export default function App() {
                           </div>
                           {!readOnly && (
                             <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+                              {(() => {
+                                const mor = moradores.find(x => x.id === e.moradorId) || moradores.find(x => normalizarTexto(x.unidade) === normalizarTexto(e.unidade || ""));
+                                const url = mor && linkWhatsApp(mor.telefone, MSG_WHATS.entregaChegou({ nome:mor.nome, unidade:mor.unidade, descricao:e.descricao, cond:nomeCond() }));
+                                return url ? (
+                                  <a href={url} target="_blank" rel="noopener noreferrer" title={`Avisar ${mor.nome} pelo WhatsApp`}
+                                    onClick={() => registrarLog("📱", `Aviso de encomenda enviado: ${mor.nome} (${mor.unidade})`)}
+                                    style={{ display:"flex", alignItems:"center", justifyContent:"center", width:38, height:38, background:D.successBg, color:D.success, border:`1px solid ${D.success}33`, borderRadius:D.radiusSm, textDecoration:"none", flexShrink:0 }}>
+                                    <NavIcon id="whats" size={16} />
+                                  </a>
+                                ) : null;
+                              })()}
                               <button onClick={() => marcarRetirada(e)} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={15} /> Retirada</button>
                               <button onClick={() => { if(window.confirm("Remover este registro?")) removerEntrega(e.id); }} title="Remover" style={{ width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, cursor:"pointer" }}><NavIcon id="logTrash" size={16} /></button>
                             </div>

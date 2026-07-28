@@ -130,10 +130,18 @@ const D = {
   textSec:     "#64748B",   // texto secundário (slate-500)
   textMut:     "#94A3B8",   // texto mais suave (slate-400)
 
-  // Brand
-  primary:     "#1A2E40",   // navy — botões primários, títulos
-  primaryFg:   "#F8FAFC",   // texto sobre o primary
-  accent:      "#1A2E40",   // ativo, gráficos, links (mesmo navy do design)
+  // Brand — família teal da logo do MySindi.
+  // O teal da marca (#14B8A6) tem contraste 2,49:1 sobre branco, abaixo do mínimo
+  // legível (4,5:1). Por isso texto e botões usam o tom fechado, e o tom da marca
+  // fica para superfícies coloridas e detalhes decorativos.
+  primary:     "#0F766E",   // teal fechado — botões e links (5,47:1 sobre branco)
+  primaryFg:   "#FFFFFF",   // texto sobre o primary
+  primaryHov:  "#0B5F58",   // hover do botão
+  accent:      "#0F766E",   // ícone ativo, links, destaques de texto
+  marca:       "#14B8A6",   // teal da logo — barras, gráficos e áreas coloridas
+  marcaClara:  "#2DD4BF",   // teal claro — sobre fundos escuros (sidebar, cartões)
+  dark:        "#0D1B2E",   // navy da logo — superfícies escuras e avatares
+  darkFg:      "#F6F7F9",   // texto sobre o navy
   secondary:   "#F1F5F9",   // fundo claro para selos/tints (slate-100)
   muted:       "#F8FAFC",   // fundo claro (slate-50)
 
@@ -147,11 +155,11 @@ const D = {
 
   // UI
   border:      "#E2E8F0",   // slate-200
-  ring:        "#1A2E40",
+  ring:        "#14B8A6",
 
   // Sidebar (retonalizada para o novo navy, mantendo estrutura escura)
-  sidebar:     "#1A2E40",   // navy do design
-  sidebarHov:  "#24384D",   // navy um pouco mais claro
+  sidebar:     "#0D1B2E",   // navy da logo
+  sidebarHov:  "#16293F",   // navy um pouco mais claro
   sidebarAct:  "rgba(148,163,184,0.18)",
   sidebarActBdr:"#CBD5E1",  // indicador de ativo (slate-300)
   sidebarFg:   "#E2E8F0",   // texto claro na sidebar
@@ -159,7 +167,7 @@ const D = {
 
   // Deprecated (mantidos para compatibilidade de código legado)
   gold:        "#D97706",
-  primaryDk:   "#12212E",
+  primaryDk:   "#0A1524",
 
   // Shadows (neutras, mais suaves — estilo do design novo)
   shadow:    "0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06)",
@@ -361,7 +369,7 @@ const TopBar = ({ title, user, readOnly, nPendentes, moradores, onBuscar, onConf
         {/* Perfil + menu */}
         <div style={{ position:"relative" }}>
           <button onClick={()=>{ setMenuAberto(v=>!v); setAvisosAberto(false); }} style={{ display:"flex", alignItems:"center", gap:10, background:"none", border:"none", cursor:"pointer", padding:"4px 6px 4px 4px", borderRadius:D.radiusSm, fontFamily:D.fontBody }}>
-            <div style={{ width:36, height:36, borderRadius:"50%", background:D.primary, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, flexShrink:0 }}>{inicial}</div>
+            <div style={{ width:36, height:36, borderRadius:"50%", background:D.dark, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, flexShrink:0 }}>{inicial}</div>
             {!isMobile && (
               <div style={{ lineHeight:1.25, textAlign:"left" }}>
                 <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text, maxWidth:140, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{nome}</div>
@@ -378,7 +386,7 @@ const TopBar = ({ title, user, readOnly, nPendentes, moradores, onBuscar, onConf
               <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, width:250, background:D.bgCard, borderRadius:D.radius, border:`1px solid ${D.border}`, boxShadow:D.shadowMd, zIndex:201, overflow:"hidden" }}>
                 {/* Cabeçalho do menu */}
                 <div style={{ padding:"14px 16px", borderBottom:`1px solid ${D.border}`, display:"flex", alignItems:"center", gap:11 }}>
-                  <div style={{ width:38, height:38, borderRadius:"50%", background:D.primary, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, flexShrink:0 }}>{inicial}</div>
+                  <div style={{ width:38, height:38, borderRadius:"50%", background:D.dark, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:16, fontWeight:600, flexShrink:0 }}>{inicial}</div>
                   <div style={{ minWidth:0 }}>
                     <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color:D.text }}>{papel}</div>
                     <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{user?.email}</div>
@@ -813,9 +821,7 @@ const Login = ({ modoInicial = "login", onVoltar }) => {
       <div style={{ background:"#fff", borderRadius:20, padding:"40px 36px", width:"100%", maxWidth:430, boxShadow:"0 32px 80px rgba(0,0,0,0.4)", position:"relative", maxHeight:"94vh", overflowY:"auto" }}>
         {/* Logo */}
         <div style={{ textAlign:"center", marginBottom:28 }}>
-          <div style={{ width:60, height:60, borderRadius:16, background:`linear-gradient(135deg, ${D.sidebarHov}, ${D.primaryDk})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", boxShadow:`0 8px 24px rgba(30,58,114,0.35)` }}>
-            <span style={{ color:"#fff", fontFamily:D.fontDisplay, fontSize:20, fontWeight:700 }}>🏢</span>
-          </div>
+          <div style={{ display:"flex", justifyContent:"center", marginBottom:16 }}><LogoMySindi tamanho={60} soSimbolo D={D} /></div>
           <h1 style={{ fontFamily:D.fontDisplay, fontSize:23, color:D.text, margin:0, fontWeight:700, letterSpacing:"-0.02em" }}>
             {modo === "login" ? "Bem-vindo de volta" : "Criar conta grátis"}
           </h1>
@@ -955,16 +961,7 @@ const LandingPage = ({ onEntrar, onCadastrar }) => {
     if (el) el.scrollIntoView({ behavior:"smooth", block:"start" });
   };
 
-  const Logo = ({ light }) => (
-    <div style={{ display:"flex", alignItems:"center", gap:9 }}>
-      <div style={{ width:34, height:34, borderRadius:9, background:`linear-gradient(135deg, ${D.sidebarHov}, ${D.primaryDk})`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:`0 2px 8px rgba(26,46,64,0.3)` }}>
-        <span style={{ color:"#fff", fontSize:17 }}>🏢</span>
-      </div>
-      <span style={{ fontFamily:D.fontDisplay, fontSize:19, fontWeight:700, letterSpacing:"-0.02em", color: light ? "#fff" : D.text }}>
-        My<span style={{ color: light ? "#93C5FD" : D.accent }}>Sindi</span>
-      </span>
-    </div>
-  );
+  const Logo = ({ light }) => <LogoMySindi tamanho={34} light={light} D={D} />;
 
   const features = [
     { icon:"💰", titulo:"Cobranças automáticas", desc:"Taxas mensais, status de pagamento e lembretes por e-mail sem esforço." },
@@ -1011,7 +1008,7 @@ const LandingPage = ({ onEntrar, onCadastrar }) => {
             </div>
             <h1 style={{ fontFamily:D.fontDisplay, fontSize: isMobile?32:50, fontWeight:700, letterSpacing:"-0.035em", lineHeight:1.08, margin:"0 0 18px" }}>
               A gestão do seu condomínio,<br/>
-              <span style={{ color:"#93C5FD" }}>simples e sem complicação.</span>
+              <span style={{ color:"#2DD4BF" }}>simples e sem complicação.</span>
             </h1>
             <p style={{ fontSize: isMobile?16:18, opacity:.82, lineHeight:1.6, margin:"0 0 30px", maxWidth:520, marginLeft: isMobile?"auto":0, marginRight: isMobile?"auto":0 }}>
               Cobranças, moradores, reservas e finanças em um só lugar. Feito para síndicos que querem controle total sem dor de cabeça.
@@ -1042,7 +1039,7 @@ const LandingPage = ({ onEntrar, onCadastrar }) => {
                 </div>
                 <div style={{ padding:16, display:"flex", flexDirection:"column", gap:12 }}>
                   {/* card escuro */}
-                  <div style={{ background:D.primary, borderRadius:D.radius, padding:"16px 18px", color:"#fff", position:"relative", overflow:"hidden" }}>
+                  <div style={{ background:D.dark, borderRadius:D.radius, padding:"16px 18px", color:"#fff", position:"relative", overflow:"hidden" }}>
                     <div style={{ position:"absolute", top:-24, right:-24, width:90, height:90, borderRadius:"50%", background:"rgba(16,185,129,0.22)" }} />
                     <div style={{ position:"relative" }}>
                       <div style={{ fontSize:10, fontWeight:700, letterSpacing:".8px", textTransform:"uppercase", opacity:.8 }}>Saldo em caixa</div>
@@ -1139,7 +1136,7 @@ const LandingPage = ({ onEntrar, onCadastrar }) => {
                   )}
                   <h3 style={{ fontFamily:D.fontDisplay, fontSize:22, fontWeight:700, color: dest?"#fff":D.text, margin:"0 0 3px", letterSpacing:"-0.02em" }}>{p.nome}</h3>
                   <p style={{ fontSize:13, color: dest?"rgba(255,255,255,0.65)":D.textSec, margin:"0 0 2px" }}>{p.apt}</p>
-                  <p style={{ fontSize:13, color: dest?"#93C5FD":D.accent, fontWeight:600, margin:"0 0 20px" }}>{p.resumo}</p>
+                  <p style={{ fontSize:13, color: dest?"#2DD4BF":D.accent, fontWeight:600, margin:"0 0 20px" }}>{p.resumo}</p>
 
                   <div style={{ marginBottom:22 }}>
                     <div style={{ height:19, marginBottom:2 }}>
@@ -1405,9 +1402,9 @@ const AdminPanel = ({ onSair }) => {
       {/* Header */}
       <header style={{ background:D.sidebar, color:"#fff", padding: isMobile?"16px 20px":"18px 40px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-          <div style={{ width:38, height:38, borderRadius:10, background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.18)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🏢</div>
+          <LogoMySindi tamanho={38} light soSimbolo D={D} />
           <div>
-            <div style={{ fontFamily:D.fontDisplay, fontSize:17, fontWeight:700, letterSpacing:"-0.02em" }}>My<span style={{ color:"#93C5FD" }}>Sindi</span> · Admin</div>
+            <div style={{ fontFamily:D.fontDisplay, fontSize:17, fontWeight:700, letterSpacing:"-0.02em" }}>My<span style={{ color:"#2DD4BF" }}>Sindi</span> · Admin</div>
             <div style={{ fontSize:11, color:"rgba(226,232,245,0.5)" }}>Painel do administrador</div>
           </div>
         </div>
@@ -1423,7 +1420,7 @@ const AdminPanel = ({ onSair }) => {
           {/* Métricas principais */}
           <h2 style={{ fontFamily:D.fontDisplay, fontSize:isMobile?20:24, fontWeight:700, color:D.text, margin:"0 0 16px", letterSpacing:"-0.02em" }}>Visão geral do negócio</h2>
           {/* Receita em destaque: é a resposta para "como está o negócio?" */}
-          <div style={{ background:D.primary, borderRadius:D.radiusXl || 16, padding: isMobile?"20px 20px 18px":"24px 26px 22px", color:"#fff", marginBottom:14, position:"relative", overflow:"hidden" }}>
+          <div style={{ background:D.dark, borderRadius:D.radiusXl || 16, padding: isMobile?"20px 20px 18px":"24px 26px 22px", color:"#fff", marginBottom:14, position:"relative", overflow:"hidden" }}>
             <div style={{ position:"absolute", top:-40, right:-30, width:160, height:160, borderRadius:"50%", background:"rgba(255,255,255,.04)" }} />
             <div style={{ position:"relative", display:"flex", justifyContent:"space-between", alignItems:"flex-end", gap:16, flexWrap:"wrap" }}>
               <div style={{ minWidth:0 }}>
@@ -2129,7 +2126,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
       <div style={{ padding: isMobile ? "16px 14px 40px" : "24px 40px 40px", maxWidth:640, margin:"0 auto" }}>
 
         {/* ── Situação do mês: a pergunta que traz o morador aqui ── */}
-        <div style={{ background:D.primary, borderRadius:D.radiusXl || 16, padding: isMobile?"18px 18px 16px":"22px 24px 20px", color:"#fff", marginBottom:16, position:"relative", overflow:"hidden" }}>
+        <div style={{ background:D.dark, borderRadius:D.radiusXl || 16, padding: isMobile?"18px 18px 16px":"22px 24px 20px", color:"#fff", marginBottom:16, position:"relative", overflow:"hidden" }}>
           <div style={{ position:"absolute", top:-40, right:-30, width:150, height:150, borderRadius:"50%", background:"rgba(255,255,255,.04)" }} />
           <div style={{ position:"relative" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, marginBottom:12 }}>
@@ -2491,6 +2488,10 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
           <button onClick={()=>setDocLegal("privacidade")} style={{ background:"none", border:"none", color:D.accent, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, textDecoration:"underline" }}>
             Política de Privacidade
           </button>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, marginTop:18, paddingTop:16, borderTop:`1px solid ${D.border}`, opacity:.75 }}>
+            <LogoMySindi tamanho={18} soSimbolo D={D} />
+            <span style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textMut }}>Sistema de gestão MySindi</span>
+          </div>
         </div>
 
       </div>
@@ -2938,6 +2939,32 @@ const validarLinhaImport = (reg, moradoresExistentes, outrasLinhas) => {
   if (un && outrasLinhas.filter(o => normalizarTexto(o.unidade) === un).length > 1) erros.push("unidade repetida na lista");
   if (em && outrasLinhas.filter(o => normalizarTexto(o.email) === em).length > 1) erros.push("e-mail repetido na lista");
   return erros;
+};
+
+// Logo do MySindi, redesenhada em vetor a partir dos arquivos da marca.
+// `light` troca para a versão de fundo escuro; `soSimbolo` omite o texto,
+// para usos apertados como favicon e cantos de documento.
+const LogoMySindi = ({ tamanho = 34, light = false, soSimbolo = false, D }) => {
+  const c = light
+    ? { caixa:"#122238", barra1:"#3A4A5E", barra2:"#2DD4BF", barra3:"#F6F7F9", my:"#F6F7F9", sindi:"#2DD4BF" }
+    : { caixa:"#E4E8EE", barra1:"#C7CCD4", barra2:"#14B8A6", barra3:"#0D1B2E", my:"#0D1B2E", sindi:"#14B8A6" };
+  const simbolo = (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 100 100" style={{ display:"block", flexShrink:0 }} role="img" aria-label="MySindi">
+      <rect width="100" height="100" rx="27" fill={c.caixa} />
+      <rect x="27" y="50" width="12" height="30" rx="6" fill={c.barra1} />
+      <rect x="44" y="28" width="12" height="52" rx="6" fill={c.barra2} />
+      <rect x="61" y="40" width="12" height="40" rx="6" fill={c.barra3} />
+    </svg>
+  );
+  if (soSimbolo) return simbolo;
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap: Math.round(tamanho * 0.26) }}>
+      {simbolo}
+      <span style={{ fontFamily: D?.fontDisplay || "inherit", fontSize: Math.round(tamanho * 0.56), fontWeight:700, letterSpacing:"-0.02em", whiteSpace:"nowrap" }}>
+        <span style={{ color:c.my }}>My</span><span style={{ color:c.sindi }}>Sindi</span>
+      </span>
+    </div>
+  );
 };
 
 // Confirmação com o visual do sistema. As caixas do navegador destoam do produto,
@@ -5676,7 +5703,7 @@ export default function App() {
   if (!condominioId && !readOnly && user.email === ADMIN_EMAIL) return (
     <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:D.sidebar, color:"#fff", fontFamily:D.fontBody, padding:24 }}>
       <div style={{ background:"#fff", borderRadius:D.radius, padding:"36px 32px", maxWidth:440, textAlign:"center", boxShadow:D.shadowMd }}>
-        <div style={{ width:60, height:60, borderRadius:16, background:`linear-gradient(135deg, ${D.sidebarHov}, ${D.primaryDk})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", fontSize:28 }}>🏢</div>
+        <div style={{ display:"flex", justifyContent:"center", marginBottom:16 }}><LogoMySindi tamanho={60} soSimbolo D={D} /></div>
         <h2 style={{ fontFamily:D.fontDisplay, color:D.text, fontSize:20, margin:"0 0 10px", letterSpacing:"-0.02em" }}>Bem-vindo, Admin</h2>
         <p style={{ fontFamily:D.fontBody, color:D.textSec, fontSize:14, lineHeight:1.6, margin:"0 0 20px" }}>
           Você está logado como administrador do MySindi. Acesse o painel para gerenciar todos os condomínios e ver as métricas do negócio.
@@ -5692,7 +5719,7 @@ export default function App() {
   if (!condominioId && !readOnly) return (
     <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:D.sidebar, color:"#fff", fontFamily:D.fontBody, padding:24 }}>
       <div style={{ background:"#fff", borderRadius:D.radius, padding:"36px 32px", maxWidth:440, textAlign:"center", boxShadow:D.shadowMd }}>
-        <div style={{ fontSize:40, marginBottom:14 }}>🏢</div>
+        <div style={{ display:"flex", justifyContent:"center", marginBottom:14 }}><LogoMySindi tamanho={54} soSimbolo D={D} /></div>
         <h2 style={{ fontFamily:D.fontDisplay, color:D.text, fontSize:20, margin:"0 0 10px", letterSpacing:"-0.02em" }}>Conta sem condomínio</h2>
         <p style={{ fontFamily:D.fontBody, color:D.textSec, fontSize:14, lineHeight:1.6, margin:"0 0 20px" }}>
           Sua conta ainda não está vinculada a nenhum condomínio. Se você é o administrador, execute a página de migração/configuração para vincular seu condomínio.
@@ -5901,7 +5928,7 @@ export default function App() {
             {navPrincipal.map(n => {
               const ativo = aba===n.id;
               return (
-              <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, color: ativo ? "#93C5FD" : "rgba(226,232,245,0.72)", borderTop: ativo ? `2px solid #93C5FD` : "2px solid transparent", fontFamily:D.fontBody }}>
+              <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, color: ativo ? "#2DD4BF" : "rgba(226,232,245,0.72)", borderTop: ativo ? `2px solid #2DD4BF` : "2px solid transparent", fontFamily:D.fontBody }}>
                 <span style={{ display:"flex", height:20, alignItems:"center" }}><NavIcon id={n.id} size={20} /></span>
                 <span style={{ fontSize:9.5, fontWeight: ativo?600:400, lineHeight:1 }}>{n.label}</span>
               </button>
@@ -5910,7 +5937,7 @@ export default function App() {
             {(() => {
               const ativo = maisAberto || navSecundario.some(n=>n.id===aba);
               return (
-              <button onClick={() => setMaisAberto(v=>!v)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, color: ativo ? "#93C5FD" : "rgba(226,232,245,0.72)", borderTop: ativo ? `2px solid #93C5FD` : "2px solid transparent", fontFamily:D.fontBody }}>
+              <button onClick={() => setMaisAberto(v=>!v)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, color: ativo ? "#2DD4BF" : "rgba(226,232,245,0.72)", borderTop: ativo ? `2px solid #2DD4BF` : "2px solid transparent", fontFamily:D.fontBody }}>
                 <span style={{ display:"flex", height:20, alignItems:"center" }}><NavIcon id="mais" size={20} /></span>
                 <span style={{ fontSize:9.5, fontWeight: ativo?600:400, lineHeight:1 }}>Mais</span>
               </button>
@@ -6482,7 +6509,7 @@ export default function App() {
                 })()}
 
                 {selCob.length > 0 && !readOnly && (
-                  <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap", background:D.primary, color:"#fff", borderRadius:D.radius, padding:"12px 16px", marginBottom:14 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap", background:D.dark, color:"#fff", borderRadius:D.radius, padding:"12px 16px", marginBottom:14 }}>
                     <span style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, flex:1, minWidth:140 }}>
                       {selCob.length} {selCob.length===1?"cobrança selecionada":"cobranças selecionadas"}
                     </span>
@@ -8710,7 +8737,7 @@ export default function App() {
                   const info = infoPapel(u.papel);
                   return (
                     <div key={u.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:D.bgCard, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, flexWrap: isMobile?"wrap":"nowrap" }}>
-                      <div style={{ width:34, height:34, borderRadius:"50%", background:D.primary, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, flexShrink:0 }}>
+                      <div style={{ width:34, height:34, borderRadius:"50%", background:D.dark, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, flexShrink:0 }}>
                         {(u.nome || u.email || "?").charAt(0).toUpperCase()}
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>

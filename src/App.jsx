@@ -2065,7 +2065,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
       <div style={{ background:`linear-gradient(135deg, ${D.sidebar}, ${D.primaryDk || D.primary})`, padding: isMobile ? "22px 20px" : "30px 40px", color:"#fff" }}>
         <div style={{ maxWidth:640, margin:"0 auto" }}>
           <div style={{ display:"flex", alignItems:"center", gap:7, fontSize:12.5, opacity:.75, marginBottom:7 }}>
-            <NavIcon id="acEmpresa" size={14} /> {morador.condominioNome || "Condomínio"}
+            <NavIcon id="acEmpresa" size={14} /> {condoConfig?.nome || morador.condominioNome || "Condomínio"}
           </div>
           <h1 style={{ fontFamily:D.fontDisplay, fontSize: isMobile?22:28, margin:"0 0 4px", fontWeight:700, letterSpacing:"-0.02em" }}>{morador.nome}</h1>
           <div style={{ fontSize:14, opacity:.85 }}>{morador.unidade}{morador.proprietario ? ` · Prop: ${morador.proprietario}` : ""}</div>
@@ -2217,7 +2217,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
                       </span>
                       <div style={{ fontSize:13, fontWeight:600, color:D.text, marginTop:2 }}>R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
                       {c.status === "pago" && (
-                        <button onClick={() => gerarReciboPDF(morador, c.dataPagamento, c.obs, { mesSel: c.mes, taxa: condoConfig?.taxa || taxa, nomeCondominio: morador.condominioNome || "Condomínio", logo: condoConfig?.logo })}
+                        <button onClick={() => gerarReciboPDF(morador, c.dataPagamento, c.obs, { mesSel: c.mes, taxa: condoConfig?.taxa || taxa, nomeCondominio: condoConfig?.nome || morador.condominioNome || "Condomínio", logo: condoConfig?.logo })}
                           style={{ display:"inline-flex", alignItems:"center", gap:5, marginTop:6, padding:"4px 10px", background:D.muted, color:D.accent, border:`1px solid ${D.border}`, borderRadius:20, fontSize:11.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
                           <NavIcon id="download" size={12} /> Recibo
                         </button>
@@ -4004,6 +4004,7 @@ export default function App() {
       cadastradoEm: new Date().toISOString(),
       cadastradoPor: user?.email || "",
       origemCadastro: "cadastro individual",
+      condominioNome: condominio?.nome || "",
     };
     const ref = await addDoc(collection(db, "moradores"), dados);
     await setDoc(doc(db, "cobrancas", `${condominioId}_${ref.id}_${mesSel}`), { condominioId, moradorId:ref.id, mes:mesSel, status:"pendente", comprovante:null, dataPagamento:null, obs:"" });
@@ -4033,6 +4034,7 @@ export default function App() {
           cadastradoEm: new Date().toISOString(),
           cadastradoPor: user?.email || "",
           origemCadastro: "importação de planilha",
+          condominioNome: condominio?.nome || "",
         });
         // Já cria a cobrança do mês corrente, como no cadastro individual
         batch.set(doc(db, "cobrancas", `${condominioId}_${ref.id}_${mesSel}`),

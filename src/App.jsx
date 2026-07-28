@@ -1670,7 +1670,22 @@ const AdminPanel = ({ onSair }) => {
 // ── Portal do Morador ──
 // Recibo de pagamento em PDF. No nível de módulo para ser usado tanto pelo síndico
 // quanto pelo portal do morador, sem duplicar código.
-const gerarReciboPDF = (morador, dataPagamento, obs, { mesSel, taxa, nomeCondominio }) => {
+// Desenha o logo do condomínio no cabeçalho do PDF, se houver um cadastrado.
+// Fica no canto direito para não competir com o nome. Se a imagem falhar, o PDF
+// continua sendo gerado sem ela — nunca deixa o documento quebrado por causa do logo.
+const desenharLogoPDF = (docPdf, logo, { x = 172, y = 8, tamanho = 22 } = {}) => {
+  if (!logo) return false;
+  try {
+    const formato = String(logo).includes("image/png") ? "PNG" : "JPEG";
+    docPdf.addImage(logo, formato, x, y, tamanho, tamanho, undefined, "FAST");
+    return true;
+  } catch (e) {
+    console.error("Não foi possível inserir o logo no PDF:", e);
+    return false;
+  }
+};
+
+const gerarReciboPDF = (morador, dataPagamento, obs, { mesSel, taxa, nomeCondominio, logo }) => {
   const docPdf  = new jsPDF();
   const AZUL    = [30, 58, 95];
   const DOURADO = [201, 147, 58];
@@ -1686,6 +1701,7 @@ const gerarReciboPDF = (morador, dataPagamento, obs, { mesSel, taxa, nomeCondomi
   docPdf.setFontSize(10);
   docPdf.setFont("helvetica","normal");
   docPdf.text("Recibo de Pagamento de Taxa Condominial", 14, 26);
+  desenharLogoPDF(docPdf, logo);
   docPdf.setTextColor(...DOURADO);
   docPdf.text(`Nº ${numRecibo}`, 14, 33);
 
@@ -2094,7 +2110,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
                       </span>
                       <div style={{ fontSize:13, fontWeight:600, color:D.text, marginTop:2 }}>R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
                       {c.status === "pago" && (
-                        <button onClick={() => gerarReciboPDF(morador, c.dataPagamento, c.obs, { mesSel: c.mes, taxa: condoConfig?.taxa || taxa, nomeCondominio: morador.condominioNome || "Condomínio" })}
+                        <button onClick={() => gerarReciboPDF(morador, c.dataPagamento, c.obs, { mesSel: c.mes, taxa: condoConfig?.taxa || taxa, nomeCondominio: morador.condominioNome || "Condomínio", logo: condoConfig?.logo })}
                           style={{ display:"inline-flex", alignItems:"center", gap:5, marginTop:6, padding:"4px 10px", background:D.muted, color:D.accent, border:`1px solid ${D.border}`, borderRadius:20, fontSize:11.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
                           <NavIcon id="download" size={12} /> Recibo
                         </button>
@@ -2865,6 +2881,9 @@ export default function App() {
   // Enquanto a config do condomínio não chega do Firestore, marcoZero é null — e agir nesse
   // momento gerava cobrança de mês que não deveria ser cobrado. Só operamos após carregar.
   const [configCarregada, setConfigCarregada]   = useState(false);
+  const [logoCond, setLogoCond]                 = useState(null);
+  const [salvandoLogo, setSalvandoLogo]         = useState(false);
+  const [publicandoPrestacao, setPublicandoPrestacao] = useState(false);
   const [enviandoEmails, setEnviandoEmails] = useState(false);
   const [mesSel, setMesSel]         = useState(mesAtual);
   const [toast, setToast]           = useState(null);
@@ -3076,6 +3095,7 @@ export default function App() {
         setMultaPercent(data.multaPercent ?? 2);
         setJurosPercentMes(data.jurosPercentMes ?? 1);
         setMarcoZero(data.marcoZero ?? null);
+        setLogoCond(data.logo ?? null);
         setConfigCarregada(true);
       } else {
         setConfigCarregada(true); // condomínio sem documento: também é um estado conhecido
@@ -3512,6 +3532,94 @@ export default function App() {
     }
   };
 
+  // Sobe o logo do condomínio. Redimensiona antes de gravar: um documento do Firestore
+  // tem limite de ~1 MB, e uma foto de celular passa disso sozinha.
+  const salvarLogo = async (arquivo) => {
+    if (!arquivo || salvandoLogo) return;
+    if (!arquivo.type.startsWith("image/")) { showToast("Escolha um arquivo de imagem (PNG ou JPG).", "error"); return; }
+    setSalvandoLogo(true);
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const leitor = new FileReader();
+        leitor.onload = e => {
+          const img = new Image();
+          img.onload = () => {
+            // Reduz para caber em 300x300 mantendo a proporção
+            const LADO = 300;
+            const escala = Math.min(LADO / img.width, LADO / img.height, 1);
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.round(img.width * escala);
+            canvas.height = Math.round(img.height * escala);
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            res(canvas.toDataURL("image/png"));
+          };
+          img.onerror = () => rej(new Error("imagem inválida"));
+          img.src = e.target.result;
+        };
+        leitor.onerror = () => rej(new Error("falha ao ler o arquivo"));
+        leitor.readAsDataURL(arquivo);
+      });
+
+      await setDoc(doc(db, "condominios", condominioId), { logo: base64 }, { merge:true });
+      registrarLog("🖼️", "Logo do condomínio atualizado");
+      showToast("Logo salvo. Ele passa a aparecer nos recibos e relatórios.");
+    } catch (e) {
+      console.error("Erro ao salvar o logo:", e);
+      showToast("Não foi possível salvar o logo. Tente outra imagem.", "error");
+    } finally {
+      setSalvandoLogo(false);
+    }
+  };
+
+  const removerLogo = async () => {
+    if (!window.confirm("Remover o logo? Os documentos voltam a sair só com o nome do condomínio.")) return;
+    try {
+      await setDoc(doc(db, "condominios", condominioId), { logo: null }, { merge:true });
+      registrarLog("🖼️", "Logo do condomínio removido");
+      showToast("Logo removido.");
+    } catch (e) {
+      console.error("Erro ao remover o logo:", e);
+      showToast("Não foi possível remover. Tente de novo.", "error");
+    }
+  };
+
+  // Publica a prestação de contas do mês no portal do morador.
+  // Em vez de dar ao portal acesso a despesas e receitas do condomínio (o que exporia
+  // tudo à conta compartilhada), gera o PDF aqui e o disponibiliza como documento.
+  const publicarPrestacaoContas = async () => {
+    if (publicandoPrestacao) return;
+    const rotulo = `Prestação de contas — ${mesLabel(mesSel)}`;
+    const jaExiste = documentos.find(d => d.nome === rotulo);
+    if (jaExiste && !window.confirm(`Já existe uma "${rotulo}" publicada.\n\nSubstituir pela versão atual?`)) return;
+    setPublicandoPrestacao(true);
+    try {
+      const pdf = exportarPrestacaoContas(true);
+      if (!pdf) { showToast("Não foi possível gerar o PDF.", "error"); return; }
+      const dados = {
+        condominioId,
+        nome: rotulo,
+        categoria: "Outro",
+        vencimento: "",
+        obs: `Publicada em ${new Date().toLocaleDateString("pt-BR")}`,
+        arquivo: pdf,
+        arquivoNome: `prestacao-contas-${slugCond()}-${mesSel}.pdf`,
+        publico: true,
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
+        timestamp: Date.now(),
+      };
+      if (jaExiste) await setDoc(doc(db, "documentos", jaExiste.id), dados, { merge:true });
+      else await addDoc(collection(db, "documentos"), dados);
+      registrarLog("📄", `Prestação de contas de ${mesLabel(mesSel)} publicada no portal`);
+      showToast(`Publicada. Os moradores já veem a prestação de ${mesLabel(mesSel)} no portal.`);
+    } catch (e) {
+      console.error("Erro ao publicar a prestação de contas:", e);
+      showToast("Não foi possível publicar. Verifique sua conexão e tente de novo.", "error");
+    } finally {
+      setPublicandoPrestacao(false);
+    }
+  };
+
   const zerarAtrasados = async () => {
     if (!condominioId) return;
     const hoje = new Date();
@@ -3607,7 +3715,7 @@ export default function App() {
       setModal(null); setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" });
       let emailOk = false;
       if (morador) {
-        gerarReciboPDF(morador, dataPgto, pagForm.obs, { mesSel, taxa, nomeCondominio: nomeCond() });
+        gerarReciboPDF(morador, dataPgto, pagForm.obs, { mesSel, taxa, nomeCondominio: nomeCond(), logo: logoCond });
         registrarLog("✅", `Pagamento registrado: ${morador.nome} (${morador.unidade}) — ${mesLabel(mesSel)} — R$ ${taxa.toFixed(2).replace(".",",")}`);
         // Envia e-mail de confirmação
         try {
@@ -4702,7 +4810,7 @@ export default function App() {
   const exportarPDF = () => {
     const docPdf = new jsPDF(); const X=14; const AZUL=[30,58,95]; let y=18;
     docPdf.setFontSize(17); docPdf.setTextColor(...AZUL);
-    docPdf.text(`${nomeCond()} — Relatório do Condomínio`, X, y); y+=7;
+    docPdf.text(`${nomeCond()} — Relatório do Condomínio`, X, y); desenharLogoPDF(docPdf, logoCond, { x:172, y:6, tamanho:20 }); y+=7;
     docPdf.setFontSize(10); docPdf.setTextColor(107,122,141);
     docPdf.text(`Período: ${mesLabel(mesSel)}  ·  Gerado em ${new Date().toLocaleDateString("pt-BR")}`, X, y); y+=10;
     if (obsSalva) {
@@ -4740,7 +4848,7 @@ export default function App() {
     docPdf.save(`relatorio-${slugCond()}-${mesSel}.pdf`); showToast("PDF gerado com sucesso!");
   };
 
-  const exportarPrestacaoContas = () => {
+  const exportarPrestacaoContas = (publicar = false) => {
     const docPdf = new jsPDF();
     const AZUL    = [30, 58, 95];
     const DOURADO = [201, 147, 58];
@@ -4757,6 +4865,7 @@ export default function App() {
     docPdf.setTextColor(255,255,255);
     docPdf.setFont("helvetica","bold");
     docPdf.setFontSize(22);
+    if (logoCond) desenharLogoPDF(docPdf, logoCond, { x: W/2 - 12, y: 6, tamanho: 24 });
     docPdf.text(nomeCond(), W/2, 30, { align:"center" });
     docPdf.setFontSize(14);
     docPdf.setFont("helvetica","normal");
@@ -4901,6 +5010,7 @@ export default function App() {
       docPdf.text(`Pagina ${i} de ${totalPags}`, W-14, 293, { align:"right" });
     }
 
+    if (publicar) return docPdf.output("datauristring");
     docPdf.save(`prestacao-contas-${slugCond()}-${mesSel}.pdf`);
     showToast("Prestacao de contas gerada!");
   };
@@ -4967,11 +5077,11 @@ export default function App() {
   const labelPorId = Object.fromEntries(navItems.map(n => [n.id, n.label]));
 
   if (!authChecked) return (
-    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#1E3A5F", color:"#fff", fontFamily:D.fontBody }}>Carregando...</div>
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:D.sidebar, color:"#fff", fontFamily:D.fontBody }}>Carregando...</div>
   );
 
   if (modoVisitante && !user) return (
-    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#1E3A5F", color:"#fff", fontFamily:D.fontBody, textAlign:"center", padding:24 }}>
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:D.sidebar, color:"#fff", fontFamily:D.fontBody, textAlign:"center", padding:24 }}>
       <div><div style={{ display:"flex", justifyContent:"center", marginBottom:10, color:D.textMut }}><NavIcon id="lock" size={34} /></div>Link de visualização indisponível.<br/>Contate o síndico.</div>
     </div>
   );
@@ -5082,7 +5192,7 @@ export default function App() {
                 style={{ width:18, height:18, marginTop:2, cursor:"pointer", accentColor:D.primary, flexShrink:0 }} />
             )}
             <div style={{ minWidth:0 }}>
-              <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:14 }}>{m.unidade} — {m.nome}</div>
+              <div style={{ fontWeight:700, color:D.text, fontSize:14 }}>{m.unidade} — {m.nome}</div>
               <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2, overflow:"hidden", textOverflow:"ellipsis" }}>{m.email}</div>
             </div>
           </div>
@@ -5593,9 +5703,14 @@ export default function App() {
                 <button onClick={exportarPDF} title="Resumo do mês em PDF" style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
                   <NavIcon id="download" size={15} /> Relatório
                 </button>
-                <button onClick={exportarPrestacaoContas} title="Relatório completo do mês em PDF, pronto para apresentar aos moradores" style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
+                <button onClick={() => exportarPrestacaoContas()} title="Relatório completo do mês em PDF, pronto para apresentar aos moradores" style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
                   <NavIcon id="histDoc" size={15} /> Prestação de contas
                 </button>
+                {!readOnly && (
+                  <button onClick={publicarPrestacaoContas} disabled={publicandoPrestacao} title="Disponibiliza a prestação de contas no portal do morador" style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 14px", background:D.bgCard, color:D.success, border:`1.5px solid ${D.success}44`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: publicandoPrestacao?"default":"pointer", opacity: publicandoPrestacao?.6:1, fontFamily:D.fontBody }}>
+                    <NavIcon id="link" size={15} /> {publicandoPrestacao ? "Publicando..." : "Publicar no portal"}
+                  </button>
+                )}
                 {!readOnly && !isMobile && <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"9px 16px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, fontFamily:D.fontBody }}>{enviandoEmails?"Enviando...":"Cobrar pendentes"}</button>}
               </div>
             </div>
@@ -7666,7 +7781,39 @@ export default function App() {
             <TopBar title="Configurações" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
             <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Configurações</h2>
-            <p style={{ color:"#6B7A8D", margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>
+            <p style={{ color:D.textSec, margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>
+
+            {/* Card de IDENTIDADE */}
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.accent}`, marginBottom:20 }}>
+              <div style={{ fontFamily:D.fontBody, fontSize:10.5, fontWeight:700, color:D.accent, textTransform:"uppercase", letterSpacing:"1px", marginBottom:8 }}>Identidade</div>
+              <h3 style={{ color:D.text, margin:"0 0 4px", fontSize:15, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Logo do condomínio</h3>
+              <p style={{ color:D.textSec, fontSize:12.5, margin:"0 0 18px", lineHeight:1.6 }}>
+                Aparece nos recibos, no relatório e na prestação de contas. Use PNG ou JPG — a imagem é reduzida automaticamente.
+              </p>
+
+              <div style={{ display:"flex", alignItems:"center", gap:18, flexWrap:"wrap" }}>
+                <div style={{ width:88, height:88, borderRadius:D.radius, border:`1.5px dashed ${logoCond?D.border:D.textMut}`, background: logoCond?"#fff":D.muted, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", flexShrink:0 }}>
+                  {logoCond
+                    ? <img src={logoCond} alt="Logo do condomínio" style={{ maxWidth:"100%", maxHeight:"100%", objectFit:"contain" }} />
+                    : <span style={{ color:D.textMut, display:"flex" }}><NavIcon id="acEmpresa" size={30} /></span>}
+                </div>
+
+                {!readOnly && (
+                  <div style={{ display:"flex", flexDirection:"column", gap:9, flex:1, minWidth:180 }}>
+                    <label style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"10px 18px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: salvandoLogo?"default":"pointer", opacity: salvandoLogo?.6:1, fontFamily:D.fontBody, width: isMobile?"100%":"fit-content" }}>
+                      <NavIcon id="download" size={15} />
+                      {salvandoLogo ? "Salvando..." : logoCond ? "Trocar logo" : "Enviar logo"}
+                      <input type="file" accept="image/png,image/jpeg" onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; salvarLogo(f); }} style={{ display:"none" }} />
+                    </label>
+                    {logoCond && (
+                      <button onClick={removerLogo} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"9px 16px", background:"none", color:D.textSec, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width: isMobile?"100%":"fit-content" }}>
+                        <NavIcon id="logTrash" size={14} /> Remover
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Card de assinatura — PLANO */}
             <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.accent}`, marginBottom:20 }}>
@@ -7987,11 +8134,11 @@ export default function App() {
       {/* ── Modais ── */}
       {modal?.type === "pagar" && (
         <Modal title={`Registrar Pgto — ${modal.data.unidade}`} onClose={() => setModal(null)} isMobile={isMobile}>
-          <p style={{ fontSize:13, color:"#6B7A8D", margin:"0 0 16px" }}>Morador: <b style={{color:"#1E3A5F"}}>{modal.data.nome}</b> · Taxa: <b style={{color:D.warning}}>R$ {taxa.toFixed(2).replace(".",",")}</b></p>
+          <p style={{ fontSize:13, color:D.textSec, margin:"0 0 16px" }}>Morador: <b style={{color:D.text}}>{modal.data.nome}</b> · Taxa: <b style={{color:D.warning}}>R$ {taxa.toFixed(2).replace(".",",")}</b></p>
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Observação</label>
-          <input value={pagForm.obs} onChange={e=>setPagForm(p=>({...p,obs:e.target.value}))} placeholder="Ex: Pago via Pix" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:6, marginBottom:14, boxSizing:"border-box" }} />
+          <input value={pagForm.obs} onChange={e=>setPagForm(p=>({...p,obs:e.target.value}))} placeholder="Ex: Pago via Pix" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:8, fontSize:14, marginTop:6, marginBottom:14, boxSizing:"border-box" }} />
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Comprovante</label>
-          <div onClick={() => fileRef.current.click()} style={{ marginTop:6, border:"2px dashed #D0DAE6", borderRadius:8, padding:"18px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:"#6B7A8D", fontSize:13 }}>
+          <div onClick={() => fileRef.current.click()} style={{ marginTop:6, border:`2px dashed ${D.border}`, borderRadius:8, padding:"18px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:D.textSec, fontSize:13 }}>
             {pagForm.arquivoNome ? <span style={{color:D.accent,fontWeight:600,display:"inline-flex",alignItems:"center",gap:6}}><NavIcon id="histDoc" size={14} /> {pagForm.arquivoNome}</span> : <><div style={{display:"flex",justifyContent:"center",marginBottom:6,color:D.textMut}}><NavIcon id="download" size={20} /></div>Toque para selecionar</>}
           </div>
           <input ref={fileRef} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f=e.target.files[0]; if(f) setPagForm(p=>({...p,arquivo:f,arquivoNome:f.name})); }} />
@@ -8009,10 +8156,10 @@ export default function App() {
           ) : modal.data.comprovante?.startsWith("data:application/pdf") ? (
             <div style={{ textAlign:"center", padding:20 }}>
               <div style={{ display:"flex", justifyContent:"center", marginBottom:10, color:D.textMut }}><NavIcon id="histDoc" size={44} /></div>
-              <p style={{ color:"#1E3A5F", fontWeight:600, marginBottom:14 }}>{modal.data.arquivoNome||"comprovante.pdf"}</p>
+              <p style={{ color:D.text, fontWeight:600, marginBottom:14 }}>{modal.data.arquivoNome||"comprovante.pdf"}</p>
               <a href={modal.data.comprovante} download={modal.data.arquivoNome||"comprovante.pdf"} style={{ padding:"10px 24px", background:"#2E6DA4", color:"#fff", borderRadius:8, textDecoration:"none", fontSize:13, fontWeight:600 }}>⬇ Baixar PDF</a>
             </div>
-          ) : <p style={{ color:"#6B7A8D", textAlign:"center" }}>Nenhum comprovante.</p>}
+          ) : <p style={{ color:D.textSec, textAlign:"center" }}>Nenhum comprovante.</p>}
         </Modal>
       )}
 
@@ -8324,7 +8471,7 @@ export default function App() {
               <div style={{ display:"flex", gap:16, marginTop:10, flexWrap:"wrap" }}>
                 <div style={{ fontSize:12 }}>✅ <b style={{color:"#2E7D32"}}>{totalPago}</b> pagamento{totalPago!==1?"s":""} em dia</div>
                 <div style={{ fontSize:12 }}>🚨 <b style={{color:"#B03A2E"}}>{totalAtraso}</b> atraso{totalAtraso!==1?"s":""}</div>
-                <div style={{ fontSize:12 }}>📋 <b style={{color:"#1E3A5F"}}>{cobMorador.length}</b> meses no sistema</div>
+                <div style={{ fontSize:12, display:"flex", alignItems:"center", gap:6 }}><span style={{ color:D.accent, display:"flex" }}><NavIcon id="histDoc" size={13} /></span> <b style={{color:D.text}}>{cobMorador.length}</b> meses no sistema</div>
               </div>
             </div>
             {/* Seções da ficha */}
@@ -8371,16 +8518,16 @@ export default function App() {
                 return (
                   <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background:bgStatus, borderRadius:10, borderLeft:`4px solid ${corBorda}` }}>
                     <div>
-                      <div style={{ fontWeight:700, color:"#1E3A5F", fontSize:13 }}>{mesLabel(c.mes)}</div>
-                      {c.dataPagamento && <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>Pago em {c.dataPagamento}</div>}
-                      {c.obs && <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>📝 {c.obs}</div>}
+                      <div style={{ fontWeight:700, color:D.text, fontSize:13 }}>{mesLabel(c.mes)}</div>
+                      {c.dataPagamento && <div style={{ fontSize:11, color:D.textSec, marginTop:2 }}>Pago em {c.dataPagamento}</div>}
+                      {c.obs && <div style={{ fontSize:11, color:D.textSec, marginTop:2 }}>📝 {c.obs}</div>}
                     </div>
                     <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4 }}>
                       <span style={{ fontSize:16 }}>{icone}</span>
                       <span style={{ fontSize:11, fontWeight:600, color:corBorda, textTransform:"capitalize" }}>{c.status}</span>
-                      <span style={{ fontSize:12, color:"#1E3A5F", fontWeight:600 }}>R$ {taxa.toFixed(2).replace(".",",")}</span>
+                      <span style={{ fontSize:12, color:D.text, fontWeight:600 }}>R$ {taxa.toFixed(2).replace(".",",")}</span>
                       {c.status === "pago" && (
-                        <button onClick={() => gerarReciboPDF(m, c.dataPagamento, c.obs, { mesSel: c.mes, taxa, nomeCondominio: nomeCond() })} style={{ fontSize:11, padding:"3px 8px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, cursor:"pointer", fontWeight:600, marginTop:2 }}>
+                        <button onClick={() => gerarReciboPDF(m, c.dataPagamento, c.obs, { mesSel: c.mes, taxa, nomeCondominio: nomeCond(), logo: logoCond })} style={{ fontSize:11, padding:"3px 8px", background:D.secondary, color:D.primary, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, cursor:"pointer", fontWeight:600, marginTop:2 }}>
                           📄 Recibo
                         </button>
                       )}
@@ -8961,7 +9108,7 @@ export default function App() {
             <option value="outro">📌 Outra despesa</option>
           </select>
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Descrição</label>
-          <input value={novaDespesa.descricao} onChange={e=>setNovaDespesa(p=>({...p,descricao:e.target.value}))} placeholder="Ex: Conta Enel Jun" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, marginBottom:14, boxSizing:"border-box", fontFamily:D.fontBody }} />
+          <input value={novaDespesa.descricao} onChange={e=>setNovaDespesa(p=>({...p,descricao:e.target.value}))} placeholder="Ex: Conta Enel Jun" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:8, fontSize:14, marginTop:5, marginBottom:14, boxSizing:"border-box", fontFamily:D.fontBody }} />
           <div style={{ display:"flex", gap:10 }}>
             <div style={{ flex:1 }}>
               <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Valor *</label>
@@ -8985,7 +9132,7 @@ export default function App() {
             </div>
           </label>
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1, display:"block", marginTop:14 }}>Comprovante</label>
-          <div onClick={() => fileRefDespesa.current.click()} style={{ marginTop:6, border:"2px dashed #D0DAE6", borderRadius:8, padding:"16px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:"#6B7A8D", fontSize:13 }}>
+          <div onClick={() => fileRefDespesa.current.click()} style={{ marginTop:6, border:`2px dashed ${D.border}`, borderRadius:8, padding:"16px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:D.textSec, fontSize:13 }}>
             {novaDespesa.arquivoNome ? <span style={{color:D.accent,fontWeight:600,display:"inline-flex",alignItems:"center",gap:6}}><NavIcon id="histDoc" size={14} /> {novaDespesa.arquivoNome}</span> : <>📁 Toque para selecionar</>}
           </div>
           <input ref={fileRefDespesa} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f=e.target.files[0]; if(f) setNovaDespesa(p=>({...p,arquivo:f,arquivoNome:f.name})); }} />
@@ -8999,7 +9146,7 @@ export default function App() {
       {modal?.type === "novoServico" && (
         <Modal title="Novo Serviço" onClose={() => setModal(null)} isMobile={isMobile}>
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Título *</label>
-          <input value={novoServico.titulo} onChange={e=>setNovoServico(p=>({...p,titulo:e.target.value}))} placeholder="Ex: Consertar o portão" style={{ display:"block", width:"100%", padding:"10px 13px", border:"1.5px solid #D0DAE6", borderRadius:8, fontSize:14, marginTop:5, marginBottom:14, boxSizing:"border-box" }} />
+          <input value={novoServico.titulo} onChange={e=>setNovoServico(p=>({...p,titulo:e.target.value}))} placeholder="Ex: Consertar o portão" style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:8, fontSize:14, marginTop:5, marginBottom:14, boxSizing:"border-box" }} />
           <label style={{ fontSize:11, fontWeight:700, color:D.textSec, textTransform:"uppercase", letterSpacing:1 }}>Descrição</label>
           <textarea value={novoServico.descricao} onChange={e=>setNovoServico(p=>({...p,descricao:e.target.value}))} placeholder="Detalhes do serviço" rows={3} style={{ display:"block", width:"100%", padding:"10px 13px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:14, marginTop:5, boxSizing:"border-box", color:D.text, fontFamily:"inherit", resize:"vertical" }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>

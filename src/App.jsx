@@ -1685,87 +1685,136 @@ const desenharLogoPDF = (docPdf, logo, { x = 172, y = 8, tamanho = 22 } = {}) =>
   }
 };
 
+// Cores do design system em RGB, para os PDFs falarem a mesma língua da interface
+const PDF = {
+  navy:    [26, 46, 64],      // D.primary
+  texto:   [15, 23, 42],      // D.text
+  textoSec:[100, 116, 139],   // D.textSec
+  textoMut:[148, 163, 184],   // D.textMut
+  borda:   [226, 232, 240],   // D.border
+  fundo:   [248, 250, 252],   // D.muted
+  verde:   [16, 185, 129],    // D.success
+  verdeBg: [236, 253, 245],   // D.successBg
+  vermelho:[220, 38, 38],     // D.danger
+};
+
+// Cabeçalho padrão: filete navy embaixo, rótulo em maiúsculas, nome do condomínio e logo.
+// Substitui a faixa cheia que ocupava um quinto da página.
+const cabecalhoPDF = (docPdf, { rotulo, titulo, subtitulo, logo, larguraPagina = 210 }) => {
+  const M = 16;
+  docPdf.setFont("helvetica", "normal");
+  docPdf.setFontSize(7.5);
+  docPdf.setTextColor(...PDF.textoMut);
+  docPdf.text(rotulo.toUpperCase(), M, 18, { charSpace: 0.6 });
+
+  docPdf.setFont("helvetica", "bold");
+  docPdf.setFontSize(16);
+  docPdf.setTextColor(...PDF.navy);
+  docPdf.text(titulo, M, 27);
+
+  let base = 27;
+  if (subtitulo) {
+    docPdf.setFont("helvetica", "normal");
+    docPdf.setFontSize(10);
+    docPdf.setTextColor(...PDF.textoSec);
+    docPdf.text(subtitulo, M, 34);
+    base = 34;
+  }
+
+  if (logo) desenharLogoPDF(docPdf, logo, { x: larguraPagina - M - 18, y: 12, tamanho: 18 });
+
+  const yLinha = base + 6;
+  docPdf.setDrawColor(...PDF.navy);
+  docPdf.setLineWidth(0.8);
+  docPdf.line(M, yLinha, larguraPagina - M, yLinha);
+  return yLinha + 12;
+};
+
+// Bloco de dados com filete à esquerda, como os cards do sistema
+const blocoPDF = (docPdf, y, titulo, linhas, { larguraPagina = 210 } = {}) => {
+  const M = 16, recuo = M + 6;
+  const altura = 6 + linhas.length * 6.5;
+
+  docPdf.setDrawColor(...PDF.borda);
+  docPdf.setLineWidth(1.2);
+  docPdf.line(M, y - 3.5, M, y + altura - 6);
+
+  docPdf.setFont("helvetica", "bold");
+  docPdf.setFontSize(7.5);
+  docPdf.setTextColor(...PDF.textoMut);
+  docPdf.text(titulo.toUpperCase(), recuo, y, { charSpace: 0.6 });
+
+  let linhaY = y + 7;
+  linhas.forEach(([rotulo, valor]) => {
+    docPdf.setFont("helvetica", "normal");
+    docPdf.setFontSize(9.5);
+    docPdf.setTextColor(...PDF.textoSec);
+    docPdf.text(String(rotulo), recuo, linhaY);
+    docPdf.setTextColor(...PDF.texto);
+    docPdf.text(String(valor ?? "—"), larguraPagina - M, linhaY, { align: "right" });
+    linhaY += 6.5;
+  });
+  return linhaY + 4;
+};
+
 const gerarReciboPDF = (morador, dataPagamento, obs, { mesSel, taxa, nomeCondominio, logo }) => {
-  const docPdf  = new jsPDF();
-  const AZUL    = [30, 58, 95];
-  const DOURADO = [201, 147, 58];
+  const docPdf = new jsPDF();
+  const M = 16, L = 210;
   const numRecibo = `${mesSel.replace("-","")}-${morador.id?.slice(0,6).toUpperCase() || "000000"}`;
+  const valorFmt = `R$ ${Number(taxa || 0).toFixed(2).replace(".", ",")}`;
 
-  // Cabeçalho
-  docPdf.setFillColor(...AZUL);
-  docPdf.rect(0, 0, 210, 38, "F");
-  docPdf.setTextColor(255,255,255);
-  docPdf.setFontSize(18);
-  docPdf.setFont("helvetica","bold");
-  docPdf.text(nomeCondominio, 14, 16);
-  docPdf.setFontSize(10);
-  docPdf.setFont("helvetica","normal");
-  docPdf.text("Recibo de Pagamento de Taxa Condominial", 14, 26);
-  desenharLogoPDF(docPdf, logo);
-  docPdf.setTextColor(...DOURADO);
-  docPdf.text(`Nº ${numRecibo}`, 14, 33);
+  let y = cabecalhoPDF(docPdf, { rotulo: "Recibo de pagamento", titulo: nomeCondominio, logo, larguraPagina: L });
 
-  // Corpo
-  docPdf.setTextColor(30,30,30);
-  let y = 52;
-  docPdf.setFontSize(11);
-  docPdf.setFont("helvetica","bold");
-  docPdf.text("DADOS DO MORADOR", 14, y); y += 7;
-  docPdf.setDrawColor(201,147,58);
-  docPdf.setLineWidth(0.5);
-  docPdf.line(14, y, 196, y); y += 8;
+  // Valor em destaque: é a informação que o morador procura primeiro
+  docPdf.setFillColor(...PDF.fundo);
+  docPdf.roundedRect(M, y, L - M * 2, 30, 2, 2, "F");
+  docPdf.setFont("helvetica", "normal");
+  docPdf.setFontSize(8.5);
+  docPdf.setTextColor(...PDF.textoSec);
+  docPdf.text("Valor pago", M + 8, y + 9);
+  docPdf.setFont("helvetica", "bold");
+  docPdf.setFontSize(22);
+  docPdf.setTextColor(...PDF.navy);
+  docPdf.text(valorFmt, M + 8, y + 20);
 
-  const campos = [
-    ["Nome",             morador.nome],
-    ["Unidade",          morador.unidade],
-    ["E-mail",           morador.email],
-    ["Telefone",         morador.telefone || "—"],
-  ];
-  docPdf.setFont("helvetica","normal");
-  docPdf.setFontSize(10);
-  campos.forEach(([label, valor]) => {
-    docPdf.setFont("helvetica","bold");   docPdf.text(`${label}:`, 14, y);
-    docPdf.setFont("helvetica","normal"); docPdf.text(valor, 60, y);
-    y += 8;
-  });
+  // Selo de confirmação
+  const selo = `Quitado em ${dataPagamento}`;
+  docPdf.setFont("helvetica", "bold");
+  docPdf.setFontSize(8.5);
+  const larguraSelo = docPdf.getTextWidth(selo) + 10;
+  docPdf.setFillColor(...PDF.verdeBg);
+  docPdf.roundedRect(L - M - larguraSelo - 8, y + 11, larguraSelo, 9, 4.5, 4.5, "F");
+  docPdf.setTextColor(...PDF.verde);
+  docPdf.text(selo, L - M - larguraSelo - 3, y + 17.2);
 
-  y += 6;
-  docPdf.setFont("helvetica","bold");
-  docPdf.setFontSize(11);
-  docPdf.text("DADOS DO PAGAMENTO", 14, y); y += 7;
-  docPdf.line(14, y, 196, y); y += 8;
+  y += 42;
 
-  const pagCampos = [
-    ["Referência",       mesLabelEmail(mesSel)],
-    ["Valor pago",       `R$ ${taxa.toFixed(2).replace(".",",")}`],
-    ["Data do pagamento",dataPagamento],
-    ["Vencimento",       formatarDataBR(dataVencimentoMes(mesSel))],
-    ["Observação",       obs || "—"],
-  ];
-  docPdf.setFontSize(10);
-  pagCampos.forEach(([label, valor]) => {
-    docPdf.setFont("helvetica","bold");   docPdf.text(`${label}:`, 14, y);
-    docPdf.setFont("helvetica","normal"); docPdf.text(String(valor), 60, y);
-    y += 8;
-  });
+  y = blocoPDF(docPdf, y, "Morador", [
+    ["Nome", morador.nome],
+    ["Unidade", morador.unidade],
+    ["E-mail", morador.email],
+    ["Telefone", morador.telefone || "—"],
+  ], { larguraPagina: L });
 
-  // Destaque do valor
-  y += 6;
-  docPdf.setFillColor(232,245,233);
-  docPdf.roundedRect(14, y, 182, 18, 3, 3, "F");
-  docPdf.setTextColor(46,125,50);
-  docPdf.setFont("helvetica","bold");
-  docPdf.setFontSize(13);
-  docPdf.text(`Pagamento confirmado: R$ ${taxa.toFixed(2).replace(".",",")}`, 20, y+12);
+  y += 4;
+
+  y = blocoPDF(docPdf, y, "Pagamento", [
+    ["Referência", mesLabelEmail(mesSel)],
+    ["Vencimento", formatarDataBR(dataVencimentoMes(mesSel))],
+    ["Data do pagamento", dataPagamento],
+    ["Observação", obs || "—"],
+  ], { larguraPagina: L });
 
   // Rodapé
-  y += 36;
-  docPdf.setTextColor(107,122,141);
-  docPdf.setFont("helvetica","normal");
-  docPdf.setFontSize(9);
-  docPdf.line(14, y, 196, y); y += 6;
-  docPdf.text(`Documento gerado automaticamente em ${new Date().toLocaleString("pt-BR")}`, 14, y); y += 5;
-  docPdf.text(`${nomeCondominio} — Sistema de Gestão Condominial`, 14, y);
+  const yRodape = 275;
+  docPdf.setDrawColor(...PDF.borda);
+  docPdf.setLineWidth(0.4);
+  docPdf.line(M, yRodape, L - M, yRodape);
+  docPdf.setFont("helvetica", "normal");
+  docPdf.setFontSize(7.5);
+  docPdf.setTextColor(...PDF.textoMut);
+  docPdf.text(`Recibo nº ${numRecibo} · emitido em ${new Date().toLocaleString("pt-BR")}`, M, yRodape + 6);
+  docPdf.text(nomeCondominio, L - M, yRodape + 6, { align: "right" });
 
   docPdf.save(`recibo-${morador.unidade.replace(/\s/g,"-")}-${mesSel}.pdf`);
 };
@@ -4973,20 +5022,22 @@ export default function App() {
 
   // ── PDF ──
   const exportarPDF = () => {
-    const docPdf = new jsPDF(); const X=14; const AZUL=[30,58,95]; let y=18;
-    docPdf.setFontSize(17); docPdf.setTextColor(...AZUL);
-    docPdf.text(`${nomeCond()} — Relatório do Condomínio`, X, y); desenharLogoPDF(docPdf, logoCond, { x:172, y:6, tamanho:20 }); y+=7;
-    docPdf.setFontSize(10); docPdf.setTextColor(107,122,141);
-    docPdf.text(`Período: ${mesLabel(mesSel)}  ·  Gerado em ${new Date().toLocaleDateString("pt-BR")}`, X, y); y+=10;
+    const docPdf = new jsPDF(); const X = 16; const AZUL = PDF.navy;
+    let y = cabecalhoPDF(docPdf, {
+      rotulo: "Relatório do condomínio",
+      titulo: nomeCond(),
+      subtitulo: `${mesLabel(mesSel)} · gerado em ${new Date().toLocaleDateString("pt-BR")}`,
+      logo: logoCond,
+    });
     if (obsSalva) {
-      docPdf.setFontSize(10); docPdf.setTextColor(30,30,30);
+      docPdf.setFontSize(10); docPdf.setTextColor(...PDF.texto);
       docPdf.setFont("helvetica","bold"); docPdf.text("Observações do mês:", X, y); y+=5;
       docPdf.setFont("helvetica","normal");
       const linhas = docPdf.splitTextToSize(obsSalva, 182);
       docPdf.text(linhas, X, y); y += linhas.length * 5 + 5;
     }
     docPdf.setFontSize(12.5); docPdf.setTextColor(...AZUL); docPdf.text("Resumo Financeiro", X, y); y+=5;
-    autoTable(docPdf, { startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
+    autoTable(docPdf, { startY:y, ...estiloTabela(AZUL),
       head:[["Indicador","Valor"]],
       body:[["Total de unidades",String(moradores.length)],["Pagamentos realizados",String(pagos)],["Pendentes",String(pendentes)],
             ["Arrecadado",`R$ ${totalArrecadado.toFixed(2).replace(".",",")}`],["A receber",`R$ ${totalPendente.toFixed(2).replace(".",",")}`],
@@ -4994,19 +5045,19 @@ export default function App() {
             ["Serviços",`R$ ${totalSaidasServicos.toFixed(2).replace(".",",")}`],["SALDO DE CAIXA",`R$ ${saldoCaixa.toFixed(2).replace(".",",")}`]],
     }); y=docPdf.lastAutoTable.finalY+12;
     docPdf.setFontSize(12.5); docPdf.setTextColor(...AZUL); docPdf.text(`Cobranças — ${mesLabel(mesSel)}`, X, y); y+=5;
-    autoTable(docPdf, { startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
+    autoTable(docPdf, { startY:y, ...estiloTabela(AZUL),
       head:[["Unidade","Morador","Status","Data Pgto"]],
       body: cobMes.map(c => { const m=moradores.find(x=>x.id===c.moradorId); return [m?.unidade||"—",m?.nome||"—",c.status==="pago"?"Pago":"Pendente",c.dataPagamento||"—"]; }),
     }); y=docPdf.lastAutoTable.finalY+12;
     if (y>250) { docPdf.addPage(); y=18; }
     docPdf.setFontSize(12.5); docPdf.setTextColor(...AZUL); docPdf.text(`Despesas — ${mesLabel(mesSel)}`, X, y); y+=5;
-    autoTable(docPdf, { startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
+    autoTable(docPdf, { startY:y, ...estiloTabela(AZUL),
       head:[["Tipo","Descrição","Valor","Status"]],
       body: despesas.filter(d=>d.mes===mesSel).map(d=>[despCat(d.tipo).label,d.descricao||"—",`R$ ${d.valor.toFixed(2).replace(".",",")}`,d.status==="pago"?"Pago":"Pendente"]),
     }); y=docPdf.lastAutoTable.finalY+12;
     if (y>230) { docPdf.addPage(); y=18; }
     docPdf.setFontSize(12.5); docPdf.setTextColor(...AZUL); docPdf.text("Serviços Concluídos", X, y); y+=5;
-    autoTable(docPdf, { startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
+    autoTable(docPdf, { startY:y, ...estiloTabela(AZUL),
       head:[["Serviço","Início","Fim","Material","Mão de obra","Total"]],
       body: servicos.filter(s=>s.status==="concluido").map(s=>[s.titulo,s.dataInicio||"—",s.dataFim||"—",`R$ ${(s.valorMaterial||0).toFixed(2).replace(".",",")}`,`R$ ${(s.valorMaoDeObra||0).toFixed(2).replace(".",",")}`,`R$ ${((s.valorMaterial||0)+(s.valorMaoDeObra||0)).toFixed(2).replace(".",",")}`]),
     });
@@ -5015,47 +5066,19 @@ export default function App() {
 
   const exportarPrestacaoContas = (publicar = false) => {
     const docPdf = new jsPDF();
-    const AZUL    = [30, 58, 95];
-    const DOURADO = [201, 147, 58];
-    const VERDE   = [46, 125, 50];
-    const VERM    = [176, 58, 46];
-    const W = 210;
-    const X = 14;
+    const W = 210, X = 16;
+    const AZUL = PDF.navy, VERDE = PDF.verde, VERM = PDF.vermelho;
 
-    // Capa
-    docPdf.setFillColor(...AZUL);
-    docPdf.rect(0, 0, W, 80, "F");
-    docPdf.setFillColor(...DOURADO);
-    docPdf.rect(0, 80, W, 4, "F");
-    docPdf.setTextColor(255,255,255);
-    docPdf.setFont("helvetica","bold");
-    docPdf.setFontSize(22);
-    if (logoCond) desenharLogoPDF(docPdf, logoCond, { x: W/2 - 12, y: 6, tamanho: 24 });
-    docPdf.text(nomeCond(), W/2, 30, { align:"center" });
-    docPdf.setFontSize(14);
-    docPdf.setFont("helvetica","normal");
-    docPdf.text("Prestacao de Contas", W/2, 42, { align:"center" });
-    docPdf.setFontSize(18);
-    docPdf.setFont("helvetica","bold");
-    docPdf.setTextColor(...DOURADO);
-    docPdf.text(mesLabelEmail(mesSel), W/2, 58, { align:"center" });
-    docPdf.setFontSize(10);
-    docPdf.setFont("helvetica","normal");
-    docPdf.setTextColor(200,220,255);
-    docPdf.text(`Gerado em ${new Date().toLocaleDateString("pt-BR")}`, W/2, 70, { align:"center" });
+    // Abre direto com o resumo: a capa em branco obrigava a virar a página
+    // para ver qualquer número.
+    let y = cabecalhoPDF(docPdf, {
+      rotulo: "Prestação de contas",
+      titulo: nomeCond(),
+      subtitulo: mesLabelEmail(mesSel),
+      logo: logoCond,
+      larguraPagina: W,
+    });
 
-    let y = 96;
-
-    const secao = (titulo) => {
-      if (y > 250) { docPdf.addPage(); y = 20; }
-      docPdf.setFontSize(12); docPdf.setFont("helvetica","bold"); docPdf.setTextColor(...AZUL);
-      docPdf.text(titulo, X, y); y += 5;
-      docPdf.setDrawColor(...DOURADO); docPdf.setLineWidth(0.5);
-      docPdf.line(X, y, W-14, y); y += 6;
-    };
-
-    // Resumo
-    secao("1. Resumo Executivo");
     const inadimplentes = cobMes.filter(c => c.status !== "pago");
     const despMes = despesas.filter(d => d.mes === mesSel);
     const servMes = servicos.filter(s => {
@@ -5066,35 +5089,65 @@ export default function App() {
     });
     const totalServMes = servMes.reduce((s,sv)=>(sv.valorMaterial||0)+(sv.valorMaoDeObra||0)+s, 0);
     const totalDespMes = despMes.filter(d=>d.status==="pago").reduce((s,d)=>s+d.valor,0);
-    autoTable(docPdf, {
-      startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:10}, headStyles:{fillColor:AZUL},
-      head:[["Indicador","Valor"]],
-      body:[
-        ["Unidades do condominio", String(moradores.length)],
-        ["Pagamentos recebidos", `${pagos} unidades`],
-        ["Inadimplentes", `${inadimplentes.length} unidades`],
-        ["Taxa mensal", `R$ ${taxa.toFixed(2).replace(".",",")}`],
-        ["Total arrecadado", `R$ ${totalArrecadado.toFixed(2).replace(".",",")}`],
-        ["Total a receber", `R$ ${totalPendente.toFixed(2).replace(".",",")}`],
-        ["Despesas pagas", `R$ ${totalDespMes.toFixed(2).replace(".",",")}`],
-        ["Servicos realizados", `R$ ${totalServMes.toFixed(2).replace(".",",")}`],
-        ["Saldo de caixa (geral)", `R$ ${saldoCaixa.toFixed(2).replace(".",",")}`],
-      ],
-      didParseCell: (data) => {
-        if (data.row.index === 8) {
-          data.cell.styles.fontStyle = "bold";
-          data.cell.styles.fillColor = saldoCaixa >= 0 ? [232,245,233] : [255,235,238];
-          data.cell.styles.textColor = saldoCaixa >= 0 ? VERDE : VERM;
-        }
-      }
+    const totalSaidas = totalDespMes + totalServMes;
+    const resultadoMes = totalArrecadado - totalSaidas;
+
+    // Três cartões de resumo, como os do painel
+    const cards = [
+      { rot:"Receitas do mês", val:totalArrecadado, cor:VERDE },
+      { rot:"Despesas do mês", val:totalSaidas,     cor:VERM },
+      { rot:"Resultado",       val:resultadoMes,    cor: resultadoMes >= 0 ? AZUL : VERM },
+    ];
+    const larguraCard = (W - X*2 - 8) / 3;
+    cards.forEach((c, i) => {
+      const cx = X + i * (larguraCard + 4);
+      docPdf.setFillColor(...PDF.fundo);
+      docPdf.roundedRect(cx, y, larguraCard, 22, 2, 2, "F");
+      docPdf.setFont("helvetica","normal");
+      docPdf.setFontSize(7.5);
+      docPdf.setTextColor(...PDF.textoSec);
+      docPdf.text(c.rot, cx + 5, y + 8);
+      docPdf.setFont("helvetica","bold");
+      docPdf.setFontSize(12);
+      docPdf.setTextColor(...c.cor);
+      docPdf.text(`R$ ${c.val.toFixed(2).replace(".",",")}`, cx + 5, y + 17);
     });
-    y = docPdf.lastAutoTable.finalY + 14;
+    y += 32;
+
+    y = blocoPDF(docPdf, y, "Arrecadação", [
+      ["Unidades do condomínio", String(moradores.length)],
+      ["Pagamentos recebidos", `${pagos} de ${moradores.length}`],
+      ["Inadimplentes", `${inadimplentes.length} ${inadimplentes.length === 1 ? "unidade" : "unidades"}`],
+      ["Taxa mensal", `R$ ${taxa.toFixed(2).replace(".",",")}`],
+      ["Total a receber", `R$ ${totalPendente.toFixed(2).replace(".",",")}`],
+      ["Saldo de caixa (geral)", `R$ ${saldoCaixa.toFixed(2).replace(".",",")}`],
+    ], { larguraPagina: W });
+    y += 6;
+
+    const secao = (titulo) => {
+      if (y > 250) { docPdf.addPage(); y = 24; }
+      docPdf.setFontSize(7.5); docPdf.setFont("helvetica","bold"); docPdf.setTextColor(...PDF.textoMut);
+      docPdf.text(titulo.toUpperCase(), X, y, { charSpace: 0.6 }); y += 3.5;
+      docPdf.setDrawColor(...PDF.borda); docPdf.setLineWidth(0.4);
+      docPdf.line(X, y, W - X, y); y += 6;
+    };
+
+    // Estilo comum das tabelas: linhas finas, sem cabeçalho escuro nem zebra
+    const estiloTabela = (destaque = PDF.navy) => ({
+      margin: { left: X, right: X },
+      theme: "plain",
+      styles: { fontSize: 8.5, cellPadding: { top: 2.5, bottom: 2.5, left: 0, right: 0 }, textColor: PDF.texto },
+      headStyles: { fontSize: 7.5, fontStyle: "bold", textColor: PDF.textoMut, lineWidth: { bottom: 0.4 }, lineColor: PDF.borda },
+      bodyStyles: { lineWidth: { bottom: 0.2 }, lineColor: PDF.borda },
+      footStyles: { fontSize: 9, fontStyle: "bold", textColor: destaque, lineWidth: { top: 0.4 }, lineColor: PDF.borda },
+      alternateRowStyles: { fillColor: false },
+    });
 
     // Receitas
-    secao("2. Receitas - Pagamentos Recebidos");
+    secao("Pagamentos recebidos");
     const pagosMes = cobMes.filter(c => c.status === "pago");
     autoTable(docPdf, {
-      startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
+      startY:y, ...estiloTabela(AZUL),
       head:[["Unidade","Morador","Data Pgto","Valor"]],
       body: pagosMes.length ? pagosMes.map(c => {
         const m = moradores.find(x=>x.id===c.moradorId);
@@ -5105,9 +5158,9 @@ export default function App() {
     y = docPdf.lastAutoTable.finalY + 14;
 
     // Inadimplentes
-    secao("3. Inadimplencia");
+    secao("Inadimplência");
     autoTable(docPdf, {
-      startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:VERM},
+      startY:y, ...estiloTabela(VERM),
       head:[["Unidade","Morador","Status","Valor em Aberto"]],
       body: inadimplentes.length ? inadimplentes.map(c => {
         const m = moradores.find(x=>x.id===c.moradorId);
@@ -5117,9 +5170,9 @@ export default function App() {
     y = docPdf.lastAutoTable.finalY + 14;
 
     // Despesas
-    secao("4. Despesas - Agua, Luz e Outros");
+    secao("Despesas do mês");
     autoTable(docPdf, {
-      startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
+      startY:y, ...estiloTabela(AZUL),
       head:[["Tipo","Descricao","Status","Valor"]],
       body: despMes.length ? despMes.map(d=>[
         despCat(d.tipo).label,
@@ -5132,9 +5185,9 @@ export default function App() {
     y = docPdf.lastAutoTable.finalY + 14;
 
     // Servicos
-    secao("5. Servicos e Manutencoes");
+    secao("Serviços e manutenções");
     autoTable(docPdf, {
-      startY:y, margin:{left:X}, theme:"grid", styles:{fontSize:9}, headStyles:{fillColor:AZUL},
+      startY:y, ...estiloTabela(AZUL),
       head:[["Servico","Inicio","Fim","Material","Mao de obra","Total"]],
       body: servMes.length ? servMes.map(s=>[
         s.titulo, s.dataInicio||"", s.dataFim||"",
@@ -5148,7 +5201,7 @@ export default function App() {
 
     // Observacoes
     if (obsSalva) {
-      secao("6. Observacoes do Mes");
+      secao("Observações do mês");
       docPdf.setFontSize(10); docPdf.setFont("helvetica","normal"); docPdf.setTextColor(44,62,80);
       const linhasObs = docPdf.splitTextToSize(obsSalva, W-28);
       docPdf.text(linhasObs, X, y);
@@ -5160,24 +5213,26 @@ export default function App() {
     y += 16;
     docPdf.setDrawColor(150,150,150); docPdf.setLineWidth(0.3);
     docPdf.line(X, y, 90, y);
-    docPdf.setFontSize(9); docPdf.setFont("helvetica","normal"); docPdf.setTextColor(107,122,141);
-    docPdf.text("Assinatura do Sindico", X, y+5);
+    docPdf.setFontSize(9); docPdf.setFont("helvetica","normal"); docPdf.setTextColor(...PDF.textoSec);
+    docPdf.setFontSize(9); docPdf.setTextColor(...PDF.textoSec);
+    docPdf.text("Assinatura do síndico", X, y+5);
     docPdf.text("Data: ___/___/______", X, y+12);
 
     // Rodape em todas as paginas
     const totalPags = docPdf.getNumberOfPages();
     for (let i=1; i<=totalPags; i++) {
       docPdf.setPage(i);
-      docPdf.setFillColor(...AZUL);
-      docPdf.rect(0, 287, W, 10, "F");
-      docPdf.setFontSize(8); docPdf.setFont("helvetica","normal"); docPdf.setTextColor(255,255,255);
-      docPdf.text(`${nomeCond()} - Prestação de Contas - ${mesLabelEmail(mesSel)}`, X, 293);
-      docPdf.text(`Pagina ${i} de ${totalPags}`, W-14, 293, { align:"right" });
+      docPdf.setDrawColor(...PDF.borda);
+      docPdf.setLineWidth(0.4);
+      docPdf.line(X, 285, W - X, 285);
+      docPdf.setFontSize(7.5); docPdf.setFont("helvetica","normal"); docPdf.setTextColor(...PDF.textoMut);
+      docPdf.text(`${nomeCond()} · Prestação de contas · ${mesLabelEmail(mesSel)}`, X, 291);
+      docPdf.text(`${i} de ${totalPags}`, W - X, 291, { align:"right" });
     }
 
     if (publicar) return docPdf.output("datauristring");
     docPdf.save(`prestacao-contas-${slugCond()}-${mesSel}.pdf`);
-    showToast("Prestacao de contas gerada!");
+    showToast("Prestação de contas gerada.");
   };
 
   const [maisAberto, setMaisAberto] = useState(false);

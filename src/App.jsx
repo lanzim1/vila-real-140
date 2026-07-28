@@ -2686,6 +2686,20 @@ const validarLinhaImport = (reg, moradoresExistentes, outrasLinhas) => {
   return erros;
 };
 
+// Botão de ação em lista (ícone pequeno). Vira link de verdade quando recebe href —
+// window.open com parâmetros extras é tratado como popup e bloqueado pelo navegador.
+// Estava duplicado em três abas, e uma alteração feita em uma não valia para as outras.
+const AcaoBtn = ({ icon, cor, titulo, onClick, href, D }) => {
+  const estilo = {
+    width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+    background: D.muted, color: cor || D.textSec, border: `1px solid ${D.border}`,
+    borderRadius: 8, cursor: "pointer", flexShrink: 0, textDecoration: "none", padding: 0,
+  };
+  return href
+    ? <a href={href} target="_blank" rel="noopener noreferrer" title={titulo} onClick={onClick} style={estilo}><NavIcon id={icon} size={15} /></a>
+    : <button onClick={onClick} title={titulo} style={estilo}><NavIcon id={icon} size={15} /></button>;
+};
+
 const BarraFiltros = ({
   periodo, setPeriodo, timestamps = [], total = 0, D, isMobile, rotuloItem = "registro",
   // Linha 1 (opcionais): busca e seletor de categoria
@@ -5889,16 +5903,6 @@ export default function App() {
               ];
               const lista = cobMes.filter(c => filtroCobranca==="todos" || c.status===filtroCobranca);
 
-              const AcaoBtn = ({ icon, cor, titulo, onClick, href }) => href ? (
-                <a href={href} target="_blank" rel="noopener noreferrer" title={titulo} onClick={onClick} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color: cor || D.textSec, border:`1px solid ${D.border}`, borderRadius:8, textDecoration:"none", flexShrink:0 }}>
-                  <NavIcon id={icon} size={15} />
-                </a>
-              ) : (
-                <button onClick={onClick} title={titulo} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color: cor||D.textSec, border:`1px solid ${D.border}`, borderRadius:8, cursor:"pointer" }}>
-                  <NavIcon id={icon} size={15} />
-                </button>
-              );
-
               return (
               <>
                 {cobMes.length > 0 && (
@@ -6126,15 +6130,15 @@ export default function App() {
                               <td style={{ padding:"13px 16px" }}>
                                 <div style={{ display:"flex", gap:6 }}>
                                   {cob.status !== "pago" && !readOnly && linkWhatsApp(m.telefone, "") && (
-                                    <AcaoBtn icon="whats" cor={D.success} titulo={`Cobrar ${m.nome} por WhatsApp`}
+                                    <AcaoBtn D={D} icon="whats" cor={D.success} titulo={`Cobrar ${m.nome} por WhatsApp`}
                                       href={linkWhatsApp(m.telefone, whatsCobranca(m, cob))} onClick={() => registrarEnvioWhats(m)} />
                                   )}
                                   {cob.status !== "pago" ? (
                                     !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Registrar</button>
                                   ) : (
                                     <>
-                                      {cob.comprovante && <AcaoBtn icon="histDoc" titulo="Ver comprovante" onClick={() => setModal({ type:"comprovante", data:{ comprovante:cob.comprovante, nome:m.nome, arquivoNome:cob.arquivoNome } })} />}
-                                      {!readOnly && <AcaoBtn icon="logUndo" cor={D.danger} titulo="Estornar pagamento" onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} />}
+                                      {cob.comprovante && <AcaoBtn D={D} icon="histDoc" titulo="Ver comprovante" onClick={() => setModal({ type:"comprovante", data:{ comprovante:cob.comprovante, nome:m.nome, arquivoNome:cob.arquivoNome } })} />}
+                                      {!readOnly && <AcaoBtn D={D} icon="logUndo" cor={D.danger} titulo="Estornar pagamento" onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} />}
                                     </>
                                   )}
                                 </div>
@@ -6206,11 +6210,6 @@ export default function App() {
                 const abrirEditar = (m) => { setEditMorador({id:m.id,nome:m.nome,unidade:m.unidade,proprietario:m.proprietario||"",email:m.email,telefone:m.telefone||"",tipo:m.tipo||"Proprietário",veiculos:m.veiculos||"",pets:m.pets||"",taxaCustom:m.taxaCustom!=null?String(m.taxaCustom):""}); setModal({type:"editarMorador"}); };
 
                 // Botão de ação com ícone de traço (desktop)
-                const AcaoBtn = ({ icon, cor, titulo, onClick }) => (
-                  <button onClick={onClick} title={titulo} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color: cor||D.textSec, border:`1px solid ${D.border}`, borderRadius:8, cursor:"pointer" }}>
-                    <NavIcon id={icon} size={15} />
-                  </button>
-                );
 
                 return (
                 <>
@@ -6292,16 +6291,16 @@ export default function App() {
                                 <td style={{ padding:"12px 20px" }}>{cob ? (cob.acordoId ? <span style={{ display:"inline-flex", alignItems:"center", gap:6, background:D.secondary, color:D.accent, fontSize:11.5, fontWeight:600, padding:"4px 11px 4px 8px", borderRadius:20, fontFamily:D.fontBody, whiteSpace:"nowrap" }}><span style={{ width:6, height:6, borderRadius:"50%", background:D.accent }} />Em acordo</span> : <Badge status={cob.status} />) : <span style={{ color:D.textMut, fontSize:12 }}>—</span>}</td>
                                 <td style={{ padding:"12px 20px" }}>
                                   <div style={{ display:"flex", gap:6 }}>
-                                    <AcaoBtn icon="histDoc" titulo="Ver histórico" onClick={() => { setFichaSecao("cobrancas"); setModal({ type:"historico", data:m }); }} />
+                                    <AcaoBtn D={D} icon="histDoc" titulo="Ver histórico" onClick={() => { setFichaSecao("cobrancas"); setModal({ type:"historico", data:m }); }} />
                                     {linkWhatsApp(m.telefone, "") && (
-                                      <AcaoBtn icon="whats" cor={D.success} titulo={`Falar com ${m.nome} no WhatsApp`}
+                                      <AcaoBtn D={D} icon="whats" cor={D.success} titulo={`Falar com ${m.nome} no WhatsApp`}
                                         href={linkWhatsApp(m.telefone, `Olá, ${(m.nome||"").split(" ")[0]}! Aqui é do ${nomeCond()}.`)} />
                                     )}
-                                    {!readOnly && <AcaoBtn icon="unlock" cor={D.warning} titulo="Gerar link novo (invalida o antigo)" onClick={() => revogarLinkPortal(m)} />}
-                                    <AcaoBtn icon="link" titulo="Copiar link do portal" onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} />
+                                    {!readOnly && <AcaoBtn D={D} icon="unlock" cor={D.warning} titulo="Gerar link novo (invalida o antigo)" onClick={() => revogarLinkPortal(m)} />}
+                                    <AcaoBtn D={D} icon="link" titulo="Copiar link do portal" onClick={() => { navigator.clipboard.writeText(linkMorador(m)); showToast(`Link do ${m.unidade} copiado!`); }} />
                                     {!readOnly && <>
-                                      <AcaoBtn icon="logPencil" titulo="Editar morador" onClick={() => abrirEditar(m)} />
-                                      <AcaoBtn icon="logTrash" cor={D.danger} titulo="Remover morador" onClick={() => { removerMorador(m.id); }} />
+                                      <AcaoBtn D={D} icon="logPencil" titulo="Editar morador" onClick={() => abrirEditar(m)} />
+                                      <AcaoBtn D={D} icon="logTrash" cor={D.danger} titulo="Remover morador" onClick={() => { removerMorador(m.id); }} />
                                     </>}
                                   </div>
                                 </td>
@@ -6360,12 +6359,6 @@ export default function App() {
               ];
               const lista = [...despesas].sort((a,b)=>b.mes.localeCompare(a.mes))
                 .filter(d => filtroDespesa==="todas" || (filtroDespesa==="pago" ? d.status==="pago" : d.status!=="pago"));
-
-              const AcaoBtn = ({ icon, cor, titulo, onClick }) => (
-                <button onClick={onClick} title={titulo} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:D.muted, color: cor||D.textSec, border:`1px solid ${D.border}`, borderRadius:8, cursor:"pointer" }}>
-                  <NavIcon id={icon} size={15} />
-                </button>
-              );
 
               return (
               <>
@@ -6448,8 +6441,8 @@ export default function App() {
                             <td style={{ padding:"13px 16px" }}>
                               <div style={{ display:"flex", gap:6 }}>
                                 {d.status!=="pago" && !readOnly && <button onClick={() => marcarDespesaPaga(d.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Marcar paga</button>}
-                                {d.comprovante && <AcaoBtn icon="histDoc" titulo="Ver comprovante" onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} />}
-                                {!readOnly && <AcaoBtn icon="logTrash" cor={D.danger} titulo="Remover despesa" onClick={() => { if(window.confirm("Remover esta despesa?")) removerDespesa(d.id); }} />}
+                                {d.comprovante && <AcaoBtn D={D} icon="histDoc" titulo="Ver comprovante" onClick={() => setModal({ type:"comprovante", data:{ comprovante:d.comprovante, nome:d.descricao||"Despesa", arquivoNome:d.arquivoNome } })} />}
+                                {!readOnly && <AcaoBtn D={D} icon="logTrash" cor={D.danger} titulo="Remover despesa" onClick={() => { if(window.confirm("Remover esta despesa?")) removerDespesa(d.id); }} />}
                               </div>
                             </td>
                           </tr>

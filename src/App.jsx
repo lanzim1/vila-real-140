@@ -3483,11 +3483,20 @@ export default function App() {
         `\n\nEssas cobranças aparecem no portal do morador mas não no seu painel. Remover?`
       )) return;
 
-      const batch = writeBatch(db);
-      orfas.forEach(o => batch.delete(doc(db, "cobrancas", o.id)));
-      await batch.commit();
-      registrarLog("🧹", `Limpeza: ${orfas.length} cobrança(s) órfã(s) removida(s)`);
-      showToast(`${orfas.length} cobrança(s) órfã(s) removida(s).`);
+      // Uma exclusão por vez, e não em lote: a regra que autoriza remover órfãs precisa
+      // consultar o morador de cada cobrança, e um writeBatch tem limite de 20 consultas
+      // no total — com muitos moradores isso estoura e o Firebase recusa tudo.
+      let removidas = 0, bloqueadas = 0;
+      for (const o of orfas) {
+        try { await deleteDoc(doc(db, "cobrancas", o.id)); removidas++; }
+        catch (err) { bloqueadas++; console.error(`Erro ao remover ${o.id}:`, err); }
+      }
+      registrarLog("🧹", `Limpeza: ${removidas} cobrança(s) órfã(s) removida(s)${bloqueadas ? `, ${bloqueadas} bloqueada(s)` : ""}`);
+      if (bloqueadas > 0) {
+        showToast(`${removidas} removida(s), mas ${bloqueadas} foi(ram) bloqueada(s) pelo Firebase. Confira se as regras mais recentes estão publicadas.`, "error");
+      } else {
+        showToast(`${removidas} cobrança(s) órfã(s) removida(s).`);
+      }
     } catch (e) {
       console.error("Erro ao limpar cobranças órfãs:", e);
       // Erro de permissão tem causa e solução específicas — vale dizer qual é

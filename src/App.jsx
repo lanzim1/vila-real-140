@@ -1422,34 +1422,85 @@ const AdminPanel = ({ onSair }) => {
         <>
           {/* Métricas principais */}
           <h2 style={{ fontFamily:D.fontDisplay, fontSize:isMobile?20:24, fontWeight:700, color:D.text, margin:"0 0 16px", letterSpacing:"-0.02em" }}>Visão geral do negócio</h2>
-          <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(4,1fr)", gap:14, marginBottom:24 }}>
-            {[
-              { label:"Receita mensal (MRR)", valor:`R$ ${mrr.toFixed(2).replace(".",",")}`, icon:"💰", cor:D.success, bg:D.successBg },
-              { label:"Clientes pagantes", valor:clientesPagantes, icon:"✅", cor:D.primary, bg:D.secondary },
-              { label:"Em teste grátis", valor:emTrial.length, icon:"✨", cor:D.warning, bg:D.warningBg },
-              { label:"Projeção anual", valor:`R$ ${projecaoAnual.toFixed(0)}`, icon:"📈", cor:D.accent, bg:D.secondary },
-            ].map((m,i)=>(
-              <div key={i} style={{ ...card, padding:"18px 20px" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
-                  <div style={{ width:34, height:34, borderRadius:9, background:m.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>{m.icon}</div>
+          {/* Receita em destaque: é a resposta para "como está o negócio?" */}
+          <div style={{ background:D.primary, borderRadius:D.radiusXl || 16, padding: isMobile?"20px 20px 18px":"24px 26px 22px", color:"#fff", marginBottom:14, position:"relative", overflow:"hidden" }}>
+            <div style={{ position:"absolute", top:-40, right:-30, width:160, height:160, borderRadius:"50%", background:"rgba(255,255,255,.04)" }} />
+            <div style={{ position:"relative", display:"flex", justifyContent:"space-between", alignItems:"flex-end", gap:16, flexWrap:"wrap" }}>
+              <div style={{ minWidth:0 }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:11, fontWeight:600, textTransform:"uppercase", letterSpacing:"1px", opacity:.7 }}>Receita mensal</div>
+                <div style={{ fontFamily:D.fontDisplay, fontSize: isMobile?28:34, fontWeight:700, letterSpacing:"-0.02em", lineHeight:1.15, marginTop:4 }}>
+                  R$ {mrr.toFixed(2).replace(".",",")}
                 </div>
-                <div style={{ fontFamily:D.fontDisplay, fontSize:isMobile?18:22, fontWeight:700, color:m.cor, letterSpacing:"-0.02em" }}>{m.valor}</div>
-                <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginTop:2 }}>{m.label}</div>
+                <div style={{ fontFamily:D.fontBody, fontSize:12.5, opacity:.78, marginTop:5 }}>
+                  {clientesPagantes} {clientesPagantes === 1 ? "cliente pagante" : "clientes pagantes"} · R$ {projecaoAnual.toFixed(0)} ao ano
+                </div>
               </div>
-            ))}
+              <div style={{ textAlign: isMobile?"left":"right", flexShrink:0 }}>
+                <div style={{ fontFamily:D.fontBody, fontSize:11, opacity:.7 }}>Gasto em {mesLabelAdmin(mesFiltro)}</div>
+                <div style={{ fontFamily:D.fontDisplay, fontSize:18, fontWeight:600, marginTop:3 }}>R$ {totalGastosMes.toFixed(2).replace(".",",")}</div>
+              </div>
+            </div>
           </div>
 
-          {/* Resumo de status */}
-          <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(4,1fr)", gap:14, marginBottom:32 }}>
+          {/* Pendências comerciais: só aparece quando há algo a fazer */}
+          {(() => {
+            // Compara datas zeradas: usar a hora final (23:59) fazia um teste que
+            // vence hoje ser exibido como "acaba amanhã".
+            const diasAteTrial = (c) => {
+              if (!c.trialAte) return null;
+              const [d,m,a] = c.trialAte.split("/").map(Number);
+              const fim = new Date(a, m-1, d).setHours(0,0,0,0);
+              const hoje = new Date().setHours(0,0,0,0);
+              return Math.round((fim - hoje) / 86400000);
+            };
+            const pend = [];
+            emTrial.forEach(c => {
+              const dias = diasAteTrial(c);
+              if (dias !== null && dias <= 7) pend.push({
+                icon:"clock", cor:D.warning, cond:c,
+                texto: `${c.nome}: teste grátis acaba ${dias <= 0 ? "hoje" : dias === 1 ? "amanhã" : `em ${dias} dias`}`,
+              });
+            });
+            expirados.forEach(c => pend.push({
+              icon:"alerta", cor:D.danger, cond:c,
+              texto: `${c.nome}: assinatura expirada — o síndico está com funções limitadas`,
+            }));
+            if (!pend.length) return null;
+            return (
+              <div style={{ background:D.bgCard, borderRadius:D.radius, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.warning}`, boxShadow:D.shadow, overflow:"hidden", marginBottom:14 }}>
+                <div style={{ padding:"13px 18px 10px", display:"flex", alignItems:"center", gap:9 }}>
+                  <span style={{ color:D.warning, display:"flex" }}><NavIcon id="alerta" size={16} /></span>
+                  <span style={{ fontFamily:D.fontDisplay, fontSize:14.5, fontWeight:600, color:D.text, letterSpacing:"-0.02em" }}>Precisa de atenção</span>
+                  <span style={{ fontFamily:D.fontBody, fontSize:12, color:D.textMut }}>({pend.length})</span>
+                </div>
+                {pend.map((pd, i) => (
+                  <button key={i} onClick={() => setModalAcao({ tipo:"gerenciar", cond:pd.cond })}
+                    style={{ width:"100%", display:"flex", alignItems:"center", gap:11, padding:"11px 18px", background:"none", border:"none", borderTop:`1px solid ${D.border}`, cursor:"pointer", textAlign:"left", fontFamily:D.fontBody }}>
+                    <span style={{ width:28, height:28, borderRadius:8, background:D.muted, color:pd.cor, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><NavIcon id={pd.icon} size={14} /></span>
+                    <span style={{ flex:1, fontSize:13, color:D.text, minWidth:0 }}>{pd.texto}</span>
+                    <span style={{ color:D.textMut, display:"flex", flexShrink:0, transform:"rotate(-90deg)" }}><NavIcon id="setaBaixo" size={14} /></span>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Carteira de clientes */}
+          <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(4,1fr)", gap:12, marginBottom:32 }}>
             {[
-              { label:"Total de condomínios", valor:condominios.length, cor:D.text },
-              { label:"Ativos", valor:ativos.length, cor:D.success },
-              { label:"Expirados", valor:expirados.length, cor:D.danger },
-              { label:"Cortesia", valor:cortesias.length, cor:D.textSec },
+              { label:"Condomínios", valor:condominios.length, icon:"acEmpresa", cor:D.text },
+              { label:"Ativos",      valor:ativos.length,      icon:"logCheck",  cor:D.success },
+              { label:"Em teste",    valor:emTrial.length,     icon:"clock",     cor:D.warning },
+              { label:"Cortesia",    valor:cortesias.length,   icon:"assinatura",cor:D.textSec },
             ].map((m,i)=>(
-              <div key={i} style={{ ...card, padding:"14px 18px", textAlign:"center" }}>
-                <div style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:700, color:m.cor }}>{m.valor}</div>
-                <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textSec, marginTop:2 }}>{m.label}</div>
+              <div key={i} style={{ ...card, padding:"14px 16px", display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ width:36, height:36, borderRadius:9, background:D.muted, color:m.cor, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <NavIcon id={m.icon} size={17} />
+                </div>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:700, color:m.cor, lineHeight:1, letterSpacing:"-0.02em" }}>{m.valor}</div>
+                  <div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textSec, marginTop:3 }}>{m.label}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -1463,13 +1514,16 @@ const AdminPanel = ({ onSair }) => {
           </div>
           <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"repeat(4,1fr)", gap:14, marginBottom:20 }}>
             {[
-              { label:"Receita", valor:receitaMes, icon:"↑", cor:D.success },
-              { label:"Gastos", valor:totalGastosMes, icon:"↓", cor:D.danger },
-              { label:"Lucro", valor:lucroMes, icon:"=", cor: lucroMes>=0?D.success:D.danger },
-              { label:"Margem", valor:null, texto:`${margemLucro.toFixed(1)}%`, icon:"%", cor:D.accent },
+              { label:"Receita", valor:receitaMes, icon:"setaCima", cor:D.success },
+              { label:"Gastos", valor:totalGastosMes, icon:"setaBaixo", cor:D.danger },
+              { label:"Lucro", valor:lucroMes, icon:"fxMoeda", cor: lucroMes>=0?D.success:D.danger },
+              { label:"Margem", valor:null, texto:`${margemLucro.toFixed(1)}%`, icon:"fluxoCaixa", cor:D.accent },
             ].map((m,i)=>(
-              <div key={i} style={{ ...card, padding:"18px 20px" }}>
-                <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec, marginBottom:6 }}>{m.label}</div>
+              <div key={i} style={{ ...card, padding:"16px 18px" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                  <span style={{ color:m.cor, display:"flex" }}><NavIcon id={m.icon} size={15} /></span>
+                  <span style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>{m.label}</span>
+                </div>
                 <div style={{ fontFamily:D.fontDisplay, fontSize:20, fontWeight:700, color:m.cor, letterSpacing:"-0.02em" }}>
                   {m.texto || `R$ ${m.valor.toFixed(2).replace(".",",")}`}
                 </div>
@@ -1647,7 +1701,7 @@ const AdminPanel = ({ onSair }) => {
         return (
           <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.75)", zIndex:1100, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
             <div style={{ background:"#fff", borderRadius:D.radius, width:"100%", maxWidth:440, boxShadow:D.shadowMd, padding:"28px 26px" }}>
-              <div style={{ fontSize:32, marginBottom:12, textAlign:"center" }}>⚠️</div>
+              <div style={{ display:"flex", justifyContent:"center", marginBottom:12, color:D.danger }}><NavIcon id="alerta" size={30} /></div>
               <h3 style={{ fontFamily:D.fontDisplay, fontSize:18, fontWeight:700, color:D.text, margin:"0 0 10px", textAlign:"center", letterSpacing:"-0.02em" }}>Excluir {c.nome}?</h3>
               <p style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec, lineHeight:1.6, margin:"0 0 18px", textAlign:"center" }}>
                 Esta ação é <b>irreversível</b>. Todos os dados serão apagados permanentemente: moradores, cobranças, despesas, serviços, reservas e histórico.

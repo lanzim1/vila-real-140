@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { auth, db } from "./firebase";
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signInAnonymously } from "firebase/auth";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import emailjs from "@emailjs/browser";
@@ -24,8 +24,9 @@ const MOCK_MORADORES = [
   { nome: "Patrícia Nunes", unidade: "Apto 302", email: "patricia@email.com", telefone: "(85) 99123-0006" },
 ];
 
-const VISITANTE_EMAIL = "visitante@vilareal140-ddf4d.firebaseapp.com";
-const VISITANTE_SENHA = "VisualizarVR140";
+// O portal do morador e o modo demonstração usam autenticação anônima do Firebase.
+// Antes havia uma conta fixa com a senha escrita aqui — como este arquivo é servido
+// publicamente, qualquer pessoa podia usá-la para ler a base inteira.
 
 // ── Admin do MySindi (dono do negócio) ──
 const ADMIN_EMAIL = "comercial.mysindi@gmail.com";
@@ -2941,6 +2942,45 @@ const validarLinhaImport = (reg, moradoresExistentes, outrasLinhas) => {
   return erros;
 };
 
+/* ── Validação de arquivo enviado ──
+   O atributo accept do campo é só uma sugestão ao seletor, e o tipo informado pelo
+   navegador vem da extensão — renomear um arquivo engana os dois. Aqui conferimos
+   os primeiros bytes, que são a assinatura real do formato. */
+const LIMITES_ARQUIVO = { imagem: 3, pdf: 6, planilha: 10 }; // em MB
+
+const ASSINATURAS = [
+  { tipo:"pdf",  bytes:[0x25,0x50,0x44,0x46] },                 // %PDF
+  { tipo:"png",  bytes:[0x89,0x50,0x4E,0x47] },                 // PNG
+  { tipo:"jpg",  bytes:[0xFF,0xD8,0xFF] },                      // JPEG
+  { tipo:"gif",  bytes:[0x47,0x49,0x46,0x38] },                 // GIF8
+  { tipo:"webp", bytes:[0x52,0x49,0x46,0x46] },                 // RIFF
+  { tipo:"zip",  bytes:[0x50,0x4B,0x03,0x04] },                 // xlsx é zip
+];
+
+const lerAssinatura = (arquivo) => new Promise((resolve) => {
+  const leitor = new FileReader();
+  leitor.onload = (e) => {
+    const b = new Uint8Array(e.target.result).subarray(0, 8);
+    const achado = ASSINATURAS.find(a => a.bytes.every((v, i) => b[i] === v));
+    resolve(achado ? achado.tipo : null);
+  };
+  leitor.onerror = () => resolve(null);
+  leitor.readAsArrayBuffer(arquivo.slice(0, 8));
+});
+
+// Devolve null quando está tudo certo, ou a mensagem de erro
+const validarArquivo = async (arquivo, permitidos, limiteMB) => {
+  if (!arquivo) return "Nenhum arquivo escolhido.";
+  const mb = arquivo.size / (1024 * 1024);
+  if (mb > limiteMB) return `Arquivo de ${mb.toFixed(1)} MB. O limite é ${limiteMB} MB — comprima ou escolha outro.`;
+  const real = await lerAssinatura(arquivo);
+  if (!real) return "Não reconheci o formato deste arquivo. Envie PNG, JPG ou PDF.";
+  if (!permitidos.includes(real)) {
+    return `Este arquivo é ${real.toUpperCase()}, que não é aceito aqui. Envie ${permitidos.map(p=>p.toUpperCase()).join(" ou ")}.`;
+  }
+  return null;
+};
+
 // Logo do MySindi, redesenhada em vetor a partir dos arquivos da marca.
 // `light` troca para a versão de fundo escuro; `soSimbolo` omite o texto,
 // para usos apertados como favicon e cantos de documento.
@@ -3416,7 +3456,7 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u && (modoVisitante || portalMoradorId)) {
-        try { await signInWithEmailAndPassword(auth, VISITANTE_EMAIL, VISITANTE_SENHA); }
+        try { await signInAnonymously(auth); }
         catch (e) { setAuthChecked(true); }
         return;
       }
@@ -3425,7 +3465,7 @@ export default function App() {
     return unsub;
   }, []);
 
-  const ehVisitante = user?.email === VISITANTE_EMAIL;
+  const ehVisitante = !!user?.isAnonymous;
   const perm = ehVisitante ? { abas:null, podeEscrever:false, podeConfigurar:false, podeRemoverMorador:false } : infoPapel(papelUsuario);
   // readOnly = "não pode escrever". Cobre visitante e conselho fiscal.
   const readOnly = ehVisitante || !perm.podeEscrever;
@@ -3955,6 +3995,74 @@ export default function App() {
   };
 
   // ── Zerar atrasos: este mês limpo, contagem começa no mês que vem ──
+  // ── LGPD: direitos do titular ──
+  // O morador pode pedir uma cópia dos próprios dados ou a exclusão deles.
+  // A exclusão preserva o registro financeiro anonimizado, que o condomínio
+  // precisa manter por obrigação contábil.
+  const exportarDadosTitular = async (m) => {
+    try {
+      const daUnidade = (r) => (r.moradorId && r.moradorId === m.id)
+        || (r.unidade && m.unidade && normalizarTexto(r.unidade) === normalizarTexto(m.unidade));
+      const pacote = {
+        geradoEm: new Date().toISOString(),
+        condominio: nomeCond(),
+        titular: {
+          nome: m.nome, unidade: m.unidade, email: m.email, telefone: m.telefone,
+          tipo: m.tipo, proprietario: m.proprietario, veiculos: m.veiculos, pets: m.pets,
+          cadastradoEm: m.cadastradoEm || null, origemCadastro: m.origemCadastro || null,
+        },
+        cobrancas:   cobrancas.filter(c => c.moradorId === m.id),
+        acessos:     acessos.filter(daUnidade),
+        entregas:    entregas.filter(daUnidade),
+        reservas:    reservas.filter(daUnidade),
+        ocorrencias: ocorrencias.filter(daUnidade),
+      };
+      const blob = new Blob([JSON.stringify(pacote, null, 2)], { type:"application/json;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a2 = document.createElement("a");
+      a2.href = url;
+      a2.download = `dados-${normalizarTexto(m.nome).replace(/[^a-z0-9]+/g,"-")}-${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
+      URL.revokeObjectURL(url);
+      registrarLog("📄", `Dados exportados a pedido do titular: ${m.nome} (${m.unidade})`);
+      showToast("Arquivo gerado. Entregue ao morador que solicitou.");
+    } catch (e) {
+      console.error("Erro ao exportar dados do titular:", e);
+      showToast("Não foi possível gerar o arquivo. Tente de novo.", "error");
+    }
+  };
+
+  const anonimizarTitular = async (m) => {
+    const cobs = cobrancas.filter(c => c.moradorId === m.id);
+    const pagas = cobs.filter(c => c.status === "pago").length;
+    if (!await confirmar({
+      titulo: `Anonimizar os dados de ${m.nome}?`,
+      mensagem: "Use quando o morador exercer o direito de exclusão previsto na LGPD.",
+      detalhes: [
+        "Nome, e-mail, telefone e veículos são apagados",
+        `As ${cobs.length} cobrança(s) permanecem sem identificação, para a contabilidade do condomínio`,
+        ...(pagas ? [`Inclui ${pagas} pagamento(s) quitado(s), que o condomínio precisa manter`] : []),
+        "Esta ação não pode ser desfeita",
+      ],
+      textoConfirmar: "Anonimizar",
+      perigo: true,
+    })) return;
+    try {
+      await setDoc(doc(db, "moradores", m.id), {
+        nome: `Unidade ${m.unidade}`,
+        email: "", telefone: "", proprietario: "", veiculos: "", pets: "",
+        tokenPortal: null,
+        anonimizadoEm: new Date().toISOString(),
+        anonimizadoPor: user?.email || "",
+      }, { merge:true });
+      registrarLog("🔒", `Dados anonimizados a pedido do titular — unidade ${m.unidade}`);
+      showToast("Dados pessoais removidos. O histórico financeiro foi preservado sem identificação.");
+    } catch (e) {
+      console.error("Erro ao anonimizar:", e);
+      showToast("Não foi possível concluir. Tente de novo.", "error");
+    }
+  };
+
   // Cobranças órfãs: têm moradorId de um morador daqui, mas condominioId ausente ou de outro
   // condomínio. O síndico nunca as via (a lista dele filtra por condominioId), mas o portal
   // do morador as exibia. Esta rotina varre por morador e limpa o que não pertence a este condomínio.
@@ -4018,7 +4126,9 @@ export default function App() {
   // tem limite de ~1 MB, e uma foto de celular passa disso sozinha.
   const salvarLogo = async (arquivo) => {
     if (!arquivo || salvandoLogo) return;
-    if (!arquivo.type.startsWith("image/")) { showToast("Escolha um arquivo de imagem (PNG ou JPG).", "error"); return; }
+    // SVG fica de fora de propósito: pode conter script que executaria no navegador
+    const erroArq = await validarArquivo(arquivo, ["png","jpg","webp"], LIMITES_ARQUIVO.imagem);
+    if (erroArq) { showToast(erroArq, "error"); return; }
     setSalvandoLogo(true);
     try {
       const base64 = await new Promise((res, rej) => {
@@ -4305,6 +4415,16 @@ export default function App() {
     setProgressoLeitura("");
     try {
       const nome = arquivo.name.toLowerCase();
+      const ehTexto = /\.(csv|txt)$/.test(nome);
+      const permitidos = ehTexto ? null : (/\.(xlsx|xls)$/.test(nome) ? ["zip"] : ["png","jpg","webp"]);
+      const limite = /\.(xlsx|xls|csv|txt)$/.test(nome) ? LIMITES_ARQUIVO.planilha : LIMITES_ARQUIVO.imagem;
+      // Arquivo de texto puro não tem assinatura de bytes: valida só o tamanho
+      if (permitidos) {
+        const erroArq = await validarArquivo(arquivo, permitidos, limite);
+        if (erroArq) { showToast(erroArq, "error"); return; }
+      } else if (arquivo.size / (1024*1024) > limite) {
+        showToast(`Arquivo muito grande. O limite é ${limite} MB.`, "error"); return;
+      }
 
       // Planilha do Excel / LibreOffice
       if (/\.(xlsx|xls)$/.test(nome)) {
@@ -4917,6 +5037,10 @@ export default function App() {
   // ── Documentos ──
   const salvarDocumento = async () => {
     if (!novoDocumento.nome.trim()) { showToast("Informe o nome do documento.", "error"); return; }
+    if (novoDocumento.arquivo) {
+      const erroArq = await validarArquivo(novoDocumento.arquivo, ["png","jpg","pdf"], LIMITES_ARQUIVO.pdf);
+      if (erroArq) { showToast(erroArq, "error"); return; }
+    }
     let base64 = null;
     if (novoDocumento.arquivo) {
       base64 = await new Promise((res) => {
@@ -6811,6 +6935,8 @@ export default function App() {
                                         { icon:"link", label:"Copiar link do portal", onClick: () => { navigator.clipboard.writeText(linkMorador(m)); showToast("Link copiado."); } },
                                         !readOnly && { icon:"unlock", label:"Gerar link novo", cor:D.warning, onClick: () => revogarLinkPortal(m) },
                                         !readOnly && { icon:"logPencil", label:"Editar morador", onClick: () => abrirEditar(m) },
+                                        !readOnly && { icon:"histDoc", label:"Exportar dados (LGPD)", separar:true, onClick: () => exportarDadosTitular(m) },
+                                        !readOnly && perm.podeRemoverMorador && { icon:"lock", label:"Anonimizar (LGPD)", cor:D.warning, onClick: () => anonimizarTitular(m) },
                                         !readOnly && { icon:"logTrash", label:"Remover morador", cor:D.danger, separar:true, onClick: () => removerMorador(m.id) },
                                       ]} />
                                   </div>
@@ -8820,7 +8946,14 @@ export default function App() {
           <div onClick={() => fileRef.current.click()} style={{ marginTop:6, border:`2px dashed ${D.border}`, borderRadius:8, padding:"18px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:D.textSec, fontSize:13 }}>
             {pagForm.arquivoNome ? <span style={{color:D.accent,fontWeight:600,display:"inline-flex",alignItems:"center",gap:6}}><NavIcon id="histDoc" size={14} /> {pagForm.arquivoNome}</span> : <><div style={{display:"flex",justifyContent:"center",marginBottom:6,color:D.textMut}}><NavIcon id="download" size={20} /></div>Toque para selecionar</>}
           </div>
-          <input ref={fileRef} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f=e.target.files[0]; if(f) setPagForm(p=>({...p,arquivo:f,arquivoNome:f.name})); }} />
+          <input ref={fileRef} type="file" accept="image/png,image/jpeg,application/pdf" style={{ display:"none" }}
+            onChange={async e => {
+              const f = e.target.files?.[0]; e.target.value = "";
+              if (!f) return;
+              const erro = await validarArquivo(f, ["png","jpg","pdf"], LIMITES_ARQUIVO.pdf);
+              if (erro) { showToast(erro, "error"); return; }
+              setPagForm(p => ({ ...p, arquivo:f, arquivoNome:f.name }));
+            }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer" }}>Cancelar</button>
             <button onClick={() => registrarPagamento(modal.data.moradorId)} style={{ padding:"10px 20px", background:D.success, color:"#fff", border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>✓ Confirmar</button>
@@ -9845,7 +9978,14 @@ export default function App() {
           <div onClick={() => fileRefDespesa.current.click()} style={{ marginTop:6, border:`2px dashed ${D.border}`, borderRadius:8, padding:"16px", textAlign:"center", cursor:"pointer", background:"#F8FAFC", color:D.textSec, fontSize:13 }}>
             {novaDespesa.arquivoNome ? <span style={{color:D.accent,fontWeight:600,display:"inline-flex",alignItems:"center",gap:6}}><NavIcon id="histDoc" size={14} /> {novaDespesa.arquivoNome}</span> : <>📁 Toque para selecionar</>}
           </div>
-          <input ref={fileRefDespesa} type="file" accept="image/*,.pdf" style={{ display:"none" }} onChange={e => { const f=e.target.files[0]; if(f) setNovaDespesa(p=>({...p,arquivo:f,arquivoNome:f.name})); }} />
+          <input ref={fileRefDespesa} type="file" accept="image/png,image/jpeg,application/pdf" style={{ display:"none" }}
+            onChange={async e => {
+              const f = e.target.files?.[0]; e.target.value = "";
+              if (!f) return;
+              const erro = await validarArquivo(f, ["png","jpg","pdf"], LIMITES_ARQUIVO.pdf);
+              if (erro) { showToast(erro, "error"); return; }
+              setNovaDespesa(p => ({ ...p, arquivo:f, arquivoNome:f.name }));
+            }} />
           <div style={{ display:"flex", gap:8, marginTop:20, justifyContent:"flex-end" }}>
             <button onClick={() => setModal(null)} style={{ padding:"10px 18px", background:"#F1F5F9", color:D.text, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>Cancelar</button>
             <button onClick={adicionarDespesa} style={{ padding:"10px 20px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontFamily:D.fontBody, fontSize:13, fontWeight:700, cursor:"pointer" }}>+ Registrar</button>

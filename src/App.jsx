@@ -411,7 +411,7 @@ const TopBar = ({ title, user, readOnly, nPendentes, moradores, onBuscar, onConf
                   </a>
                   <div style={{ height:1, background:D.border, margin:"6px 8px" }} />
                   <button onClick={async ()=>{ setMenuAberto(false); await signOut(auth); if (readOnly) window.location.href = window.location.origin + window.location.pathname; }} style={{ display:"flex", alignItems:"center", gap:11, width:"100%", padding:"10px 12px", background:"none", border:"none", borderRadius:D.radiusSm, cursor:"pointer", fontFamily:D.fontBody, fontSize:14, color:D.danger, textAlign:"left" }}>
-                    <span style={{ fontSize:16 }}>🚪</span> Sair
+                    <span style={{ display:"flex" }}><NavIcon id="sair" size={16} /></span> Sair
                   </button>
                 </div>
               </div>
@@ -2558,6 +2558,8 @@ const NAV_ICON_PATHS = {
   sino:        '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   busca:       '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
   fechar:      '<path d="M18 6 6 18M6 6l12 12"/>',
+  menu:        '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  sair:        '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
   clock:       '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   catLuz:      '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
   catLimpeza:  '<path d="M12 3l1.6 4.8L18 9l-4.4 1.2L12 15l-1.6-4.8L6 9l4.4-1.2z"/><path d="M5 18l1.5 1.5M18 4l1 1"/>',
@@ -5728,46 +5730,31 @@ export default function App() {
 
   const [maisAberto, setMaisAberto] = useState(false);
 
+  // Barra de baixo: só as três de uso diário. As demais ficam no menu lateral,
+  // que cabe todas sem apertar. Antes eram cinco, com os rótulos cortados.
   const navPrincipal = [
-    { id:"dashboard", icon:"📊", label:"Dashboard" },
-    { id:"cobrancas", icon:"💰", label:"Cobranças"  },
-    { id:"moradores", icon:"👥", label:"Moradores"  },
-    { id:"despesas",  icon:"💧", label:"Água/Luz"   },
-    { id:"servicos",  icon:"🔧", label:"Serviços"   },
+    { id:"dashboard", label:"Início"    },
+    { id:"cobrancas", label:"Cobranças" },
+    { id:"moradores", label:"Moradores" },
   ].filter(i => podeVerAba(i.id));
-  const navSecundario = [
-    { id:"reservas",    icon:"📅", label:"Reservas"    },
-    { id:"acessos",     icon:"🚪", label:"Acessos"     },
-    { id:"entregas",    icon:"📦", label:"Entregas"    },
-    { id:"comunicados", icon:"📢", label:"Comunicados" },
-    { id:"ocorrencias", icon:"🛎️", label:"Ocorrências" },
-    { id:"enquetes",    icon:"🗳️", label:"Consultas"    },
-    { id:"documentos",  icon:"📁", label:"Documentos"  },
-    { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
-    { id:"fluxoCaixa",  icon:"📈", label:"Fluxo de Caixa" },
-    { id:"agenda",      icon:"🗓️", label:"Agenda"      },
-    { id:"historico",   icon:"📋", label:"Histórico"   },
-    ...(perm.podeConfigurar ? [{ id:"config", icon:"⚙️", label:"Config."  }] : []),
-  ].filter(i => podeVerAba(i.id));
-
   const navItems = [
-    { id:"dashboard",   icon:"📊", label:"Dashboard"   },
-    { id:"cobrancas",   icon:"💰", label:"Cobranças"   },
-    { id:"moradores",   icon:"👥", label:"Moradores"   },
-    { id:"despesas",    icon:"💧", label:"Água/Luz"    },
-    { id:"servicos",    icon:"🔧", label:"Serviços"    },
-    { id:"reservas",    icon:"📅", label:"Reservas"    },
-    { id:"acessos",     icon:"🚪", label:"Acessos"     },
-    { id:"entregas",    icon:"📦", label:"Entregas"    },
-    { id:"comunicados", icon:"📢", label:"Comunicados" },
-    { id:"ocorrencias", icon:"🛎️", label:"Ocorrências" },
-    { id:"enquetes",    icon:"🗳️", label:"Consultas"    },
-    { id:"documentos",  icon:"📁", label:"Documentos"  },
-    { id:"fundoReserva",icon:"🏦", label:"Fundo"       },
-    { id:"fluxoCaixa",  icon:"📈", label:"Fluxo de Caixa" },
-    { id:"agenda",      icon:"🗓️", label:"Agenda"      },
-    { id:"historico",   icon:"📋", label:"Histórico"   },
-    ...(perm.podeConfigurar ? [{ id:"config", icon:"⚙️", label:"Config." }] : []),
+    { id:"dashboard", label:"Dashboard"   },
+    { id:"cobrancas", label:"Cobranças"   },
+    { id:"moradores", label:"Moradores"   },
+    { id:"despesas", label:"Água/Luz"    },
+    { id:"servicos", label:"Serviços"    },
+    { id:"reservas", label:"Reservas"    },
+    { id:"acessos", label:"Acessos"     },
+    { id:"entregas", label:"Entregas"    },
+    { id:"comunicados", label:"Comunicados" },
+    { id:"ocorrencias", label:"Ocorrências" },
+    { id:"enquetes", label:"Consultas"    },
+    { id:"documentos", label:"Documentos"  },
+    { id:"fundoReserva", label:"Fundo"       },
+    { id:"fluxoCaixa", label:"Fluxo de Caixa" },
+    { id:"agenda", label:"Agenda"      },
+    { id:"historico", label:"Histórico"   },
+    ...(perm.podeConfigurar ? [{ id:"config", label:"Config." }] : []),
   ].filter(i => podeVerAba(i.id));
 
   // Se o papel não dá acesso à aba atual, leva para a primeira permitida.
@@ -6007,7 +5994,7 @@ export default function App() {
             </div>
             {readOnly && (
               <button onClick={async () => { await signOut(auth); window.location.href = window.location.origin + window.location.pathname; }} style={{ width:"100%", marginTop:8, padding:"8px 11px", background:"rgba(184,114,0,.15)", border:`1px solid rgba(184,114,0,.3)`, borderRadius:8, color:"#FCD34D", fontFamily:D.fontBody, fontSize:11.5, fontWeight:500, textAlign:"center", cursor:"pointer" }}>
-                👁️ Modo Visualização — Sair
+                <span style={{ display:"inline-flex", alignItems:"center", gap:7 }}><NavIcon id="sair" size={14} /> Sair da visualização</span>
               </button>
             )}
           </div>
@@ -6017,56 +6004,87 @@ export default function App() {
       {/* ── Barra de navegação inferior (mobile) ── */}
       {isMobile && (
         <>
-          {/* Painel "Mais" */}
+          {/* Menu lateral: cabe todas as abas, agrupadas, com quem está logado no topo */}
           {maisAberto && (
-            <div style={{ position:"fixed", inset:0, zIndex:498 }} onClick={() => setMaisAberto(false)}>
-              <div style={{ position:"absolute", bottom:68, left:0, right:0, background:D.sidebar, borderTop:`1px solid ${D.sidebarBdr}`, padding:"8px 12px 12px", boxShadow:"0 -8px 24px rgba(0,0,0,.3)" }} onClick={e=>e.stopPropagation()}>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:4, marginBottom:8 }}>
-                  {navSecundario.map(n => {
-                    const bloqueado = !podeUsar(n.id);
-                    return (
-                    <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ background: aba===n.id ? D.sidebarAct : "transparent", border:"none", cursor:"pointer", padding:"10px 4px", display:"flex", flexDirection:"column", alignItems:"center", gap:4, color: aba===n.id ? "#fff" : "rgba(226,232,245,0.75)", borderRadius:10, fontFamily:D.fontBody, position:"relative" }}>
-                      <span style={{ display:"flex" }}><NavIcon id={n.id} size={20} /></span>
-                      <span style={{ fontSize:10, fontWeight: aba===n.id?600:400 }}>{n.label}</span>
-                      {bloqueado && <span style={{ position:"absolute", top:4, right:8, display:"flex", opacity:.7 }}><NavIcon id="lock" size={11} /></span>}
-                    </button>
-                    );
-                  })}
+            <>
+              <div onClick={() => setMaisAberto(false)}
+                style={{ position:"fixed", inset:0, background:"rgba(13,27,46,.55)", zIndex:498 }} />
+              <div style={{ position:"fixed", top:0, left:0, bottom:0, width:"min(82vw, 310px)", background:D.sidebar, zIndex:499, display:"flex", flexDirection:"column", boxShadow:"4px 0 24px rgba(0,0,0,.35)" }}>
+
+                {/* Quem está logado e em qual condomínio */}
+                <div style={{ padding:"18px 18px 16px", borderBottom:`1px solid ${D.sidebarBdr}`, display:"flex", alignItems:"center", gap:11, flexShrink:0 }}>
+                  <div style={{ width:38, height:38, borderRadius:"50%", background:D.marca, color:D.dark, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:16, fontWeight:700, flexShrink:0 }}>
+                    {(user?.email || "?").charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ minWidth:0, flex:1 }}>
+                    <div style={{ fontFamily:D.fontBody, fontSize:13.5, fontWeight:600, color:D.sidebarFg, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                      {readOnly ? "Modo visualização" : infoPapel(papelUsuario).label}
+                    </div>
+                    <div style={{ fontFamily:D.fontBody, fontSize:11.5, color:D.textMut, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                      {nomeCond()}
+                    </div>
+                  </div>
+                  <button onClick={() => setMaisAberto(false)} title="Fechar menu"
+                    style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer", flexShrink:0 }}>
+                    <NavIcon id="fechar" size={17} />
+                  </button>
                 </div>
-                <div style={{ borderTop:`1px solid ${D.sidebarBdr}`, paddingTop:8 }}>
-                  {readOnly ? (
-                    <button onClick={async () => { await signOut(auth); window.location.href = window.location.origin+window.location.pathname; }} style={{ width:"100%", padding:"10px", background:"rgba(252,211,77,.1)", border:`1px solid rgba(252,211,77,.2)`, borderRadius:10, color:"#FCD34D", fontFamily:D.fontBody, fontSize:13, fontWeight:500, cursor:"pointer" }}>
-                      👁️ Modo Visualização — Sair
-                    </button>
-                  ) : (
-                    <button onClick={() => signOut(auth)} style={{ width:"100%", padding:"10px", background:"rgba(224,58,34,.12)", border:`1px solid rgba(224,58,34,.2)`, borderRadius:10, color:"#FCA5A5", fontFamily:D.fontBody, fontSize:13, fontWeight:500, cursor:"pointer" }}>
-                      🚪 Sair do sistema
-                    </button>
-                  )}
+
+                {/* Abas agrupadas */}
+                <div style={{ flex:1, overflowY:"auto", padding:"10px 0" }}>
+                  {gruposNav.map((grupo) => (
+                    <div key={grupo.titulo} style={{ marginBottom:6 }}>
+                      <div style={{ fontFamily:D.fontBody, fontSize:10.5, fontWeight:700, color:D.textMut, textTransform:"uppercase", letterSpacing:"1px", padding:"10px 18px 6px" }}>
+                        {grupo.titulo}
+                      </div>
+                      {grupo.ids.map(id => {
+                        const ativo = aba === id;
+                        const bloqueado = !podeUsar(id);
+                        return (
+                          <button key={id} onClick={() => { setAba(id); setMaisAberto(false); }}
+                            style={{ display:"flex", alignItems:"center", gap:13, width:"100%", padding:"12px 18px", background: ativo?D.sidebarAct:"transparent", border:"none", borderLeft:`3px solid ${ativo?D.marcaClara:"transparent"}`, cursor:"pointer", textAlign:"left", fontFamily:D.fontBody, opacity: bloqueado?.5:1 }}>
+                            <span style={{ display:"flex", color: ativo?D.marcaClara:D.sidebarFg, flexShrink:0 }}><NavIcon id={id} size={19} /></span>
+                            <span style={{ flex:1, fontSize:14, fontWeight: ativo?600:400, color: ativo?D.marcaClara:D.sidebarFg, minWidth:0 }}>
+                              {labelPorId[id] || id}
+                            </span>
+                            {bloqueado && <span style={{ display:"flex", color:D.textMut, flexShrink:0 }}><NavIcon id="lock" size={13} /></span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Sair: discreto, longe das abas de uso diário */}
+                <div style={{ borderTop:`1px solid ${D.sidebarBdr}`, padding:"10px 8px", flexShrink:0 }}>
+                  <button onClick={async () => {
+                      if (readOnly) { await signOut(auth); window.location.href = window.location.origin + window.location.pathname; }
+                      else signOut(auth);
+                    }}
+                    style={{ display:"flex", alignItems:"center", gap:13, width:"100%", padding:"12px 10px", background:"none", border:"none", cursor:"pointer", textAlign:"left", fontFamily:D.fontBody, borderRadius:D.radiusSm }}>
+                    <span style={{ display:"flex", color:D.textMut, flexShrink:0 }}><NavIcon id="sair" size={18} /></span>
+                    <span style={{ fontSize:13.5, color:D.textMut }}>{readOnly ? "Sair da visualização" : "Sair do sistema"}</span>
+                  </button>
                 </div>
               </div>
-            </div>
+            </>
           )}
-          {/* Barra principal */}
-          <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:D.sidebar, display:"flex", zIndex:499, boxShadow:`0 -1px 0 ${D.sidebarBdr}, 0 -4px 16px rgba(28,45,94,.4)`, paddingBottom:"env(safe-area-inset-bottom,0)", height:64 }}>
+
+          {/* Barra de baixo */}
+          <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:D.sidebar, display:"flex", zIndex:497, boxShadow:`0 -1px 0 ${D.sidebarBdr}, 0 -4px 16px rgba(0,0,0,.18)` }}>
             {navPrincipal.map(n => {
-              const ativo = aba===n.id;
+              const ativo = aba===n.id && !maisAberto;
               return (
-              <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, color: ativo ? "#2DD4BF" : "rgba(226,232,245,0.72)", borderTop: ativo ? `2px solid #2DD4BF` : "2px solid transparent", fontFamily:D.fontBody }}>
+              <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 4px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:4, color: ativo?D.marcaClara:D.sidebarFg, fontFamily:D.fontBody, opacity: ativo?1:.75 }}>
                 <span style={{ display:"flex", height:20, alignItems:"center" }}><NavIcon id={n.id} size={20} /></span>
-                <span style={{ fontSize:9.5, fontWeight: ativo?600:400, lineHeight:1 }}>{n.label}</span>
+                <span style={{ fontSize:10, fontWeight: ativo?600:400, lineHeight:1 }}>{n.label}</span>
               </button>
               );
             })}
-            {(() => {
-              const ativo = maisAberto || navSecundario.some(n=>n.id===aba);
-              return (
-              <button onClick={() => setMaisAberto(v=>!v)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 2px 8px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, color: ativo ? "#2DD4BF" : "rgba(226,232,245,0.72)", borderTop: ativo ? `2px solid #2DD4BF` : "2px solid transparent", fontFamily:D.fontBody }}>
-                <span style={{ display:"flex", height:20, alignItems:"center" }}><NavIcon id="mais" size={20} /></span>
-                <span style={{ fontSize:9.5, fontWeight: ativo?600:400, lineHeight:1 }}>Mais</span>
-              </button>
-              );
-            })()}
+            <button onClick={() => setMaisAberto(v=>!v)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 4px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:4, color: maisAberto?D.marcaClara:D.sidebarFg, fontFamily:D.fontBody, opacity: maisAberto?1:.75 }}>
+              <span style={{ display:"flex", height:20, alignItems:"center" }}><NavIcon id="menu" size={20} /></span>
+              <span style={{ fontSize:10, fontWeight: maisAberto?600:400, lineHeight:1 }}>Menu</span>
+            </button>
           </nav>
         </>
       )}

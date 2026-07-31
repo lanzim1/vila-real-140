@@ -12,6 +12,17 @@
       href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <style>
+      /* Respeita quem pediu menos animação no sistema — acessibilidade e
+         também quem sente desconforto com movimento na tela. */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: .01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: .01ms !important;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

@@ -343,7 +343,7 @@ const TopBar = ({ title, user, readOnly, nPendentes, moradores, onBuscar, onConf
             style={{ position:"relative", display:"flex", alignItems:"center", background:"none", border:"none", cursor:"pointer", padding:6, color: avisosAberto?D.accent:D.textSec }}>
             <NavIcon id="sino" size={20} />
             {avisos?.length > 0 && (
-              <span style={{ position:"absolute", top:0, right:0, background:D.danger, color:"#fff", fontFamily:D.fontBody, fontSize:10, fontWeight:700, minWidth:16, height:16, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 4px", border:`2px solid ${D.bgCard}` }}>{avisos.length > 99 ? "99+" : avisos.length}</span>
+              <span style={{ position:"absolute", top:-1, right:-1, boxSizing:"border-box", background:D.danger, color:"#fff", fontFamily:D.fontBody, fontSize:9.5, fontWeight:700, lineHeight:1, minWidth:17, height:17, borderRadius:9, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 4px", border:`1.5px solid ${D.bgCard}` }}>{avisos.length > 9 ? "9+" : avisos.length}</span>
             )}
           </button>
           {avisosAberto && (

@@ -6005,11 +6005,22 @@ export default function App() {
       {isMobile && (
         <>
           {/* Menu lateral: cabe todas as abas, agrupadas, com quem está logado no topo */}
-          {maisAberto && (
-            <>
-              <div onClick={() => setMaisAberto(false)}
-                style={{ position:"fixed", inset:0, background:"rgba(13,27,46,.55)", zIndex:498 }} />
-              <div style={{ position:"fixed", top:0, left:0, bottom:0, width:"min(82vw, 310px)", background:D.sidebar, zIndex:499, display:"flex", flexDirection:"column", boxShadow:"4px 0 24px rgba(0,0,0,.35)" }}>
+          {/* Fundo escurecido: aparece e some por opacidade */}
+          <div onClick={() => setMaisAberto(false)} aria-hidden={!maisAberto}
+            style={{ position:"fixed", inset:0, background:"rgba(13,27,46,.55)", zIndex:498,
+              opacity: maisAberto ? 1 : 0,
+              pointerEvents: maisAberto ? "auto" : "none",
+              transition:"opacity .26s ease" }} />
+
+          {/* Painel: fica sempre montado e desliza para dentro e para fora */}
+          <div style={{ position:"fixed", top:0, right:0, bottom:0, width:"min(82vw, 310px)", background:D.sidebar, zIndex:499, display:"flex", flexDirection:"column", boxShadow:"-4px 0 24px rgba(0,0,0,.35)",
+              transform: maisAberto ? "translateX(0)" : "translateX(100%)",
+              visibility: maisAberto ? "visible" : "hidden",
+              // A visibilidade só muda no fim do deslize, senão o painel some antes de terminar
+              transitionProperty:"transform, visibility",
+              transitionDuration:".28s, 0s",
+              transitionTimingFunction:"cubic-bezier(.32,.72,0,1)",
+              transitionDelay: maisAberto ? "0s, 0s" : "0s, .28s" }}>
 
                 {/* Quem está logado e em qual condomínio */}
                 <div style={{ padding:"18px 18px 16px", borderBottom:`1px solid ${D.sidebarBdr}`, display:"flex", alignItems:"center", gap:11, flexShrink:0 }}>
@@ -6025,8 +6036,8 @@ export default function App() {
                     </div>
                   </div>
                   <button onClick={() => setMaisAberto(false)} title="Fechar menu"
-                    style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", color:D.textMut, cursor:"pointer", flexShrink:0 }}>
-                    <NavIcon id="fechar" size={17} />
+                    style={{ width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(255,255,255,.06)", border:"none", borderRadius:9, color:D.sidebarFg, cursor:"pointer", flexShrink:0 }}>
+                    <NavIcon id="fechar" size={16} />
                   </button>
                 </div>
 
@@ -6042,7 +6053,7 @@ export default function App() {
                         const bloqueado = !podeUsar(id);
                         return (
                           <button key={id} onClick={() => { setAba(id); setMaisAberto(false); }}
-                            style={{ display:"flex", alignItems:"center", gap:13, width:"100%", padding:"12px 18px", background: ativo?D.sidebarAct:"transparent", border:"none", borderLeft:`3px solid ${ativo?D.marcaClara:"transparent"}`, cursor:"pointer", textAlign:"left", fontFamily:D.fontBody, opacity: bloqueado?.5:1 }}>
+                            style={{ display:"flex", alignItems:"center", gap:13, width:"100%", padding:"12px 18px", background: ativo?D.sidebarAct:"transparent", border:"none", borderRight:`3px solid ${ativo?D.marcaClara:"transparent"}`, cursor:"pointer", textAlign:"left", fontFamily:D.fontBody, opacity: bloqueado?.5:1, transition:"background .16s ease, border-color .16s ease" }}>
                             <span style={{ display:"flex", color: ativo?D.marcaClara:D.sidebarFg, flexShrink:0 }}><NavIcon id={id} size={19} /></span>
                             <span style={{ flex:1, fontSize:14, fontWeight: ativo?600:400, color: ativo?D.marcaClara:D.sidebarFg, minWidth:0 }}>
                               {labelPorId[id] || id}
@@ -6066,22 +6077,20 @@ export default function App() {
                     <span style={{ fontSize:13.5, color:D.textMut }}>{readOnly ? "Sair da visualização" : "Sair do sistema"}</span>
                   </button>
                 </div>
-              </div>
-            </>
-          )}
+          </div>
 
           {/* Barra de baixo */}
           <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:D.sidebar, display:"flex", zIndex:497, boxShadow:`0 -1px 0 ${D.sidebarBdr}, 0 -4px 16px rgba(0,0,0,.18)` }}>
             {navPrincipal.map(n => {
               const ativo = aba===n.id && !maisAberto;
               return (
-              <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 4px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:4, color: ativo?D.marcaClara:D.sidebarFg, fontFamily:D.fontBody, opacity: ativo?1:.75 }}>
+              <button key={n.id} onClick={() => { setAba(n.id); setMaisAberto(false); }} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 4px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:4, color: ativo?D.marcaClara:D.sidebarFg, fontFamily:D.fontBody, opacity: ativo?1:.75, transition:"color .18s ease, opacity .18s ease" }}>
                 <span style={{ display:"flex", height:20, alignItems:"center" }}><NavIcon id={n.id} size={20} /></span>
                 <span style={{ fontSize:10, fontWeight: ativo?600:400, lineHeight:1 }}>{n.label}</span>
               </button>
               );
             })}
-            <button onClick={() => setMaisAberto(v=>!v)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 4px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:4, color: maisAberto?D.marcaClara:D.sidebarFg, fontFamily:D.fontBody, opacity: maisAberto?1:.75 }}>
+            <button onClick={() => setMaisAberto(v=>!v)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"9px 4px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:4, color: maisAberto?D.marcaClara:D.sidebarFg, fontFamily:D.fontBody, opacity: maisAberto?1:.75, transition:"color .18s ease, opacity .18s ease" }}>
               <span style={{ display:"flex", height:20, alignItems:"center" }}><NavIcon id="menu" size={20} /></span>
               <span style={{ fontSize:10, fontWeight: maisAberto?600:400, lineHeight:1 }}>Menu</span>
             </button>

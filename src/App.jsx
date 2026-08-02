@@ -1925,19 +1925,26 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     return () => { u1(); };
   }, [moradorId]);
 
-  // Cobranças do morador — filtradas TAMBÉM pelo condomínio.
-  // Antes buscava só por moradorId: cobranças órfãs (sem condominioId ou de outro
-  // condomínio) apareciam no portal e o síndico nem sabia que existiam.
+  // Cobranças do morador — o filtro por condominioId vai na CONSULTA, não só no cliente.
+  //
+  // Não é só higiene de dados: a regra do Firestore para conta de gestão exige
+  // resource.data.condominioId == meuCondominio(). Numa consulta o Firestore só
+  // autoriza se conseguir casar essa condição com um filtro da própria consulta.
+  // Buscando apenas por moradorId ele não consegue provar nada e nega tudo — era o que
+  // deixava cobranças, reservas, ocorrências e votos fora do portal quando ele é aberto
+  // no mesmo navegador em que o síndico está logado (a sessão então NÃO é anônima).
+  //
+  // O doCond() continua abaixo como segunda barreira, para registros órfãos.
   useEffect(() => {
     if (!moradorId || !morador?.condominioId) return;
     const doCond = (arr) => arr.filter(x => x.condominioId === morador.condominioId);
     const uCob = onSnapshot(
-      query(collection(db, "cobrancas"), where("moradorId","==",moradorId)),
+      query(collection(db, "cobrancas"), where("condominioId","==",morador.condominioId), where("moradorId","==",moradorId)),
       s => setCobrancas(doCond(s.docs.map(d => ({ id:d.id, ...d.data() }))).sort((a,b) => b.mes.localeCompare(a.mes))),
       erroPortal("cobrancas")
     );
     const uRes = onSnapshot(
-      query(collection(db, "reservas"), where("moradorId","==",moradorId)),
+      query(collection(db, "reservas"), where("condominioId","==",morador.condominioId), where("moradorId","==",moradorId)),
       s => setReservasMor(doCond(s.docs.map(d => ({ id:d.id, ...d.data() }))).sort((a,b) => b.timestamp - a.timestamp)),
       erroPortal("reservas")
     );
@@ -1986,7 +1993,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     );
     // Ocorrências deste morador
     const u5e = onSnapshot(
-      query(collection(db, "ocorrencias"), where("moradorId","==",moradorId)),
+      query(collection(db, "ocorrencias"), where("condominioId","==",morador.condominioId), where("moradorId","==",moradorId)),
       s => setOcorrenciasMor(s.docs.map(d => ({ id:d.id, ...d.data() })).filter(o => o.condominioId === morador?.condominioId).sort((a,b) => b.timestamp - a.timestamp)),
       erroPortal("ocorrencias")
     );
@@ -1997,7 +2004,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
       erroPortal("enquetes")
     );
     const u7e = onSnapshot(
-      query(collection(db, "votos"), where("moradorId","==",moradorId)),
+      query(collection(db, "votos"), where("condominioId","==",morador.condominioId), where("moradorId","==",moradorId)),
       s => setVotosMor(s.docs.map(d => ({ id:d.id, ...d.data() }))),
       erroPortal("votos")
     );

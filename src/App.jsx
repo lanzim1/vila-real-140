@@ -3552,28 +3552,37 @@ export default function App() {
     if (!user || !condominioId) return;
     const byCond = (col) => query(collection(db, col), where("condominioId", "==", condominioId));
 
-    const u1 = onSnapshot(byCond("moradores"), s => setMoradores(s.docs.map(d => ({ id:d.id, ...d.data() }))));
-    const uEq = onSnapshot(byCond("usuarios"), s => setEquipe(s.docs.map(d => ({ id:d.id, ...d.data() }))));
-    const uPre = onSnapshot(byCond("prestacoes"), s => setPrestacoes(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.mes.localeCompare(a.mes))));
-    const uAco = onSnapshot(byCond("acordos"), s => setAcordos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
-    const uMan = onSnapshot(byCond("manutencoes"), s => setManutencoes(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (a.proximaData||"").localeCompare(b.proximaData||""))));
-    const u2 = onSnapshot(byCond("cobrancas"), s => setCobrancas(s.docs.map(d => ({ id:d.id, ...d.data() }))));
-    const u4 = onSnapshot(byCond("despesas"),  s => setDespesas(s.docs.map(d => ({ id:d.id, ...d.data() }))));
-    const u5 = onSnapshot(byCond("servicos"),  s => setServicos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
-    const u7 = onSnapshot(byCond("logs"),      s => setLogs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
-    const u8 = onSnapshot(byCond("acessos"),   s => setAcessos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
-    const u9 = onSnapshot(byCond("reservas"),  s => setReservas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
-    const u10 = onSnapshot(byCond("comunicados"), s => setComunicados(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (b.fixado?1:0)-(a.fixado?1:0) || b.timestamp - a.timestamp)));
-    const u11 = onSnapshot(byCond("documentos"), s => setDocumentos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
-    const u12 = onSnapshot(byCond("fundo_movs"), s => setFundoMovs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
-    const u13 = onSnapshot(byCond("entregas"), s => setEntregas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
-    const u14 = onSnapshot(byCond("eventos"), s => setEventos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
-    const u15 = onSnapshot(byCond("cobrancas_extras"), s => setCobrancasExtras(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
-    const u16 = onSnapshot(byCond("pag_extras"), s => setPagExtras(s.docs.map(d => ({ id:d.id, ...d.data() }))));
-    const u17 = onSnapshot(byCond("receitas"), s => setReceitas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
-    const u18 = onSnapshot(byCond("ocorrencias"), s => setOcorrencias(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
-    const u19 = onSnapshot(byCond("enquetes"), s => setEnquetes(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
-    const u20 = onSnapshot(byCond("votos"), s => setVotos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    // Envolve o listener para dizer QUAL coleção falhou. Sem isso, uma regra
+    // negada aparece como "erro de conexão" sem indicar a origem.
+    const ouvir = (col, aoReceber) => onSnapshot(byCond(col), aoReceber, (erro) => {
+      console.error(`[Firestore] Falha ao ler "${col}":`, erro.code, erro.message);
+      if (erro.code === "permission-denied") {
+        showToast(`Sem permissão para ler "${col}". Verifique as regras do Firestore.`, "error");
+      }
+    });
+
+    const u1 = ouvir("moradores", s => setMoradores(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const uEq = ouvir("usuarios", s => setEquipe(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const uPre = ouvir("prestacoes", s => setPrestacoes(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.mes.localeCompare(a.mes))));
+    const uAco = ouvir("acordos", s => setAcordos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const uMan = ouvir("manutencoes", s => setManutencoes(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (a.proximaData||"").localeCompare(b.proximaData||""))));
+    const u2 = ouvir("cobrancas", s => setCobrancas(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const u4 = ouvir("despesas",  s => setDespesas(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const u5 = ouvir("servicos",  s => setServicos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const u7 = ouvir("logs",      s => setLogs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u8 = ouvir("acessos",   s => setAcessos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u9 = ouvir("reservas",  s => setReservas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u10 = ouvir("comunicados", s => setComunicados(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (b.fixado?1:0)-(a.fixado?1:0) || b.timestamp - a.timestamp)));
+    const u11 = ouvir("documentos", s => setDocumentos(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u12 = ouvir("fundo_movs", s => setFundoMovs(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u13 = ouvir("entregas", s => setEntregas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u14 = ouvir("eventos", s => setEventos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const u15 = ouvir("cobrancas_extras", s => setCobrancasExtras(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u16 = ouvir("pag_extras", s => setPagExtras(s.docs.map(d => ({ id:d.id, ...d.data() }))));
+    const u17 = ouvir("receitas", s => setReceitas(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u18 = ouvir("ocorrencias", s => setOcorrencias(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u19 = ouvir("enquetes", s => setEnquetes(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    const u20 = ouvir("votos", s => setVotos(s.docs.map(d => ({ id:d.id, ...d.data() }))));
 
     // Config (taxa/dia de vencimento) vem do próprio documento do condomínio
     const u3 = onSnapshot(doc(db, "condominios", condominioId), d => {

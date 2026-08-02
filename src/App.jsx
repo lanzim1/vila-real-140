@@ -107,6 +107,15 @@ const mesLabel = (m) => {
   const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
   return `${meses[parseInt(mo) - 1]}/${y}`;
 };
+// Anda n meses a partir de "AAAA-MM". O Date resolve a virada de ano sozinho:
+// mesVizinho("2026-01", -1) devolve "2025-12".
+// Não confundir com somarMeses, que opera em "AAAA-MM-DD" e é usada em acordos
+// e manutenção preventiva — os dois formatos não são intercambiáveis.
+const mesVizinho = (m, n) => {
+  const [y, mo] = m.split("-").map(Number);
+  const d = new Date(y, mo - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
 
 // ── Hook de detecção de mobile ──
 function useIsMobile() {
@@ -3111,6 +3120,31 @@ const AcaoVazia = ({ icon, titulo, D }) => (
   </span>
 );
 
+// Seletor de mês com setas: o dropdown lista o ano corrente, as setas passam de
+// Jan para Dez do ano anterior sem parar. Usado em Cobranças e Moradores — fica no
+// nível de módulo justamente para não existir em duas versões que saem de sincronia.
+const SeletorMes = ({ valor, meses, rotulo, onChange, D, isMobile }) => {
+  const btn = {
+    width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center",
+    background:D.bgCard, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm,
+    cursor:"pointer", color:D.textSec, flexShrink:0, padding:0,
+  };
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:6, flex: isMobile?1:"none", minWidth:0 }}>
+      <button onClick={() => onChange(mesVizinho(valor, -1))} title="Mês anterior" aria-label="Mês anterior" style={btn}>
+        <span style={{ display:"flex", transform:"rotate(-90deg)" }}><NavIcon id="setaCima" size={15} /></span>
+      </button>
+      <select value={valor} onChange={e=>onChange(e.target.value)}
+        style={{ padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, fontFamily:D.fontBody, flex:1, minWidth:0 }}>
+        {meses.map(m => <option key={m} value={m}>{rotulo(m)}</option>)}
+      </select>
+      <button onClick={() => onChange(mesVizinho(valor, 1))} title="Próximo mês" aria-label="Próximo mês" style={btn}>
+        <span style={{ display:"flex", transform:"rotate(90deg)" }}><NavIcon id="setaCima" size={15} /></span>
+      </button>
+    </div>
+  );
+};
+
 const BarraFiltros = ({
   periodo, setPeriodo, timestamps = [], total = 0, D, isMobile, rotuloItem = "registro",
   // Linha 1 (opcionais): busca e seletor de categoria
@@ -3969,6 +4003,9 @@ export default function App() {
     // Não gera cobranças para meses anteriores ao início da cobrança (marco zero)
     const mesInicio = marcoZero ? marcoZero.slice(0,7) : null; // ex: "2026-08"
     if (mesInicio && mes < mesInicio) return;
+    // Mês futuro é só leitura. Gerar cobrança adiantada encheria o fluxo de caixa,
+    // a inadimplência e a central de avisos com pendências que ainda nem existem.
+    if (mes > mesAtual()) return;
     const existentes = new Set(cobrancas.filter(c => c.mes === mes).map(c => c.moradorId));
     const batch = writeBatch(db); let mudou = false;
     moradores.forEach(m => {
@@ -5514,6 +5551,12 @@ export default function App() {
     // Inclui o mês em que a cobrança começa, mesmo que ainda não tenha nada lançado:
     // sem isso o síndico não conseguia navegar até ele pelo seletor.
     if (marcoZero) s.add(marcoZero.slice(0,7));
+    // Os 12 meses do ano corrente entram sempre, com ou sem cobrança lançada.
+    const ano = mesAtual().slice(0,4);
+    for (let i = 1; i <= 12; i++) s.add(`${ano}-${String(i).padStart(2,"0")}`);
+    // O mês selecionado precisa estar na lista: quando as setas levam para fora do
+    // ano corrente, um <select> sem a opção correspondente aparece em branco.
+    s.add(mesSel);
     return Array.from(s).sort().reverse();
   };
   // Rótulo do seletor: avisa quando o mês não tem cobrança lançada
@@ -6444,9 +6487,7 @@ export default function App() {
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Registre pagamentos e comprovantes</p>
               </div>
               <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", width: isMobile?"100%":"auto" }}>
-                <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, flex: isMobile?1:"none" }}>
-                  {mesesDisponiveis().map(m => <option key={m} value={m}>{rotuloMesSeletor(m)}</option>)}
-                </select>
+                <SeletorMes valor={mesSel} meses={mesesDisponiveis()} rotulo={rotuloMesSeletor} onChange={mudarMes} D={D} isMobile={isMobile} />
                 <button onClick={exportarCobrancasCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, flex: isMobile?1:"none", whiteSpace:"nowrap" }}>⬇ Exportar CSV</button>
                 <button onClick={exportarPDF} title="Resumo do mês em PDF" style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
                   <NavIcon id="download" size={15} /> Relatório
@@ -6698,6 +6739,10 @@ export default function App() {
                             Ir para {mesLabel(marcoZero.slice(0,7))}
                           </button>
                         </>
+                      ) : mesSel > mesAtual() ? (
+                        <div style={{ fontSize:13, color:D.textSec, lineHeight:1.6 }}>
+                          Mês futuro. As cobranças são geradas quando o mês começa.
+                        </div>
                       ) : (
                         <div style={{ fontSize:13, color:D.textSec, lineHeight:1.6 }}>
                           {moradores.length === 0
@@ -6726,6 +6771,10 @@ export default function App() {
                               Ir para {mesLabel(marcoZero.slice(0,7))}
                             </button>
                           </>
+                        ) : mesSel > mesAtual() ? (
+                          <div style={{ fontSize:13, color:D.textSec, lineHeight:1.6, maxWidth:420, margin:"0 auto" }}>
+                            Este mês ainda não chegou. As cobranças são geradas automaticamente quando ele começar — até lá o mês fica disponível só para consulta.
+                          </div>
                         ) : moradores.length === 0 ? (
                           <div style={{ fontSize:13, color:D.textSec, lineHeight:1.6, maxWidth:420, margin:"0 auto" }}>
                             Cadastre os moradores para o sistema gerar as cobranças deste mês.
@@ -6829,9 +6878,7 @@ export default function App() {
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
                 <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{moradores.length} unidade{moradores.length!==1?"s":""} cadastrada{moradores.length!==1?"s":""}</div>
                 <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", width: isMobile?"100%":"auto" }}>
-                  <select value={mesSel} onChange={e=>mudarMes(e.target.value)} style={{ padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, fontFamily:D.fontBody, flex: isMobile?1:"none" }}>
-                    {mesesDisponiveis().map(m => <option key={m} value={m}>{rotuloMesSeletor(m)}</option>)}
-                  </select>
+                  <SeletorMes valor={mesSel} meses={mesesDisponiveis()} rotulo={rotuloMesSeletor} onChange={mudarMes} D={D} isMobile={isMobile} />
                   <button onClick={exportarMoradoresCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, flex: isMobile?1:"none", whiteSpace:"nowrap" }}>
                     ⬇ Exportar CSV
                   </button>

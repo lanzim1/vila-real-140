@@ -1905,6 +1905,12 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
   const [acessoNegado, setAcessoNegado] = useState(false);
   const isMobile = useIsMobile();
 
+  // Diz QUAL leitura falhou. O painel do síndico já fazia isso; o portal ficou de
+  // fora e por isso um permission-denied aqui aparecia sem origem no console.
+  const erroPortal = (nome) => (erro) => {
+    console.error(`[Portal] Falha ao ler "${nome}":`, erro.code, erro.message);
+  };
+
   useEffect(() => {
     if (!moradorId) return;
     const u1 = onSnapshot(doc(db, "moradores", moradorId), d => {
@@ -1915,7 +1921,7 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
       if (dados.tokenPortal && dados.tokenPortal !== portalToken) { setAcessoNegado(true); return; }
       setAcessoNegado(false);
       setMorador({ id:d.id, ...dados });
-    });
+    }, erroPortal("moradores"));
     return () => { u1(); };
   }, [moradorId]);
 
@@ -1927,11 +1933,13 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     const doCond = (arr) => arr.filter(x => x.condominioId === morador.condominioId);
     const uCob = onSnapshot(
       query(collection(db, "cobrancas"), where("moradorId","==",moradorId)),
-      s => setCobrancas(doCond(s.docs.map(d => ({ id:d.id, ...d.data() }))).sort((a,b) => b.mes.localeCompare(a.mes)))
+      s => setCobrancas(doCond(s.docs.map(d => ({ id:d.id, ...d.data() }))).sort((a,b) => b.mes.localeCompare(a.mes))),
+      erroPortal("cobrancas")
     );
     const uRes = onSnapshot(
       query(collection(db, "reservas"), where("moradorId","==",moradorId)),
-      s => setReservasMor(doCond(s.docs.map(d => ({ id:d.id, ...d.data() }))).sort((a,b) => b.timestamp - a.timestamp))
+      s => setReservasMor(doCond(s.docs.map(d => ({ id:d.id, ...d.data() }))).sort((a,b) => b.timestamp - a.timestamp)),
+      erroPortal("reservas")
     );
     return () => { uCob(); uRes(); };
   }, [moradorId, morador?.condominioId]);
@@ -1942,11 +1950,13 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     if (!morador?.condominioId) return;
     const uDoc = onSnapshot(
       query(collection(db, "documentos"), where("condominioId","==",morador.condominioId)),
-      s => setDocumentosMor(s.docs.map(d => ({ id:d.id, ...d.data() })).filter(d => d.publico))
+      s => setDocumentosMor(s.docs.map(d => ({ id:d.id, ...d.data() })).filter(d => d.publico)),
+      erroPortal("documentos")
     );
     const uPre = onSnapshot(
       query(collection(db, "prestacoes"), where("condominioId","==",morador.condominioId)),
-      s => setPrestacoesMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.mes.localeCompare(a.mes)))
+      s => setPrestacoesMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.mes.localeCompare(a.mes))),
+      erroPortal("prestacoes")
     );
     return () => { uDoc(); uPre(); };
   }, [morador?.condominioId]);
@@ -1956,34 +1966,40 @@ function PortalMorador({ moradorId, db, taxa, mesLabel, mesAtual }) {
     if (!morador?.condominioId) return;
     const u = onSnapshot(
       query(collection(db, "comunicados"), where("condominioId","==",morador.condominioId)),
-      s => setComunicadosMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (b.fixado?1:0)-(a.fixado?1:0) || b.timestamp - a.timestamp))
+      s => setComunicadosMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (b.fixado?1:0)-(a.fixado?1:0) || b.timestamp - a.timestamp)),
+      erroPortal("comunicados")
     );
     // Config do condomínio (dia de vencimento, multa/juros) para calcular encargos
     const u2 = onSnapshot(doc(db, "condominios", morador.condominioId), d => {
       if (d.exists()) setCondoConfig(d.data());
-    });
+    }, erroPortal("condominios"));
     // Cobranças extras do condomínio e os pagamentos deste morador
     const u3e = onSnapshot(
       query(collection(db, "cobrancas_extras"), where("condominioId","==",morador.condominioId)),
-      s => setExtrasMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
+      s => setExtrasMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)),
+      erroPortal("cobrancas_extras")
     );
     const u4e = onSnapshot(
       query(collection(db, "pag_extras"), where("condominioId","==",morador.condominioId)),
-      s => setPagExtrasMor(s.docs.map(d => ({ id:d.id, ...d.data() })))
+      s => setPagExtrasMor(s.docs.map(d => ({ id:d.id, ...d.data() }))),
+      erroPortal("pag_extras")
     );
     // Ocorrências deste morador
     const u5e = onSnapshot(
       query(collection(db, "ocorrencias"), where("moradorId","==",moradorId)),
-      s => setOcorrenciasMor(s.docs.map(d => ({ id:d.id, ...d.data() })).filter(o => o.condominioId === morador?.condominioId).sort((a,b) => b.timestamp - a.timestamp))
+      s => setOcorrenciasMor(s.docs.map(d => ({ id:d.id, ...d.data() })).filter(o => o.condominioId === morador?.condominioId).sort((a,b) => b.timestamp - a.timestamp)),
+      erroPortal("ocorrencias")
     );
     // Enquetes do condomínio e votos deste morador
     const u6e = onSnapshot(
       query(collection(db, "enquetes"), where("condominioId","==",morador.condominioId)),
-      s => setEnquetesMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp))
+      s => setEnquetesMor(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.timestamp - a.timestamp)),
+      erroPortal("enquetes")
     );
     const u7e = onSnapshot(
       query(collection(db, "votos"), where("moradorId","==",moradorId)),
-      s => setVotosMor(s.docs.map(d => ({ id:d.id, ...d.data() })))
+      s => setVotosMor(s.docs.map(d => ({ id:d.id, ...d.data() }))),
+      erroPortal("votos")
     );
     return () => { u(); u2(); u3e(); u4e(); u5e(); u6e(); u7e(); };
   }, [morador?.condominioId]);

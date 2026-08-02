@@ -3130,12 +3130,12 @@ const SeletorMes = ({ valor, meses, rotulo, onChange, D, isMobile }) => {
     cursor:"pointer", color:D.textSec, flexShrink:0, padding:0,
   };
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:6, flex: isMobile?1:"none", minWidth:0 }}>
+    <div style={{ display:"flex", alignItems:"center", gap:6, width: isMobile?"100%":"auto", minWidth:0 }}>
       <button onClick={() => onChange(mesVizinho(valor, -1))} title="Mês anterior" aria-label="Mês anterior" style={btn}>
         <span style={{ display:"flex", transform:"rotate(-90deg)" }}><NavIcon id="setaCima" size={15} /></span>
       </button>
       <select value={valor} onChange={e=>onChange(e.target.value)}
-        style={{ padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, fontFamily:D.fontBody, flex:1, minWidth:0 }}>
+        style={{ padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, fontFamily:D.fontBody, flex:1, minWidth:130 }}>
         {meses.map(m => <option key={m} value={m}>{rotulo(m)}</option>)}
       </select>
       <button onClick={() => onChange(mesVizinho(valor, 1))} title="Próximo mês" aria-label="Próximo mês" style={btn}>
@@ -3635,10 +3635,16 @@ export default function App() {
         setConfigCarregada(true); // condomínio sem documento: também é um estado conhecido
       }
     });
-    // Observações: doc com id composto condominioId_mes
+    // Observações: doc com id composto condominioId_mes.
+    // Não passa pelo `ouvir` acima porque é doc() avulso, não uma coleção filtrada —
+    // por isso precisa do próprio handler, senão o erro sai sem dizer a origem.
     const u6 = onSnapshot(doc(db, "observacoes", `${condominioId}_${mesSel}`), d => {
       const texto = d.exists() ? (d.data().texto || "") : "";
       setObsMes(texto); setObsSalva(texto);
+    }, (erro) => {
+      console.error(`[Firestore] Falha ao ler "observacoes/${condominioId}_${mesSel}":`, erro.code, erro.message);
+      // Mês sem observação salva ainda não deve derrubar a tela: mostra o campo vazio.
+      setObsMes(""); setObsSalva("");
     });
 
     return () => { u1(); uEq(); uMan(); uAco(); uPre(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); u13(); u14(); u15(); u16(); u17(); u18(); u19(); u20(); };
@@ -4327,10 +4333,19 @@ export default function App() {
     setMesSel(m);
     setSelCob([]);
     garantirMes(m);
-    const snap = await getDoc(doc(db, "observacoes", `${condominioId}_${m}`));
-    const texto = snap.exists() ? (snap.data().texto || "") : "";
-    setObsMes(texto);
-    setObsSalva(texto);
+    // A leitura da observação não pode derrubar a troca de mês. Sem o try, uma regra
+    // negada abortava a função e o campo ficava com o texto do mês anterior.
+    // O listener u6 já recarrega esse mesmo documento quando mesSel muda.
+    try {
+      const snap = await getDoc(doc(db, "observacoes", `${condominioId}_${m}`));
+      const texto = snap.exists() ? (snap.data().texto || "") : "";
+      setObsMes(texto);
+      setObsSalva(texto);
+    } catch (erro) {
+      console.error(`[Firestore] Falha ao ler "observacoes/${condominioId}_${m}":`, erro.code, erro.message);
+      setObsMes("");
+      setObsSalva("");
+    }
   };
 
   // ── Pagamentos ──

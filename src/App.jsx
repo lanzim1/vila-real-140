@@ -6912,26 +6912,48 @@ export default function App() {
             <TopBar title="Moradores" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
 
-              {/* Cabeçalho + ações */}
+              {/* Cabeçalho + ações.
+                  No mobile: seletor de mês + menu de ações secundárias numa linha, e
+                  só "Adicionar morador" ocupa largura total. Antes eram três botões de
+                  peso idêntico empilhados, sem indicar qual é a ação principal.
+                  O desktop cabe numa linha e ficou como estava. */}
+              {isMobile ? (
+                <div style={{ marginBottom:14 }}>
+                  <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:12 }}>
+                    <SeletorMes valor={mesSel} meses={mesesDisponiveis()} rotulo={rotuloMesSeletor} onChange={mudarMes} D={D} isMobile={isMobile} />
+                    <MenuAcoes D={D} aberto={menuAcao === "__moradores"} onToggle={() => setMenuAcao(a => a === "__moradores" ? null : "__moradores")}
+                      itens={[
+                        { icon:"download", label:"Exportar CSV", onClick: exportarMoradoresCSV },
+                        !readOnly && { icon:"entregas", label:"Importar planilha", onClick: () => setModal({ type:"importarMoradores" }) },
+                      ]} />
+                  </div>
+                  {!readOnly && (
+                    <button onClick={() => setModal({ type:"novoMorador" })} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"12px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)`, width:"100%" }}>
+                      <NavIcon id="mais" size={16} /> Adicionar morador
+                    </button>
+                  )}
+                </div>
+              ) : (
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
                 <div style={{ fontFamily:D.fontBody, fontSize:13, color:D.textSec }}>{moradores.length} unidade{moradores.length!==1?"s":""} cadastrada{moradores.length!==1?"s":""}</div>
-                <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", width: isMobile?"100%":"auto" }}>
+                <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", width:"auto" }}>
                   <SeletorMes valor={mesSel} meses={mesesDisponiveis()} rotulo={rotuloMesSeletor} onChange={mudarMes} D={D} isMobile={isMobile} />
-                  <button onClick={exportarMoradoresCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, flex: isMobile?1:"none", whiteSpace:"nowrap" }}>
-                    ⬇ Exportar CSV
+                  <button onClick={exportarMoradoresCSV} style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, whiteSpace:"nowrap" }}>
+                    <NavIcon id="download" size={15} /> Exportar CSV
                   </button>
                   {!readOnly && (
-                    <button onClick={() => setModal({ type:"importarMoradores" })} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"10px 16px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width: isMobile?"100%":"auto" }}>
+                    <button onClick={() => setModal({ type:"importarMoradores" })} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"10px 16px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width:"auto" }}>
                       <NavIcon id="entregas" size={15} /> Importar planilha
                     </button>
                   )}
                   {!readOnly && (
-                    <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)`, width: isMobile?"100%":"auto" }}>
+                    <button onClick={() => setModal({ type:"novoMorador" })} style={{ padding:"10px 16px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:`0 2px 8px rgba(30,58,114,0.25)`, width:"auto" }}>
                       + Adicionar morador
                     </button>
                   )}
                 </div>
               </div>
+              )}
 
               {/* Filtros por status + tabela */}
               {(() => {
@@ -6959,7 +6981,34 @@ export default function App() {
 
                 return (
                 <>
-                  {/* Chips de status */}
+                  {/* Filtros de status.
+                      No mobile os chips viram cartões que já mostram a contagem — assim
+                      "N unidades cadastradas" e os 4 chips (que quebravam em duas linhas)
+                      somem, e sobra espaço para a lista. Tocar no cartão ativo volta para
+                      "todos", que é o que substitui o chip Todos. */}
+                  {isMobile ? (
+                    <div style={{ marginBottom:14 }}>
+                      <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+                        {chips.filter(c => c.id!=="todos").map(c => {
+                          const ativo = filtroMorador===c.id;
+                          const temAlgum = cont[c.id] > 0;
+                          return (
+                            <button key={c.id} onClick={()=>setFiltroMorador(ativo ? "todos" : c.id)}
+                              style={{ flex:1, minWidth:0, textAlign:"left", padding:"9px 10px", background: ativo ? c.cor : (temAlgum ? D.muted : D.bgCard), border: `1.5px solid ${ativo ? c.cor : D.border}`, borderRadius:D.radiusSm, cursor:"pointer", fontFamily:D.fontBody }}>
+                              <div style={{ fontSize:11, fontWeight:600, color: ativo ? "#fff" : D.textSec, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.label}</div>
+                              <div style={{ fontSize:19, fontWeight:700, color: ativo ? "#fff" : (temAlgum ? c.cor : D.textMut), lineHeight:1.2 }}>{cont[c.id]}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, fontSize:12, color:D.textSec, fontFamily:D.fontBody }}>
+                        <span>{filtroMorador==="todos" ? `${cont.todos} unidade${cont.todos!==1?"s":""} cadastrada${cont.todos!==1?"s":""}` : `Mostrando ${lista.length} de ${cont.todos}`}</span>
+                        {filtroMorador!=="todos" && (
+                          <button onClick={()=>setFiltroMorador("todos")} style={{ background:"none", border:"none", padding:0, color:D.accent, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, whiteSpace:"nowrap" }}>Limpar filtro</button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
                   <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:16 }}>
                     {chips.map(c => {
                       // Mostra sempre os 4 filtros, mesmo zerados
@@ -6972,6 +7021,7 @@ export default function App() {
                       );
                     })}
                   </div>
+                  )}
 
                   <div style={{ background:D.bgCard, borderRadius:D.radius, boxShadow:D.shadow, border:`1px solid ${D.border}`, overflow:"hidden" }}>
                     {lista.length===0 ? (

@@ -8868,17 +8868,17 @@ export default function App() {
 
                   {!readOnly && (
                     <>
-                      <label style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"11px 18px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: salvandoLogo?"default":"pointer", opacity: salvandoLogo?.6:1, fontFamily:D.fontBody, width:"100%" }}>
+                      <label style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", gap:7, padding:"9px 16px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: salvandoLogo?"default":"pointer", opacity: salvandoLogo?.6:1, fontFamily:D.fontBody, width:"fit-content" }}>
                         <NavIcon id="download" size={15} />
                         {salvandoLogo ? "Salvando..." : logoCond ? "Trocar logo" : "Enviar logo"}
                         <input type="file" accept="image/png,image/jpeg" onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; salvarLogo(f); }} style={{ display:"none" }} />
                       </label>
                       {logoCond && (
-                        <button onClick={removerLogo} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"9px 16px", background:"none", color:D.textSec, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width:"100%", marginTop:9 }}>
+                        <button onClick={removerLogo} style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", gap:7, padding:"9px 16px", background:"none", color:D.textSec, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width:"fit-content", marginTop:9 }}>
                           <NavIcon id="logTrash" size={14} /> Remover
                         </button>
                       )}
-                      <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, textAlign:"center", marginTop:9 }}>PNG ou JPG · reduzida automaticamente</div>
+                      <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, marginTop:9 }}>PNG ou JPG · reduzida automaticamente</div>
                     </>
                   )}
                 </>

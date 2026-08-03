@@ -3147,21 +3147,26 @@ const AcaoVazia = ({ icon, titulo, D }) => (
 // Jan para Dez do ano anterior sem parar. Usado em Cobranças e Moradores — fica no
 // nível de módulo justamente para não existir em duas versões que saem de sincronia.
 const SeletorMes = ({ valor, meses, rotulo, onChange, D, isMobile }) => {
-  const btn = {
-    width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center",
-    background:D.bgCard, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm,
-    cursor:"pointer", color:D.textSec, flexShrink:0, padding:0,
+  // Setas e mês formam UM controle, com divisórias internas em vez de três peças
+  // soltas. O <select> perde a aparência nativa (appearance:none) porque o navegador
+  // encosta o texto à esquerda e desenha a própria seta — era o que deixava o mês
+  // visivelmente descentralizado entre as duas setas.
+  const seta = {
+    width:40, alignSelf:"stretch", display:"flex", alignItems:"center", justifyContent:"center",
+    background:"transparent", border:"none", cursor:"pointer", color:D.textSec, flexShrink:0, padding:0,
   };
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:6, width: isMobile?"100%":"auto", minWidth:0 }}>
-      <button onClick={() => onChange(mesVizinho(valor, -1))} title="Mês anterior" aria-label="Mês anterior" style={btn}>
+    <div style={{ display:"flex", alignItems:"stretch", height:42, background:D.bgCard, border:`1.5px solid ${D.border}`, borderRadius:9, overflow:"hidden", width: isMobile?"100%":"auto", minWidth:0 }}>
+      <button onClick={() => onChange(mesVizinho(valor, -1))} title="Mês anterior" aria-label="Mês anterior"
+        style={{ ...seta, borderRight:`1px solid ${D.border}` }}>
         <span style={{ display:"flex", transform:"rotate(-90deg)" }}><NavIcon id="setaCima" size={15} /></span>
       </button>
       <select value={valor} onChange={e=>onChange(e.target.value)}
-        style={{ padding:"9px 12px", border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, color:D.text, background:D.bgCard, fontFamily:D.fontBody, flex:1, minWidth:130 }}>
-        {meses.map(m => <option key={m} value={m}>{rotulo(m)}</option>)}
+        style={{ flex:1, minWidth:0, border:"none", outline:"none", background:"transparent", textAlign:"center", textAlignLast:"center", WebkitAppearance:"none", MozAppearance:"none", appearance:"none", fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color:D.text, letterSpacing:"-0.01em", cursor:"pointer", padding:"0 4px" }}>
+        {meses.map(m => <option key={m} value={m} style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:400 }}>{rotulo(m)}</option>)}
       </select>
-      <button onClick={() => onChange(mesVizinho(valor, 1))} title="Próximo mês" aria-label="Próximo mês" style={btn}>
+      <button onClick={() => onChange(mesVizinho(valor, 1))} title="Próximo mês" aria-label="Próximo mês"
+        style={{ ...seta, borderLeft:`1px solid ${D.border}` }}>
         <span style={{ display:"flex", transform:"rotate(90deg)" }}><NavIcon id="setaCima" size={15} /></span>
       </button>
     </div>
@@ -6519,14 +6524,37 @@ export default function App() {
           <div>
             <TopBar title="Cobranças" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
+            {/* Cabeçalho + ações.
+                No mobile o título sai: o TopBar logo acima já diz "Cobranças", e o par
+                título+subtítulo consumia uma faixa inteira sem informar nada novo.
+                Dos quatro botões de peso idêntico sobra um primário; o resto vai para o
+                menu de ações, que é onde ficam as tarefas de uma vez por mês. */}
+            {isMobile ? (
+              <div style={{ marginBottom:16 }}>
+                <div style={{ marginBottom:10 }}>
+                  <SeletorMes valor={mesSel} meses={mesesDisponiveis()} rotulo={rotuloMesSeletor} onChange={mudarMes} D={D} isMobile={isMobile} />
+                </div>
+                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                  <button onClick={() => exportarPrestacaoContas()} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"12px 14px", background:D.primary, color:D.primaryFg, border:"none", borderRadius:D.radiusSm, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, boxShadow:"0 2px 8px rgba(15,118,110,0.25)" }}>
+                    <NavIcon id="histDoc" size={16} /> Prestação de contas
+                  </button>
+                  <MenuAcoes D={D} aberto={menuAcao === "__cobrancas"} onToggle={() => setMenuAcao(a => a === "__cobrancas" ? null : "__cobrancas")}
+                    itens={[
+                      { icon:"download", label:"Exportar CSV", onClick: exportarCobrancasCSV },
+                      { icon:"download", label:"Relatório em PDF", onClick: exportarPDF },
+                      !readOnly && { icon:"link", label: publicandoPrestacao ? "Publicando..." : "Publicar no portal", cor:D.success, onClick: publicarPrestacaoContas },
+                    ]} />
+                </div>
+              </div>
+            ) : (
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16, flexWrap:"wrap", gap:10 }}>
               <div>
                 <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:0, fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Cobranças</h2>
                 <p style={{ color:D.textSec, margin:"4px 0 0", fontSize:13 }}>Registre pagamentos e comprovantes</p>
               </div>
-              <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", width: isMobile?"100%":"auto" }}>
+              <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", width:"auto" }}>
                 <SeletorMes valor={mesSel} meses={mesesDisponiveis()} rotulo={rotuloMesSeletor} onChange={mudarMes} D={D} isMobile={isMobile} />
-                <button onClick={exportarCobrancasCSV} style={{ padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, flex: isMobile?1:"none", whiteSpace:"nowrap" }}>⬇ Exportar CSV</button>
+                <button onClick={exportarCobrancasCSV} style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, whiteSpace:"nowrap" }}><NavIcon id="download" size={15} /> Exportar CSV</button>
                 <button onClick={exportarPDF} title="Resumo do mês em PDF" style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 14px", background:D.bgCard, color:D.primary, border:`1.5px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}>
                   <NavIcon id="download" size={15} /> Relatório
                 </button>
@@ -6538,9 +6566,10 @@ export default function App() {
                     <NavIcon id="link" size={15} /> {publicandoPrestacao ? "Publicando..." : "Publicar no portal"}
                   </button>
                 )}
-                {!readOnly && !isMobile && <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"9px 16px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, fontFamily:D.fontBody }}>{enviandoEmails?"Enviando...":"Cobrar pendentes"}</button>}
+                {!readOnly && <button onClick={() => dispararEmails("vencimento")} disabled={enviandoEmails} style={{ padding:"9px 16px", background:"#2E6DA4", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor: enviandoEmails?"default":"pointer", opacity: enviandoEmails?.7:1, fontFamily:D.fontBody }}>{enviandoEmails?"Enviando...":"Cobrar pendentes"}</button>}
               </div>
             </div>
+            )}
 
             {/* ── Resumo financeiro do mês ── */}
             {(() => {

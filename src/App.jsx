@@ -8838,39 +8838,81 @@ export default function App() {
           <div>
             <TopBar title="Configurações" user={user} readOnly={readOnly} nPendentes={nPagos} moradores={moradores} onBuscar={abrirMoradorBusca} onConfig={()=>setAba("config")} onPlano={()=>setModal({type:"meuPlano"})} avisos={avisos} onIrPara={setAba} />
             <div style={{ padding: isMobile?"14px 14px 80px":"24px 28px 40px" }}>
-            <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Configurações</h2>
-            <p style={{ color:D.textSec, margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>
+            {/* No mobile o título sai: o TopBar logo acima já diz "Configurações". */}
+            {!isMobile && <>
+              <h2 style={{ fontFamily:D.fontDisplay, color:D.text, margin:"0 0 6px", fontSize:h2size, letterSpacing:"-0.02em", fontWeight:600 }}>Configurações</h2>
+              <p style={{ color:D.textSec, margin:"0 0 20px", fontSize:13 }}>Parâmetros do condomínio</p>
+            </>}
 
-            {/* Card de IDENTIDADE */}
-            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?20:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.accent}`, marginBottom:20 }}>
-              <div style={{ fontFamily:D.fontBody, fontSize:10.5, fontWeight:700, color:D.accent, textTransform:"uppercase", letterSpacing:"1px", marginBottom:8 }}>Identidade</div>
-              <h3 style={{ color:D.text, margin:"0 0 4px", fontSize:15, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Logo do condomínio</h3>
-              <p style={{ color:D.textSec, fontSize:12.5, margin:"0 0 18px", lineHeight:1.6 }}>
-                Aparece nos recibos, no relatório e na prestação de contas. Use PNG ou JPG — a imagem é reduzida automaticamente.
-              </p>
+            {/* Card de IDENTIDADE.
+                No mobile a miniatura fica ao LADO do título, não acima do botão: antes
+                um quadrado de 88px de altura convivia com um botão de 38, e sobrava um
+                vão morto no meio do card. O detalhe de formato virou nota abaixo do
+                botão — é o que importa na hora de escolher o arquivo, não antes. */}
+            <div style={{ background:D.bgCard, borderRadius:D.radius, padding: isMobile?16:28, boxShadow:D.shadow, border:`1px solid ${D.border}`, borderLeft:`3px solid ${D.accent}`, marginBottom:20 }}>
+              <div style={{ fontFamily:D.fontBody, fontSize:10.5, fontWeight:700, color:D.accent, textTransform:"uppercase", letterSpacing:"1px", marginBottom: isMobile?12:8 }}>Identidade</div>
 
-              <div style={{ display:"flex", alignItems:"center", gap:18, flexWrap:"wrap" }}>
-                <div style={{ width:88, height:88, borderRadius:D.radius, border:`1.5px dashed ${logoCond?D.border:D.textMut}`, background: logoCond?"#fff":D.muted, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", flexShrink:0 }}>
-                  {logoCond
-                    ? <img src={logoCond} alt="Logo do condomínio" style={{ maxWidth:"100%", maxHeight:"100%", objectFit:"contain" }} />
-                    : <span style={{ color:D.textMut, display:"flex" }}><NavIcon id="acEmpresa" size={30} /></span>}
-                </div>
+              {isMobile ? (
+                <>
+                  <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:14 }}>
+                    <div style={{ width:56, height:56, borderRadius:D.radiusSm, border:`1.5px dashed ${logoCond?D.border:D.textMut}`, background: logoCond?"#fff":D.muted, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", flexShrink:0 }}>
+                      {logoCond
+                        ? <img src={logoCond} alt="Logo do condomínio" style={{ maxWidth:"100%", maxHeight:"100%", objectFit:"contain" }} />
+                        : <span style={{ color:D.textMut, display:"flex" }}><NavIcon id="acEmpresa" size={22} /></span>}
+                    </div>
+                    <div style={{ minWidth:0, flex:1 }}>
+                      <h3 style={{ color:D.text, margin:0, fontSize:14, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Logo do condomínio</h3>
+                      <p style={{ color:D.textSec, fontSize:11.5, margin:"2px 0 0", lineHeight:1.5 }}>Aparece nos recibos e na prestação de contas</p>
+                    </div>
+                  </div>
 
-                {!readOnly && (
-                  <div style={{ display:"flex", flexDirection:"column", gap:9, flex:1, minWidth:180 }}>
-                    <label style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"10px 18px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: salvandoLogo?"default":"pointer", opacity: salvandoLogo?.6:1, fontFamily:D.fontBody, width: isMobile?"100%":"fit-content" }}>
-                      <NavIcon id="download" size={15} />
-                      {salvandoLogo ? "Salvando..." : logoCond ? "Trocar logo" : "Enviar logo"}
-                      <input type="file" accept="image/png,image/jpeg" onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; salvarLogo(f); }} style={{ display:"none" }} />
-                    </label>
-                    {logoCond && (
-                      <button onClick={removerLogo} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"9px 16px", background:"none", color:D.textSec, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width: isMobile?"100%":"fit-content" }}>
-                        <NavIcon id="logTrash" size={14} /> Remover
-                      </button>
+                  {!readOnly && (
+                    <>
+                      <label style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"11px 18px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: salvandoLogo?"default":"pointer", opacity: salvandoLogo?.6:1, fontFamily:D.fontBody, width:"100%" }}>
+                        <NavIcon id="download" size={15} />
+                        {salvandoLogo ? "Salvando..." : logoCond ? "Trocar logo" : "Enviar logo"}
+                        <input type="file" accept="image/png,image/jpeg" onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; salvarLogo(f); }} style={{ display:"none" }} />
+                      </label>
+                      {logoCond && (
+                        <button onClick={removerLogo} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"9px 16px", background:"none", color:D.textSec, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width:"100%", marginTop:9 }}>
+                          <NavIcon id="logTrash" size={14} /> Remover
+                        </button>
+                      )}
+                      <div style={{ fontFamily:D.fontBody, fontSize:11, color:D.textMut, textAlign:"center", marginTop:9 }}>PNG ou JPG · reduzida automaticamente</div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  <h3 style={{ color:D.text, margin:"0 0 4px", fontSize:15, fontWeight:600, fontFamily:D.fontDisplay, letterSpacing:"-0.02em" }}>Logo do condomínio</h3>
+                  <p style={{ color:D.textSec, fontSize:12.5, margin:"0 0 18px", lineHeight:1.6 }}>
+                    Aparece nos recibos, no relatório e na prestação de contas. Use PNG ou JPG — a imagem é reduzida automaticamente.
+                  </p>
+
+                  <div style={{ display:"flex", alignItems:"center", gap:18, flexWrap:"wrap" }}>
+                    <div style={{ width:88, height:88, borderRadius:D.radius, border:`1.5px dashed ${logoCond?D.border:D.textMut}`, background: logoCond?"#fff":D.muted, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", flexShrink:0 }}>
+                      {logoCond
+                        ? <img src={logoCond} alt="Logo do condomínio" style={{ maxWidth:"100%", maxHeight:"100%", objectFit:"contain" }} />
+                        : <span style={{ color:D.textMut, display:"flex" }}><NavIcon id="acEmpresa" size={30} /></span>}
+                    </div>
+
+                    {!readOnly && (
+                      <div style={{ display:"flex", flexDirection:"column", gap:9, flex:1, minWidth:180 }}>
+                        <label style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"10px 18px", background:D.primary, color:"#fff", borderRadius:D.radiusSm, fontSize:13, fontWeight:600, cursor: salvandoLogo?"default":"pointer", opacity: salvandoLogo?.6:1, fontFamily:D.fontBody, width:"fit-content" }}>
+                          <NavIcon id="download" size={15} />
+                          {salvandoLogo ? "Salvando..." : logoCond ? "Trocar logo" : "Enviar logo"}
+                          <input type="file" accept="image/png,image/jpeg" onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; salvarLogo(f); }} style={{ display:"none" }} />
+                        </label>
+                        {logoCond && (
+                          <button onClick={removerLogo} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"9px 16px", background:"none", color:D.textSec, border:`1px solid ${D.border}`, borderRadius:D.radiusSm, fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody, width:"fit-content" }}>
+                            <NavIcon id="logTrash" size={14} /> Remover
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
+                </>
+              )}
             </div>
 
             {/* Card de assinatura — PLANO */}

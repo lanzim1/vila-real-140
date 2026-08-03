@@ -3486,6 +3486,9 @@ export default function App() {
   const [progressoLeitura, setProgressoLeitura] = useState("");
   const [linhasEditadas, setLinhasEditadas] = useState({});
   const [menuAcao, setMenuAcao]         = useState(null);
+  // Card de cobrança já paga: guarda qual está aberto. Comprovante e estorno ficam
+  // recolhidos porque são ações raras — o card pago some da vista sem ocupar espaço.
+  const [cardPagoAberto, setCardPagoAberto] = useState(null);
   const [confirmacao, setConfirmacao]   = useState(null);
   const respostaConfirmacao             = useRef(null);
   const [acessos, setAcessos]   = useState([]);
@@ -5974,51 +5977,110 @@ export default function App() {
   const CobCard = ({ cob }) => {
     const m = moradores.find(x => x.id === cob.moradorId);
     if (!m) return null;
-    const enc = encargosCobranca(cob);
+    const enc  = encargosCobranca(cob);
+    const pago = cob.status === "pago";
+    const atrasado = cob.status === "atrasado";
+    const temEncargo = enc.multa > 0 || enc.juros > 0;
+    const selecionado = selCob.includes(cob.moradorId);
+    const temWhats = !readOnly && linkWhatsApp(m.telefone, "");
+    const aberto = cardPagoAberto === cob.moradorId;
+
+    // Cor da barra lateral e do estado. O card pago fica inteiro em verde: com 24
+    // unidades na lista, o que já foi resolvido precisa se distinguir num relance,
+    // sem obrigar a ler linha por linha.
+    const corBarra = pago ? D.success : atrasado ? D.danger : D.warning;
+    const fundo    = pago ? "#F0FDF4" : D.bgCard;
+    const borda    = pago ? "#BBF7D0" : (selecionado ? D.primary : D.border);
+
+    // Linha que explica o estado. Antes, quem não tinha telefone simplesmente não
+    // ganhava o botão de WhatsApp e nada dizia o porquê.
+    const legenda = pago
+      ? (cob.dataPagamento ? `pago em ${cob.dataPagamento}` : "pago")
+      : atrasado && enc.diasAtraso
+        ? `atrasado ${enc.diasAtraso} dia${enc.diasAtraso !== 1 ? "s" : ""}`
+        : !temWhats && !readOnly
+          ? "sem telefone"
+          : `vence dia ${diaVencimento}`;
+    const corLegenda = pago ? "#15803D" : atrasado ? D.danger : (!temWhats && !readOnly ? D.textMut : D.warning);
+
+    const faixaBtn = {
+      flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:6,
+      padding:"10px 8px", background:"transparent", border:"none", cursor:"pointer",
+      fontFamily:D.fontBody, fontSize:12, fontWeight:600, textDecoration:"none", minWidth:0,
+    };
+
     return (
-      <div style={{ background:D.bgCard, borderRadius:D.radius, padding:16, boxShadow:D.shadow, border:`1px solid ${selCob.includes(cob.moradorId)?D.primary:D.border}`, borderLeft:`3px solid ${cob.status==="pago"?D.success:cob.status==="atrasado"?D.danger:D.warning}`, marginBottom:10 }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8, gap:10 }}>
-          <div style={{ display:"flex", alignItems:"flex-start", gap:10, minWidth:0 }}>
-            {!readOnly && cob.status !== "pago" && (
-              <input type="checkbox" checked={selCob.includes(cob.moradorId)}
-                onChange={e => setSelCob(prev => e.target.checked ? [...prev, cob.moradorId] : prev.filter(x => x !== cob.moradorId))}
-                style={{ width:18, height:18, marginTop:2, cursor:"pointer", accentColor:D.primary, flexShrink:0 }} />
-            )}
-            <div style={{ minWidth:0 }}>
-              <div style={{ fontWeight:700, color:D.text, fontSize:14 }}>{m.unidade} — {m.nome}</div>
-              <div style={{ fontSize:12, color:D.textSec, fontFamily:D.fontBody, marginTop:2, overflow:"hidden", textOverflow:"ellipsis" }}>{m.email}</div>
-            </div>
+      <div style={{ background:fundo, borderRadius:10, border:`1px solid ${borda}`, borderLeft:`3px solid ${corBarra}`, overflow:"hidden", marginBottom:8, boxShadow:D.shadow }}>
+        <div onClick={pago ? () => setCardPagoAberto(a => a === cob.moradorId ? null : cob.moradorId) : undefined}
+          style={{ padding:"11px 12px", display:"flex", alignItems:"center", gap:10, cursor: pago ? "pointer" : "default" }}>
+          {!readOnly && !pago ? (
+            <input type="checkbox" checked={selecionado}
+              onChange={e => setSelCob(prev => e.target.checked ? [...prev, cob.moradorId] : prev.filter(x => x !== cob.moradorId))}
+              style={{ width:16, height:16, cursor:"pointer", accentColor:D.primary, flexShrink:0 }} />
+          ) : <span style={{ width:16, flexShrink:0 }} />}
+
+          {/* A unidade vira o avatar: é o identificador que o síndico realmente usa. */}
+          <div style={{ width:34, height:34, borderRadius:"50%", background: pago ? D.success : D.dark, color: pago ? "#fff" : D.marcaClara, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:D.fontDisplay, fontSize:12.5, fontWeight:600, flexShrink:0 }}>
+            {pago ? <NavIcon id="logCheck" size={17} /> : m.unidade.replace(/\D/g, "") || m.unidade.slice(0,3)}
           </div>
-          {cob.acordoId ? <span style={{ display:"inline-flex", alignItems:"center", gap:6, background:D.secondary, color:D.accent, fontSize:11.5, fontWeight:600, padding:"4px 11px 4px 8px", borderRadius:20, fontFamily:D.fontBody, whiteSpace:"nowrap" }}><span style={{ width:6, height:6, borderRadius:"50%", background:D.accent }} />Em acordo</span> : <Badge status={cob.status} />}
-        </div>
-        {/* Valor da cobrança (com encargos se houver) */}
-        <div style={{ marginBottom:8 }}>
-          {enc.multa > 0 || enc.juros > 0 ? (
-            <div style={{ background:D.dangerBg, borderRadius:D.radiusSm, padding:"8px 12px" }}>
-              <div style={{ fontFamily:D.fontBody, fontSize:12, color:D.textSec }}>Taxa: R$ {enc.valorBase.toFixed(2).replace(".",",")} · multa R$ {enc.multa.toFixed(2).replace(".",",")} · juros R$ {enc.juros.toFixed(2).replace(".",",")} ({enc.diasAtraso}d)</div>
-              <div style={{ fontFamily:D.fontDisplay, fontSize:16, fontWeight:700, color:D.danger }}>Total: R$ {enc.valorTotal.toFixed(2).replace(".",",")}</div>
+
+          <div style={{ minWidth:0, flex:1 }}>
+            <div style={{ fontFamily:D.fontBody, fontSize:13, fontWeight:600, color: pago ? "#166534" : D.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{m.nome}</div>
+            <div style={{ fontFamily:D.fontBody, fontSize:11, color:corLegenda, marginTop:1 }}>{legenda}</div>
+          </div>
+
+          <div style={{ textAlign:"right", flexShrink:0 }}>
+            <div style={{ fontFamily:D.fontDisplay, fontSize:14, fontWeight:600, color: pago ? "#15803D" : temEncargo ? D.danger : D.text }}>
+              R$ {(temEncargo ? enc.valorTotal : enc.valorBase).toFixed(2).replace(".",",")}
             </div>
-          ) : (
-            <div style={{ fontFamily:D.fontDisplay, fontSize:15, fontWeight:600, color:D.text }}>R$ {enc.valorBase.toFixed(2).replace(".",",")}</div>
+            {temEncargo && (
+              <div style={{ fontFamily:D.fontBody, fontSize:10, color:D.textMut }}>
+                {enc.valorBase.toFixed(2).replace(".",",")} + {(enc.multa + enc.juros).toFixed(2).replace(".",",")}
+              </div>
+            )}
+          </div>
+
+          {pago && (cob.comprovante || !readOnly) && (
+            <span style={{ display:"flex", color:"#86EFAC", flexShrink:0, transform: aberto ? "rotate(180deg)" : "none" }}><NavIcon id="setaBaixo" size={15} /></span>
           )}
         </div>
-        {cob.dataPagamento && <div style={{ fontSize:12, color:"#9aa6b5", marginBottom:8 }}>Pago em {cob.dataPagamento}</div>}
-        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-          {cob.status !== "pago" && !readOnly && linkWhatsApp(m.telefone, "") && (
-            <a href={linkWhatsApp(m.telefone, whatsCobranca(m, cob))} target="_blank" rel="noopener noreferrer" onClick={() => registrarEnvioWhats(m)}
-              style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, flex:1, minWidth:130, padding:"10px 14px", background:D.successBg, color:D.success, border:`1px solid ${D.success}33`, borderRadius:D.radiusSm, fontSize:13, fontWeight:600, textDecoration:"none", fontFamily:D.fontBody }}>
-              <NavIcon id="whats" size={15} /> Cobrar no WhatsApp
-            </a>
-          )}
-          {cob.status !== "pago" ? (
-            !readOnly && <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.successBg, color:D.success, border:`1px solid #86EFAC`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logCheck" size={14} /> Registrar Pgto</button>
-          ) : (
-            <>
-              {cob.comprovante && <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:cob.comprovante, nome:m.nome, arquivoNome:cob.arquivoNome } })} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.bgCard, color:D.text, border:`1px solid ${D.border}`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="histDoc" size={14} /> Comprovante</button>}
-              {!readOnly && <button onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:D.bgCard, color:D.danger, border:`1px solid #FECACA`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:D.fontBody }}><NavIcon id="logUndo" size={14} /> Estornar</button>}
-            </>
-          )}
-        </div>
+
+        {cob.acordoId && (
+          <div style={{ padding:"0 12px 10px 62px", fontFamily:D.fontBody, fontSize:11, color:D.accent, fontWeight:600 }}>Em acordo de dívida</div>
+        )}
+
+        {!pago && !readOnly && (
+          <div style={{ display:"flex", borderTop:`1px solid ${D.border}` }}>
+            {temWhats && (
+              <a href={linkWhatsApp(m.telefone, whatsCobranca(m, cob))} target="_blank" rel="noopener noreferrer"
+                onClick={() => registrarEnvioWhats(m)}
+                style={{ ...faixaBtn, color:D.success, borderRight:`1px solid ${D.border}` }}>
+                <NavIcon id="whats" size={14} /> Cobrar
+              </a>
+            )}
+            <button onClick={() => { setPagForm({ obs:"", arquivo:null, arquivoNome:"", arquivoUrl:"" }); setModal({ type:"pagar", data:{ moradorId:m.id, nome:m.nome, unidade:m.unidade } }); }}
+              style={{ ...faixaBtn, color:D.success }}>
+              <NavIcon id="logCheck" size={14} /> {temWhats ? "Registrar" : "Registrar pagamento"}
+            </button>
+          </div>
+        )}
+
+        {pago && aberto && (cob.comprovante || !readOnly) && (
+          <div style={{ display:"flex", borderTop:"1px solid #BBF7D0" }}>
+            {cob.comprovante && (
+              <button onClick={() => setModal({ type:"comprovante", data:{ comprovante:cob.comprovante, nome:m.nome, arquivoNome:cob.arquivoNome } })}
+                style={{ ...faixaBtn, color:"#15803D", borderRight: !readOnly ? "1px solid #BBF7D0" : "none" }}>
+                <NavIcon id="histDoc" size={14} /> Comprovante
+              </button>
+            )}
+            {!readOnly && (
+              <button onClick={() => setModal({ type:"estorno", data:{ moradorId:m.id, nome:m.nome } })}
+                style={{ ...faixaBtn, color:D.danger }}>
+                <NavIcon id="logUndo" size={14} /> Estornar
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
   };
